@@ -1,0 +1,67 @@
+# Описание Xcode-проекта для XcodeGen — единый источник правды.
+# PersonalVPN.xcodeproj генерируется командой `make gen` и НЕ хранится в git.
+name: PersonalVPN
+
+options:
+  bundleIdPrefix: com.razhev
+  deploymentTarget:
+    iOS: "16.0"
+  createIntermediateGroups: true
+
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+    # Device-only: у OpenVPNAdapter.framework нет simulator-slice,
+    # а Network Extension в симуляторе не работает в принципе.
+    SUPPORTED_PLATFORMS: iphoneos
+    TARGETED_DEVICE_FAMILY: "1"
+    CODE_SIGN_STYLE: Automatic
+    # Team ID появится после одобрения Apple Developer аккаунта (шаг M1.1).
+    DEVELOPMENT_TEAM: ""
+    CURRENT_PROJECT_VERSION: "1"
+    MARKETING_VERSION: "0.1.0"
+
+targets:
+  PersonalVPN:
+    type: application
+    platform: iOS
+    sources:
+      - App
+      - Shared
+    dependencies:
+      # Расширение встраивается в приложение (Embed App Extensions).
+      - target: PacketTunnel
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.razhev.personalvpn
+        CODE_SIGN_ENTITLEMENTS: App/PersonalVPN.entitlements
+    info:
+      path: App/Info.plist
+      properties:
+        CFBundleDisplayName: PersonalVPN
+        UILaunchScreen: {}
+        UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
+        UIRequiresFullScreen: true
+        # Стандартная криптография (TLS/AES) — экспортное исключение;
+        # без этого флага каждая загрузка в TestFlight задаёт вопрос про шифрование.
+        ITSAppUsesNonExemptEncryption: false
+    scheme:
+      testTargets: []
+
+  PacketTunnel:
+    type: app-extension
+    platform: iOS
+    sources:
+      - PacketTunnel
+      - Shared
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.razhev.personalvpn.tunnel
+        CODE_SIGN_ENTITLEMENTS: PacketTunnel/PacketTunnel.entitlements
+    info:
+      path: PacketTunnel/Info.plist
+      properties:
+        CFBundleDisplayName: PacketTunnel
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.networkextension.packet-tunnel
+          NSExtensionPrincipalClass: $(PRODUCT_MODULE_NAME).PacketTunnelProvider

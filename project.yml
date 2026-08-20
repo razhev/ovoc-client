@@ -21,6 +21,10 @@ settings:
     CURRENT_PROJECT_VERSION: "1"
     MARKETING_VERSION: "0.1.0"
 
+packages:
+  ConfigKit:
+    path: ConfigKit
+
 targets:
   PersonalVPN:
     type: application
@@ -31,6 +35,8 @@ targets:
     dependencies:
       # Расширение встраивается в приложение (Embed App Extensions).
       - target: PacketTunnel
+      # Разбор ключа vpn:// — только в приложении; расширение не парсит ничего.
+      - package: ConfigKit
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.razhev.personalvpn

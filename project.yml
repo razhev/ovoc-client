@@ -37,6 +37,11 @@ targets:
       - target: PacketTunnel
       # Разбор ключа vpn:// — только в приложении; расширение не парсит ничего.
       - package: ConfigKit
+      # Фреймворк живёт в бандле ПРИЛОЖЕНИЯ (appex не может embed'ить фреймворки),
+      # расширение находит его через runpath ../../Frameworks.
+      - framework: Frameworks/OpenVPNAdapter.framework
+        embed: true
+        codeSign: true
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.razhev.personalvpn
@@ -60,10 +65,17 @@ targets:
     sources:
       - PacketTunnel
       - Shared
+    dependencies:
+      - framework: Frameworks/OpenVPNAdapter.framework
+        embed: false
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.razhev.personalvpn.tunnel
         CODE_SIGN_ENTITLEMENTS: PacketTunnel/PacketTunnel.entitlements
+        LD_RUNPATH_SEARCH_PATHS:
+          - "$(inherited)"
+          - "@executable_path/Frameworks"
+          - "@executable_path/../../Frameworks"
     info:
       path: PacketTunnel/Info.plist
       properties:

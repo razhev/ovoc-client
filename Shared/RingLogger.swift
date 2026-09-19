@@ -1,30 +1,49 @@
 import Foundation
 import os
 
-/// Файловый лог расширения в App Group + дублирование в os.Logger.
+/// Файловый лог в App Group + дублирование в os.Logger.
 ///
 /// Файловый канал — основной способ отладки: отладчик Xcode ломает
 /// Go-код Cloak (golang/go#57651 — под отладчиком всё работает ~5 fps
 /// и выглядит зависшим), поэтому подключать отладчик к расширению нельзя,
-/// а печатать в консоль расширение не может.
+/// а печатать в консоль расширение не может. Файлы с телефона забирает
+/// `make logs`.
 final class RingLogger {
-    static let shared = RingLogger(fileURL: SharedPaths.logFileURL, maxBytes: 256 * 1024)
+    /// Один логгер на процесс, у каждого процесса свой файл: расширение пишет
+    /// tunnel.log, приложение — app.log (двум процессам нельзя дописывать
+    /// и ротировать один и тот же файл).
+    static let shared: RingLogger = {
+        let isExtension = Bundle.main.bundleURL.pathExtension == "appex"
+        return RingLogger(
+            fileURL: isExtension ? SharedPaths.logFileURL : SharedPaths.appLogFileURL,
+            maxBytes: 256 * 1024,
+            category: isExtension ? "tunnel" : "app"
+        )
+    }()
 
     private let fileURL: URL?
     private let maxBytes: Int
-    private let osLog = Logger(subsystem: "com.razhev.personalvpn", category: "tunnel")
+    private let osLog: Logger
     private let queue = DispatchQueue(label: "com.razhev.personalvpn.ringlogger")
     private var heartbeatTimer: DispatchSourceTimer?
 
-    init(fileURL: URL?, maxBytes: Int) {
+    init(fileURL: URL?, maxBytes: Int, category: String) {
         self.fileURL = fileURL
         self.maxBytes = maxBytes
+        self.osLog = Logger(subsystem: "com.razhev.personalvpn", category: category)
     }
 
     func log(_ message: String) {
-        osLog.info("\(message, privacy: .public)")
+        // .notice, а не .info: info-сообщения не сохраняются в хранилище логов
+        // и скрыты в Console.app по умолчанию.
+        osLog.notice("\(message, privacy: .public)")
         let line = "\(Self.timestamp()) \(message)\n"
         queue.async { self.append(line) }
+    }
+
+    /// Разовая строка с потреблением памяти; label — что только что произошло.
+    func logMemory(_ label: String) {
+        log("memory \(label): \(Self.memoryFootprintMB()) MB")
     }
 
     /// Раз в 30 сек пишет потребление памяти: у расширения жёсткий лимит

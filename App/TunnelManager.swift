@@ -6,7 +6,7 @@ import ConfigKit
 /// старт/стоп туннеля, наблюдение за статусом.
 ///
 /// Профиль — это то, что появляется в Настройках iOS после первого
-/// «Разрешить» (системный диалог «…хочет добавить конфигурацию VPN»).
+/// «Разрешить» (системный диалог «…хочет добавить конфигурации VPN»).
 @MainActor
 final class TunnelManager: ObservableObject {
 
@@ -17,15 +17,26 @@ final class TunnelManager: ObservableObject {
 
     private var manager: NETunnelProviderManager?
     private var statusObserver: NSObjectProtocol?
+    private let logger = RingLogger.shared
+
+    /// Не удалось даже прочитать профили при запуске — почти наверняка в подписи
+    /// сборки нет права на Network Extension.
+    private var loadFailed = false
+    /// Отключение по кнопке — не ошибка, причину искать не нужно.
+    private var userRequestedStop = false
+    /// Момент последнего запроса на старт: по нему видно, успело ли расширение
+    /// написать в tunnel.log хоть строку.
+    private var startRequestedAt: Date?
 
     private static let tunnelBundleID = "com.razhev.personalvpn.tunnel"
 
     init() {
+        // object: nil — уведомления приходят обо всех VPN системы; обработчик
+        // всё равно перечитывает статус только нашего соединения.
         statusObserver = NotificationCenter.default.addObserver(
             forName: .NEVPNStatusDidChange, object: nil, queue: .main
-        ) { [weak self] notification in
-            guard let connection = notification.object as? NEVPNConnection else { return }
-            Task { @MainActor in self?.statusChanged(connection) }
+        ) { [weak self] _ in
+            Task { @MainActor in self?.statusChanged() }
         }
     }
 
@@ -36,9 +47,13 @@ final class TunnelManager: ObservableObject {
         do {
             let managers = try await NETunnelProviderManager.loadAllFromPreferences()
             manager = managers.first
+            loadFailed = false
+            logger.log("load: profiles=\(managers.count) appGroup=\(SharedPaths.containerURL == nil ? "UNAVAILABLE" : "ok")")
             refreshDerivedState()
         } catch {
-            lastError = "Не удалось загрузить профиль VPN: \(error.localizedDescription)"
+            loadFailed = true
+            logger.log("load FAILED: \(Self.raw(error))")
+            lastError = explain(error)
         }
     }
 
@@ -93,28 +108,61 @@ final class TunnelManager: ObservableObject {
 
     // MARK: - Управление туннелем
 
-    func start() {
-        guard let manager else { return }
+    /// Единая точка входа кнопки «Подключить». Любая ошибка попадает под кнопку
+    /// и в app.log: M1 существует, чтобы увидеть ошибки подписи и entitlements,
+    /// «мёртвой» кнопки без сообщения быть не должно.
+    func connect() async {
+        lastError = nil
+        userRequestedStop = false
         do {
+            if manager == nil {
+                // Профиля ещё нет (M1) — создаём пустышку; здесь появляется
+                // системный диалог «…хочет добавить конфигурации VPN».
+                try await timed { try await self.applyDummyProfile() }
+            }
+            guard let manager else { return }
+
+            // iOS держит включённым только один VPN-профиль. Если подключались
+            // другим клиентом (AmneziaVPN), наш профиль выключен и старт упадёт
+            // с configurationDisabled — включаем его обратно.
+            if !manager.isEnabled {
+                manager.isEnabled = true
+                try await timed {
+                    try await manager.saveToPreferences()
+                    try await manager.loadFromPreferences()
+                }
+            }
+
+            // Ошибка прошлого запуска не должна всплыть после нового.
+            if let url = SharedPaths.lastErrorURL { try? FileManager.default.removeItem(at: url) }
+
+            startRequestedAt = Date()
             try manager.connection.startVPNTunnel()
-            lastError = nil
+            logger.log("startVPNTunnel requested")
         } catch {
-            lastError = "Не удалось запустить туннель: \(error.localizedDescription)"
+            logger.log("connect FAILED: \(Self.raw(Self.unwrap(error).error))")
+            lastError = explain(error)
+            // Устаревший профиль лечится перечитыванием — следующее нажатие сработает.
+            try? await manager?.loadFromPreferences()
         }
     }
 
     func stop() {
+        userRequestedStop = true
         manager?.connection.stopVPNTunnel()
     }
 
-    var hasProfile: Bool { manager != nil }
-
     // MARK: - Статус
 
-    private func statusChanged(_ connection: NEVPNConnection) {
-        status = connection.status
-        if status == .disconnected {
-            readLastErrorFile()
+    private func statusChanged() {
+        guard let manager else { return }
+        let newStatus = manager.connection.status
+        guard newStatus != status else { return }
+        status = newStatus
+        logger.log("status: \(newStatus.localizedText)")
+
+        if newStatus == .disconnected, !userRequestedStop, startRequestedAt != nil {
+            Task { await explainDisconnect() }
         }
     }
 
@@ -124,12 +172,127 @@ final class TunnelManager: ObservableObject {
         hasRealConfig = (providerConfig?[TunnelConfigKeys.ovpnConfig] as? String)?.isEmpty == false
     }
 
-    /// Расширение пишет фатальные ошибки в App Group — показываем под кнопкой.
-    private func readLastErrorFile() {
-        guard let url = SharedPaths.lastErrorURL,
-              let text = try? String(contentsOf: url, encoding: .utf8),
-              !text.isEmpty else { return }
-        lastError = text
+    /// Почему туннель отключился сам. Источники: причина от системы
+    /// (fetchLastDisconnectError) и last_error.txt, который пишет расширение.
+    private func explainDisconnect() async {
+        guard let connection = manager?.connection else { return }
+        let systemError: NSError? = await withCheckedContinuation { continuation in
+            connection.fetchLastDisconnectError { continuation.resume(returning: $0 as NSError?) }
+        }
+
+        var parts: [String] = []
+        if let systemError {
+            logger.log("disconnect reason: \(Self.raw(systemError))")
+            parts.append(Self.describeDisconnect(systemError) + "\n[\(Self.raw(systemError))]")
+        }
+        if let url = SharedPaths.lastErrorURL,
+           let text = try? String(contentsOf: url, encoding: .utf8), !text.isEmpty {
+            parts.append(text)
+        }
+        if !extensionWroteLogSince(startRequestedAt) {
+            parts.append("Расширение туннеля не написало в лог ни строки — оно не запустилось "
+                         + "или у него нет доступа к App Group.")
+        }
+        guard !parts.isEmpty else { return }
+        lastError = parts.joined(separator: "\n\n")
+    }
+
+    private func extensionWroteLogSince(_ date: Date?) -> Bool {
+        guard let date,
+              let url = SharedPaths.logFileURL,
+              let modified = try? FileManager.default.attributesOfItem(atPath: url.path)[.modificationDate] as? Date
+        else { return false }
+        return modified >= date.addingTimeInterval(-1)
+    }
+
+    // MARK: - Расшифровка ошибок
+
+    /// Ошибка шага сохранения профиля + сколько он длился. Мгновенный отказ
+    /// означает, что системный диалог даже не показывался.
+    private struct ProfileSaveError: Error {
+        let underlying: Error
+        let elapsed: TimeInterval
+    }
+
+    private func timed(_ step: () async throws -> Void) async throws {
+        let started = Date()
+        do {
+            try await step()
+        } catch {
+            throw ProfileSaveError(underlying: error, elapsed: Date().timeIntervalSince(started))
+        }
+    }
+
+    private static func unwrap(_ error: Error) -> (error: Error, elapsed: TimeInterval?) {
+        if let saveError = error as? ProfileSaveError {
+            return (saveError.underlying, saveError.elapsed)
+        }
+        return (error, nil)
+    }
+
+    /// Человеческое объяснение + сырой код. Строки системных ошибок NE не
+    /// документированы, подсказка эвристическая — поэтому код показываем всегда.
+    private func explain(_ error: Error) -> String {
+        let (underlying, elapsed) = Self.unwrap(error)
+        let nsError = underlying as NSError
+        let text = nsError.localizedDescription.lowercased()
+
+        let hint: String
+        if text.contains("permission denied") || text.contains("ipc failed") {
+            if loadFailed || (elapsed ?? 1) < 0.5 {
+                hint = "Система отказала сразу, без диалога: в подписи сборки нет права на "
+                     + "Network Extension. Это проблема сборки — смотрите ворота entitlements "
+                     + "в выводе make install."
+            } else {
+                hint = "Вы нажали «Не разрешать» (или VPN запрещён профилем управления). "
+                     + "Нажмите «Подключить» ещё раз и выберите «Разрешить»."
+            }
+        } else if nsError.domain == NEVPNErrorDomain, let code = NEVPNError.Code(rawValue: nsError.code) {
+            switch code {
+            case .configurationInvalid:
+                hint = "Профиль VPN некорректен — обычно не совпал bundle id расширения."
+            case .configurationDisabled:
+                hint = "Профиль VPN выключен: активен другой VPN. Отключите его и повторите."
+            case .configurationStale:
+                hint = "Профиль VPN устарел — нажмите «Подключить» ещё раз."
+            case .configurationReadWriteFailed:
+                hint = "Система не дала прочитать или сохранить профиль VPN."
+            case .connectionFailed:
+                hint = "Система не смогла запустить туннель."
+            default:
+                hint = "Не удалось создать или запустить профиль VPN."
+            }
+        } else {
+            hint = "Не удалось создать или запустить профиль VPN."
+        }
+        return "\(hint)\n[\(Self.raw(underlying))]"
+    }
+
+    /// Коды NEVPNConnectionErrorDomain (NEVPNConnection.h). Ошибка из другого
+    /// домена — это NSError, который расширение само передало системе.
+    private static func describeDisconnect(_ error: NSError) -> String {
+        guard error.domain == NEVPNConnectionErrorDomain else {
+            return "Туннель завершился с ошибкой: \(error.localizedDescription)"
+        }
+        switch error.code {
+        case 12:
+            return "Расширение туннеля аварийно завершилось: не загрузился фреймворк, сбой "
+                 + "подписи или нехватка памяти. Отчёт о падении: make crashlogs."
+        case 14:
+            return "Система не нашла расширение туннеля (bundle id / NSExtension) либо "
+                 + "приложение только что переустановлено — попробуйте ещё раз."
+        case 4, 13:
+            return "Профиль VPN повреждён: удалите его в Настройки → VPN и подключитесь заново."
+        case 2:
+            return "Нет сети."
+        default:
+            return "Система разорвала VPN-соединение."
+        }
+    }
+
+    private static func raw(_ error: Error) -> String {
+        let nsError = error as NSError
+        return "\(nsError.domain) \(nsError.code): \(nsError.localizedDescription)"
     }
 }
 

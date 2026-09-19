@@ -36,6 +36,8 @@ struct ContentView: View {
                         .foregroundStyle(.red)
                         .multilineTextAlignment(.center)
                         .padding(.horizontal, 24)
+                        // Текст с кодом ошибки удобно скопировать и прислать.
+                        .textSelection(.enabled)
                 }
 
                 Spacer()
@@ -77,12 +79,10 @@ struct ContentView: View {
             busy = true
             Task {
                 defer { busy = false }
-                // M1: профиля ещё нет — создаём пустышку (системный диалог
-                // «…хочет добавить конфигурацию VPN» появится здесь).
-                if !tunnel.hasProfile {
-                    try? await tunnel.applyDummyProfile()
-                }
-                tunnel.start()
+                // M1: профиля ещё нет — connect() создаст пустышку (системный
+                // диалог «…хочет добавить конфигурации VPN» появится здесь).
+                // Любая ошибка окажется в tunnel.lastError под кнопкой.
+                await tunnel.connect()
             }
         }
     }

@@ -3,7 +3,7 @@
 PROJECT := PersonalVPN.xcodeproj
 SCHEME  := PersonalVPN
 
-.PHONY: gen build test fetch verify devices install logs crashlogs clean
+.PHONY: gen build test fetch verify devices ddi install logs crashlogs clean
 
 ## Сгенерировать PersonalVPN.xcodeproj из project.yml
 gen:
@@ -30,6 +30,11 @@ verify:
 ## Какие iPhone видит Mac и готовы ли они к установке
 devices:
 	@python3 scripts/find-device.py --list
+
+## Смонтировать на телефон образ разработчика (DDI). Нужен доступ к gs.apple.com
+## БЕЗ VPN; держится до перезагрузки телефона. make install делает это сам.
+ddi:
+	@./scripts/mount-ddi.sh
 
 ## Подписанная сборка → установка на подключённый iPhone → запуск.
 ## Несколько устройств: make install DEVICE=<udid|имя>

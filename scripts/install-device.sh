@@ -89,6 +89,11 @@ if is_locked; then
     echo "  Телефон разблокирован."
 fi
 
+# ── 1б. Developer Disk Image ──
+# Монтируем заранее: иначе xcodebuild минуту ждёт устройство и падает с общей
+# фразой, а mount-ddi.sh называет настоящую причину (чаще всего — VPN на Mac).
+scripts/mount-ddi.sh "$UDID" || exit 4
+
 # ── 2. Подписанная сборка ──
 mkdir -p "$LOG_DIR"
 echo "Сборка с подписью… (полный лог: ${BUILD_LOG#"$ROOT"/})"

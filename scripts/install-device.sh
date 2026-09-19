@@ -47,6 +47,48 @@ DEVICE_LINE="$(python3 scripts/find-device.py)" || exit $?
 IFS=$'\t' read -r UDID DEVICE_NAME OS_VERSION <<<"$DEVICE_LINE"
 echo "Устройство: $DEVICE_NAME (iOS $OS_VERSION)"
 
+# Заблокированный телефон не даёт смонтировать Developer Disk Image, и сборка
+# падает с невнятным «The developer disk image could not be mounted». Ждём
+# разблокировки до 2 минут. Если devicectl не отдал состояние — не мешаем.
+is_locked() {
+    local tmp
+    tmp="$(mktemp)"
+    xcrun devicectl device info lockState --device "$UDID" --json-output "$tmp" >/dev/null 2>&1 || true
+    python3 - "$tmp" <<'PY'
+import json, sys
+try:
+    data = json.load(open(sys.argv[1], encoding="utf-8"))
+except Exception:
+    sys.exit(1)          # состояние неизвестно — считаем, что не заблокирован
+def find(node):
+    if isinstance(node, dict):
+        if "passcodeRequired" in node:
+            return node["passcodeRequired"]
+        for value in node.values():
+            found = find(value)
+            if found is not None:
+                return found
+    return None
+sys.exit(0 if find(data) is True else 1)
+PY
+    local status=$?
+    rm -f "$tmp"
+    return $status
+}
+
+if is_locked; then
+    echo "  ⚠ Телефон заблокирован — разблокируйте его (Face ID / код) и не гасите экран. Жду до 2 минут…"
+    for _ in $(seq 1 40); do
+        sleep 3
+        is_locked || break
+    done
+    if is_locked; then
+        echo "FAIL: телефон всё ещё заблокирован. Разблокируйте и повторите make install."
+        exit 4
+    fi
+    echo "  Телефон разблокирован."
+fi
+
 # ── 2. Подписанная сборка ──
 mkdir -p "$LOG_DIR"
 echo "Сборка с подписью… (полный лог: ${BUILD_LOG#"$ROOT"/})"

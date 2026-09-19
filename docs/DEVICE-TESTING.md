@@ -140,6 +140,7 @@ M2: `OpenVPNAdapter.framework` реально загружается в проц
 | «provisioning profile doesn't include the … networkextension entitlement» / App Groups | capability ещё не включена на App ID | повторить `make install`; иначе портал → Identifiers → у **обоих** App ID включить Network Extensions и App Groups, привязать группу |
 | сборка висит на CodeSign / `errSecInternalComponent` | ждёт диалог Связки ключей либо запущено не из GUI-сессии | пароль Mac → «Всегда разрешать»; запускать из Terminal.app |
 | `FAIL подпись …` (ворота скрипта) | сборка прошла, но в подписи нет права на VPN или App Group | то же, что строкой выше про capability |
+| «The developer disk image could not be mounted on this device» | телефон заблокирован в момент сборки (скрипт теперь сам ждёт разблокировки); реже — DDI из Xcode старее, чем iOS на телефоне | разблокировать телефон и не гасить экран; если телефон разблокирован, а ошибка та же — обновить Xcode |
 | «Unable to find a destination», устройство в списке `Ineligible` | заблокирован / не нажато «Доверять» / выключен режим разработчика / ещё «Preparing» / iOS новее, чем знает Xcode | `make devices`; этап A, шаг 3; в последнем случае обновить Xcode |
 
 ### Установка и запуск

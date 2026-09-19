@@ -7,26 +7,37 @@
 
 - **[PLAN.md](PLAN.md)** — полный план разработки: архитектура, этапы (M0–M6) с проверками, риски.
 - **[docs/IMPLEMENTATION.md](docs/IMPLEMENTATION.md)** — детальный план имплементации по шагам (Фаза 0 → M6), тест-стратегия, план коммитов, открытые вопросы.
+- **[docs/DEVICE-TESTING.md](docs/DEVICE-TESTING.md)** — инструкция по тестированию на iPhone: подготовка аккаунта и телефона, чек-лист первого запуска, каналы отладки, таблица «симптом → что делать».
 - **[docs/FRAMEWORK-API.md](docs/FRAMEWORK-API.md)** — зафиксированный API `OpenVPNAdapter.framework`, выписанный из реальных заголовков. По нему пишется код провайдера.
 - **[IMPLEMENTATION_PROMPT.md](IMPLEMENTATION_PROMPT.md)** — самодостаточный промпт для агента (выжимка исследования).
 
 ## Статус
 
-Фаза 0 (всё, что не требует подписи и устройства): каркас проекта, ConfigKit с тестами,
-скрипты фреймворка — **готово**. Дальше по [docs/IMPLEMENTATION.md](docs/IMPLEMENTATION.md):
-M1 (пустышка-туннель на iPhone) — ждёт одобрения Apple Developer аккаунта.
+Фазы 0 и 0.5 (всё, что не требует подписи и устройства): каркас проекта, ConfigKit с тестами,
+скрипты фреймворка, полный `PacketTunnelProvider` — **готово**. Apple Developer аккаунт одобрен,
+Team ID вписан, путь «подписанная сборка → установка → логи» готов. Сейчас: **M1+M2** — первый
+запуск пустышки-туннеля на iPhone по [docs/DEVICE-TESTING.md](docs/DEVICE-TESTING.md).
+Дальше — M3 (реальное соединение).
 
 ## Команды
 
 Требуются: Xcode 26+, [XcodeGen](https://github.com/yonaskolb/XcodeGen) (`brew install xcodegen`).
 
 ```bash
-make gen      # сгенерировать PersonalVPN.xcodeproj из project.yml
-make build    # собрать оба таргета БЕЗ подписи (до одобрения аккаунта)
-make test     # юнит-тесты ConfigKit — на Mac, телефон не нужен
-make fetch    # скачать OpenVPNAdapter.framework (SHA-256 зафиксирован)
-make verify   # ворота: arm64? символы Cloak? setPTCloak в заголовках?
+make gen        # сгенерировать PersonalVPN.xcodeproj из project.yml
+make build      # собрать оба таргета БЕЗ подписи — быстрая проверка компиляции
+make test       # юнит-тесты ConfigKit — на Mac, телефон не нужен
+make fetch      # скачать OpenVPNAdapter.framework (SHA-256 зафиксирован)
+make verify     # ворота: arm64? символы Cloak? setPTCloak в заголовках?
+
+make devices    # какие iPhone видит Mac и готовы ли они к установке
+make install    # подписанная сборка → установка на подключённый iPhone → запуск
+make logs       # забрать логи с телефона в build/logs/latest/
+make crashlogs  # то же + отчёты о падениях расширения/приложения
 ```
+
+`PersonalVPN.xcodeproj` пересоздаётся каждым `make gen` — все настройки подписи живут в
+`project.yml`, в интерфейсе Xcode ничего не настраиваем.
 
 Разобрать ключ Amnezia в читаемый JSON (вывод сохранять только в `Secrets/`):
 
@@ -51,12 +62,16 @@ python3 scripts/decode-vpnkey.py Secrets/my.vpnkey > Secrets/my-decoded.json
 ## Отладка на устройстве (M1+)
 
 К процессу расширения **нельзя подключать отладчик Xcode** — Go-код Cloak под
-отладчиком деградирует до ~5 fps и выглядит зависшим (golang/go#57651).
-Каналы отладки:
+отладчиком деградирует до ~5 fps и выглядит зависшим (golang/go#57651). Поэтому
+на телефон ставим только через `make install`, не кнопкой Run. Каналы отладки:
 
-- экран Logs в приложении (файл `tunnel.log` из App Group, кнопка «Поделиться»);
+- экран «Логи» в приложении: `tunnel.log` (расширение) и `app.log` (приложение)
+  из App Group, кнопка «Поделиться»;
+- `make logs` / `make crashlogs` — те же файлы и отчёты о падениях на Mac, без sudo;
 - Console.app с фильтром по subsystem `com.razhev.personalvpn`;
-- `log collect --device-name "<iPhone>" --last 10m` по кабелю.
+- `sudo log collect --device-name "<iPhone>" --last 10m` по кабелю.
+
+Подробности и разбор типовых ошибок — [docs/DEVICE-TESTING.md](docs/DEVICE-TESTING.md).
 
 ## Секреты
 

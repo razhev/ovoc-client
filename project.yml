@@ -14,10 +14,12 @@ settings:
     # Device-only: у OpenVPNAdapter.framework нет simulator-slice,
     # а Network Extension в симуляторе не работает в принципе.
     SUPPORTED_PLATFORMS: iphoneos
-    TARGETED_DEVICE_FAMILY: "1"
+    # TARGETED_DEVICE_FAMILY задаётся на таргетах: пресет XcodeGen (Platforms/iOS.yml)
+    # ставит "1,2" на уровне таргета и перебивает значение отсюда.
     CODE_SIGN_STYLE: Automatic
-    # Team ID появится после одобрения Apple Developer аккаунта (шаг M1.1).
-    DEVELOPMENT_TEAM: ""
+    # Team ID платной команды (developer.apple.com → Membership). Не секрет:
+    # он и так зашит в каждую подписанную сборку.
+    DEVELOPMENT_TEAM: "222A4867MA"
     CURRENT_PROJECT_VERSION: "1"
     MARKETING_VERSION: "0.1.0"
 
@@ -39,17 +41,29 @@ targets:
       - package: ConfigKit
       # Фреймворк живёт в бандле ПРИЛОЖЕНИЯ (appex не может embed'ить фреймворки),
       # расширение находит его через runpath ../../Frameworks.
+      # link: false — приложение его не импортирует; без линковки Go-runtime
+      # не стартует в процессе приложения, а сбой загрузки фреймворка не
+      # убивает приложение раньше, чем оно покажет диагностику.
       - framework: Frameworks/OpenVPNAdapter.framework
         embed: true
         codeSign: true
+        link: false
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.razhev.personalvpn
         CODE_SIGN_ENTITLEMENTS: App/PersonalVPN.entitlements
+        # Только iPhone (пресет XcodeGen иначе ставит "1,2").
+        TARGETED_DEVICE_FAMILY: "1"
+        # Пресет application_iOS.yml ставит устаревшее "iPhone Developer".
+        CODE_SIGN_IDENTITY: "Apple Development"
     info:
       path: App/Info.plist
       properties:
         CFBundleDisplayName: PersonalVPN
+        # Версии — из build settings (MARKETING_VERSION / CURRENT_PROJECT_VERSION),
+        # иначе XcodeGen зашивает 1.0 / 1 и настройки выше не действуют.
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         UILaunchScreen: {}
         UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
         UIRequiresFullScreen: true
@@ -72,6 +86,7 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.razhev.personalvpn.tunnel
         CODE_SIGN_ENTITLEMENTS: PacketTunnel/PacketTunnel.entitlements
+        TARGETED_DEVICE_FAMILY: "1"
         LD_RUNPATH_SEARCH_PATHS:
           - "$(inherited)"
           - "@executable_path/Frameworks"
@@ -80,6 +95,9 @@ targets:
       path: PacketTunnel/Info.plist
       properties:
         CFBundleDisplayName: PacketTunnel
+        # Версии appex обязаны совпадать с версиями приложения.
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         NSExtension:
           NSExtensionPointIdentifier: com.apple.networkextension.packet-tunnel
           NSExtensionPrincipalClass: $(PRODUCT_MODULE_NAME).PacketTunnelProvider

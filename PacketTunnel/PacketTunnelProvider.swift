@@ -461,7 +461,9 @@ extension PacketTunnelProvider: OpenVPNAdapterDelegate {
     }
 
     func openVPNAdapter(_ openVPNAdapter: OpenVPNAdapter, handleLogMessage logMessage: String) {
-        logger.log("ovpn: \(logMessage)")
+        // Сообщения ядра приходят с хвостовым переводом строки — без обрезки
+        // лог наполовину состоит из пустых строк.
+        logger.log("ovpn: \(logMessage.trimmingCharacters(in: .whitespacesAndNewlines))")
     }
 
     private func eventName(_ event: OpenVPNAdapterEvent) -> String {

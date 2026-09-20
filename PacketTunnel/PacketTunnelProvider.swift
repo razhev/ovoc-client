@@ -150,6 +150,7 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
         armStartWatchdog()
         packetBridge.serverAddress = serverIP.split(separator: ".").compactMap { UInt8($0) }
         packetBridge.reset()
+        logger.heartbeatExtra = { [weak self] in self?.packetBridge.summary() ?? "" }
         adapter.connect(using: packetBridge)
     }
 

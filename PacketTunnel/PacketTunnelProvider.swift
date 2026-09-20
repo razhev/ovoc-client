@@ -98,6 +98,21 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
         let configuration = OpenVPNConfiguration()
         configuration.fileContent = ovpn.data(using: .utf8)
         configuration.tunPersist = true
+        // Рецепт самой Amnezia (amnezia-client PR #2360 «fix: ios ovpn fix»).
+        // Значение enum по умолчанию — 0 (.enabled, сжатие в обе стороны), а серверу
+        // нужен режим «только заглушки». Без этого клиент не объявляет серверу
+        // поддержку заглушек сжатия, и соединение рвётся, как только идут данные:
+        // у нас это выглядело как PT_SIZE_ERROR и переподключение каждые 5 секунд
+        // (тот же симптом — amnezia-client#2072).
+        configuration.compressionMode = .disabled
+        // Заглушки объявляем и явно: в этой сборке ядра peerInfo только ДОПОЛНЯЕТ
+        // peer-info (переопределять IV_VER/IV_PROTO она не умеет), поэтому берём
+        // из рецепта Amnezia лишь те ключи, которых ядро само не отправляет.
+        configuration.peerInfo = [
+            "IV_LZO_STUB": "1",
+            "IV_COMP_STUB": "1",
+            "IV_COMP_STUBv2": "1",
+        ]
         // Включает Cloak-транспорт; сам конфиг Cloak фреймворк читает
         // из блока <cloak> внутри fileContent (метод аргументов не имеет).
         configuration.setPTCloak()

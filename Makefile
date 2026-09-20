@@ -3,7 +3,7 @@
 PROJECT := PersonalVPN.xcodeproj
 SCHEME  := PersonalVPN
 
-.PHONY: gen build test fetch verify devices ddi install push-key logs crashlogs clean
+.PHONY: gen build test fetch verify devices ddi install push-key connect disconnect logs crashlogs clean
 
 ## Сгенерировать PersonalVPN.xcodeproj из project.yml
 gen:
@@ -45,6 +45,14 @@ install: gen
 ## не попадает в сборку). Другой файл: make push-key KEY=путь
 push-key:
 	@./scripts/push-key.sh $(KEY)
+
+## Отладка с Mac: перезапустить приложение на телефоне и сразу подключить / отключить
+## VPN (только DEBUG-сборка; телефон должен быть разблокирован)
+connect:
+	@./scripts/launch-app.sh -autoconnect
+
+disconnect:
+	@./scripts/launch-app.sh -autodisconnect
 
 ## Забрать логи с телефона в build/logs/latest/ (tunnel.log, app.log, last_error.txt)
 logs:

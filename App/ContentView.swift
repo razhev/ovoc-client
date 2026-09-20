@@ -7,6 +7,7 @@ import NetworkExtension
 struct ContentView: View {
     @StateObject private var tunnel = TunnelManager()
     @State private var busy = false
+    @State private var launchActionDone = false
 
     var body: some View {
         NavigationStack {
@@ -67,7 +68,23 @@ struct ContentView: View {
                     }
                 }
             }
-            .task { await tunnel.load() }
+            .task {
+                await tunnel.load()
+                #if DEBUG
+                // Отладка с Mac без нажатий на телефоне: `make connect` и
+                // `make disconnect` запускают приложение с этими аргументами.
+                // .task срабатывает при каждом появлении экрана — действие
+                // запуска выполняем один раз.
+                guard !launchActionDone else { return }
+                launchActionDone = true
+                let arguments = ProcessInfo.processInfo.arguments
+                if arguments.contains("-autoconnect") {
+                    await tunnel.connect()
+                } else if arguments.contains("-autodisconnect") {
+                    tunnel.stop()
+                }
+                #endif
+            }
         }
     }
 

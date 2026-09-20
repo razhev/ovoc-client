@@ -179,7 +179,17 @@ M2: `OpenVPNAdapter.framework` реально загружается в проц
 
 **Подготовка (человек).** В рабочей AmneziaVPN создать **отдельный** ключ (нового клиента):
 сервер OpenVPN не держит два одновременных подключения с одним сертификатом, второй клиент
-выбивает первого. Сохранить в `Secrets/my.vpnkey` — каталог в `.gitignore`. Ключ содержит
+выбивает первого. В окне «Поделиться»: Protocol — **OpenVPN over Cloak**, Connection format —
+**«For the AmneziaVPN app»**. Только этот формат даёт ключ `vpn://…` с конфигом OpenVPN *и*
+настройками Cloak; «OpenVPN native format» — это `.ovpn` без Cloak, он не подойдёт.
+
+Сохранить, нигде не показывая: «Копировать» в Amnezia, затем на Mac
+
+```bash
+mkdir -p Secrets && pbpaste > Secrets/my.vpnkey && head -c 6 Secrets/my.vpnkey && echo && wc -c Secrets/my.vpnkey
+```
+
+Ожидаем `vpn://` и размер в несколько килобайт. Каталог `Secrets/` в `.gitignore`. Ключ содержит
 приватный ключ и сертификаты: его не вставляют в чаты, код, тесты и сообщения коммитов.
 
 **Что делает агент.**

@@ -149,7 +149,7 @@ if [[ "$FAILED" -ne 0 ]]; then
 fi
 
 # ── 4. Установка ──
-echo "Установка на «$DEVICE_NAME»…"
+echo "Установка на «${DEVICE_NAME}»…"
 if ! xcrun devicectl device install app --device "$UDID" "$APP"; then
     echo "FAIL: установка не прошла (телефон разблокирован? Developer Mode включён?)."
     exit 6
@@ -163,5 +163,5 @@ if ! xcrun devicectl device process launch --device "$UDID" --terminate-existing
 fi
 
 echo ""
-echo "Готово: PersonalVPN установлен и запущен на «$DEVICE_NAME»."
+echo "Готово: PersonalVPN установлен и запущен на «${DEVICE_NAME}»."
 echo "Дальше: «Подключить» → системный диалог про конфигурации VPN → «Разрешить». Логи: make logs"

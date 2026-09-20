@@ -90,7 +90,7 @@ fi
 
 ln -sfn "$STAMP" "$ROOT/build/logs/latest"
 echo ""
-echo "Логи «$DEVICE_NAME» (iOS $OS_VERSION): build/logs/latest/"
+echo "Логи «${DEVICE_NAME}» (iOS $OS_VERSION): build/logs/latest/"
 
 for FILE in last_error.txt app.log tunnel.log; do
     if [[ -s "$OUT/$FILE" ]]; then

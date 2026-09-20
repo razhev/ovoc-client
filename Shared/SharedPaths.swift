@@ -17,6 +17,9 @@ enum SharedPaths {
     /// Кольцевой лог расширения (пишет RingLogger, читает LogView).
     static var logFileURL: URL? { containerURL?.appendingPathComponent("tunnel.log") }
 
+    /// Кольцевой лог приложения: ошибки профиля VPN и причины отключений.
+    static var appLogFileURL: URL? { containerURL?.appendingPathComponent("app.log") }
+
     /// Последняя фатальная ошибка туннеля — приложение показывает её под кнопкой.
     static var lastErrorURL: URL? { containerURL?.appendingPathComponent("last_error.txt") }
 

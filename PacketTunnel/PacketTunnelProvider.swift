@@ -39,7 +39,7 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
     // MARK: - Старт
 
     override func startTunnel(options: [String: NSObject]?, completionHandler: @escaping (Error?) -> Void) {
-        logger.log("startTunnel")
+        logger.log("startTunnel: \(ProcessInfo.processInfo.operatingSystemVersionString)")
         logger.startMemoryHeartbeat()
 
         let providerConfig = (protocolConfiguration as? NETunnelProviderProtocol)?.providerConfiguration
@@ -83,6 +83,28 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
 
     private func startDummyTunnel(completionHandler: @escaping (Error?) -> Void) {
         logger.log("dummy mode: no ovpnConfig in providerConfiguration")
+
+        // M1 проверяет именно App Group. Без контейнера файловый лог молча не
+        // пишется, поэтому падаем громко: приложение покажет причину под кнопкой
+        // (она доходит через fetchLastDisconnectError).
+        guard SharedPaths.containerURL != nil else {
+            completionHandler(NSError(
+                domain: "com.razhev.personalvpn.tunnel", code: 3,
+                userInfo: [NSLocalizedDescriptionKey:
+                    "App Group \(SharedPaths.appGroupID) недоступна расширению — проверьте "
+                    + "entitlements PacketTunnel и App Groups у App ID на портале"]
+            ))
+            return
+        }
+
+        // M2: фреймворк реально загрузился и инициализировался в процессе
+        // расширения на устройстве (ошибки встраивания/подписи вылезают здесь,
+        // а не в M3). Строка памяти — базовый расход Go+OpenVPN3 при лимите ~50 МБ.
+        let frameworkBundle = Bundle(for: OpenVPNAdapter.self)
+        let version = frameworkBundle.infoDictionary?["CFBundleShortVersionString"] as? String ?? "?"
+        logger.log("OpenVPNAdapter loaded: \(type(of: adapter)) v\(version) from \(frameworkBundle.bundlePath)")
+        logger.logMemory("after framework init")
+
         // Пустышке НИКОГДА не отдаём default route: мёртвый туннель,
         // забравший весь трафик, оставит телефон без интернета.
         let settings = NEPacketTunnelNetworkSettings(tunnelRemoteAddress: "10.8.0.1")
@@ -103,7 +125,7 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
     // MARK: - Стоп
 
     override func stopTunnel(with reason: NEProviderStopReason, completionHandler: @escaping () -> Void) {
-        logger.log("stopTunnel: reason=\(reason.rawValue)")
+        logger.log("stopTunnel: reason=\(Self.stopReasonName(reason))")
         cancelStartWatchdog()
 
         guard adapterStarted else {
@@ -173,6 +195,19 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
             guard parts.count >= 3, parts[0] == "dhcp-option", parts[1] == "DNS" else { return nil }
             return String(parts[2])
         }
+    }
+
+    /// По rawValue, а не switch по кейсам: internalError появился только в
+    /// iOS 18.1, а deployment target — 16.0.
+    private static func stopReasonName(_ reason: NEProviderStopReason) -> String {
+        let names = [
+            0: "none", 1: "userInitiated", 2: "providerFailed", 3: "noNetworkAvailable",
+            4: "unrecoverableNetworkChange", 5: "providerDisabled", 6: "authenticationCanceled",
+            7: "configurationFailed", 8: "idleTimeout", 9: "configurationDisabled",
+            10: "configurationRemoved", 11: "superceded", 12: "userLogout", 13: "userSwitch",
+            14: "connectionFailed", 15: "sleep", 16: "appUpdate", 17: "internalError",
+        ]
+        return names[reason.rawValue].map { "\($0)(\(reason.rawValue))" } ?? "#\(reason.rawValue)"
     }
 
     private func writeLastError(_ text: String) {

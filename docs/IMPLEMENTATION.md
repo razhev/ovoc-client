@@ -22,7 +22,7 @@
 |---|---|---|---|
 | **0** | project.yml + скелеты таргетов (компиляция без подписи), весь ConfigKit + тесты, скрипты fetch/verify фреймворка, decode-vpnkey.py, Makefile, README | **Нет** | `swift test` зелёный; `xcodebuild` без подписи собирается; `verify-framework.sh` — 3 PASS; сигнатура `setPTCloak` зафиксирована |
 | **0.5** (опц., пока ждём Apple) | Подключение фреймворка compile-only + полный код `PacketTunnelProvider` по реальным заголовкам | **Нет** | Оба таргета компилируются с фреймворком без подписи |
-| **M1** | Подписи, установка на iPhone, пустышка-туннель | **Да** | Значок VPN в статус-баре; логи расширения видны в LogView |
+| **M1** | Подписи, установка на iPhone, пустышка-туннель | **Да** | Настройки → VPN: «Подключено» (значок VPN — в Пункте управления); логи расширения видны в LogView |
 | **M2** | Фреймворк загружается в процессе расширения на устройстве | Да | «OpenVPNAdapter loaded» в логе; пустышка по-прежнему работает |
 | **M3** | Настоящее соединение на зашитом конфиге (главный риск) | Да + реальный ключ | Сайт-определитель показывает IP сервера; 10 мин стабильно; чистый reconnect |
 | **M4** | Импорт `vpn://` в приложении + вшитый ключ | Да | Чистая установка + вставка ключа воспроизводит M3 |
@@ -54,7 +54,7 @@
 - **`Shared/TunnelIPC.swift`** — `enum TunnelConfigKeys`: строковые ключи `ovpnConfig`, `serverIP`, `dns1`, `dns2` для `providerConfiguration`.
 - **`App/PersonalVPNApp.swift`**, **`App/ContentView.swift`** — минимальный SwiftUI: кнопка «Подключить» (пока без действия), текст статуса. `Assets.xcassets` с плейсхолдером.
 - **`PacketTunnel/PacketTunnelProvider.swift`** — скелет: `startTunnel` поднимает **пустышку** (`NEPacketTunnelNetworkSettings(tunnelRemoteAddress: "10.8.0.1")`, адрес `10.8.0.2/24`, `includedRoutes = [NEIPv4Route(dest: "10.8.0.0", mask: "255.255.255.0")]` — **узкий маршрут, НИКОГДА не default route**), пишет строку в лог App Group. Это ровно то, что нужно для M1 — пишем сразу.
-- **`PacketTunnel/RingLogger.swift`** — `final class RingLogger`: `init(fileURL:maxBytes:)` (лимит ~256 КБ, ротация усечением половины), `func log(_:)` (файл + `os.Logger` subsystem `com.razhev.personalvpn`), `func startMemoryHeartbeat()` — раз в 30 сек строка с footprint из `task_vm_info` (следим за лимитом 50 МБ).
+- **`Shared/RingLogger.swift`** (с M1 — в `Shared/`: расширение пишет `tunnel.log`, приложение — `app.log`) — `final class RingLogger`: `init(fileURL:maxBytes:category:)` (лимит ~256 КБ, ротация усечением половины), `func log(_:)` (файл + `os.Logger` subsystem `com.razhev.personalvpn`, уровень `.notice`), `func startMemoryHeartbeat()` — раз в 30 сек строка с footprint из `task_vm_info` (следим за лимитом 50 МБ).
 - **`Makefile`** — цели: `gen` (xcodegen), `build` (см. проверку ниже), `test` (`cd ConfigKit && swift test`), `fetch` / `verify` (скрипты фреймворка), позже `install` / `archive` / `upload` / `logs`.
 
 **Команды/проверка:**
@@ -176,21 +176,26 @@ xcodebuild -project PersonalVPN.xcodeproj -scheme PersonalVPN \
 
 ### M1 — Подписи + пустышка-туннель на устройстве (1–2 сессии)
 
+Пошаговая инструкция с чек-листом и таблицей «симптом → причина → что делать» — в **[DEVICE-TESTING.md](DEVICE-TESTING.md)**.
+
 | Шаг | Кто | Что |
 |---|---|---|
-| 1.1 | **Пользователь** | Дождаться одобрения Apple Developer (Individual). Xcode → Settings → Accounts → добавить Apple ID. Сообщить агенту **Team ID** (developer.apple.com → Membership, 10 символов) |
-| 1.2 | Агент | Вписать Team ID в `project.yml` (`DEVELOPMENT_TEAM`), `make gen`. Сборка с подписью: `xcodebuild … -allowProvisioningUpdates` — Xcode сам выпустит сертификат и два профиля (для packet-tunnel портал самообслуживаемый) |
-| 1.3 | **Пользователь** | Подключить iPhone кабелем; на телефоне: Trust This Computer; Settings → Privacy & Security → **Developer Mode** → включить (перезагрузка). *Developer Mode — переключатель iOS 16+, без него телефон не принимает сборки не из App Store* |
-| 1.4 | Агент | `scripts/install-device.sh`: `xcodebuild -destination 'generic/platform=iOS' build` → `xcrun devicectl device install app` + `launch`. Если на телефоне iOS 16 — переключиться на `ios-deploy` (см. открытые вопросы) |
-| 1.5 | **Пользователь** | Первое нажатие «Подключить» → системное окно «…хочет добавить конфигурацию VPN» → Allow |
-| 1.6 | Агент+Пользователь | Довести `ContentView`/`LogView` до проверки M1 |
+| 1.1 | **Пользователь** | Дождаться одобрения Apple Developer (Individual); на портале принять соглашения. Xcode → Settings → Accounts → добавить Apple ID. Сообщить агенту **Team ID** (developer.apple.com → Membership, 10 символов) |
+| 1.2 | **Пользователь** | Подключить iPhone кабелем; на телефоне: Trust This Computer; открыть Xcode → Window → Devices and Simulators (после «Preparing…» в настройках телефона появится пункт Developer Mode); Settings → Privacy & Security → **Developer Mode** → включить (перезагрузка). *Developer Mode — переключатель iOS 16+, без него телефон не принимает сборки не из App Store* |
+| 1.3 | Агент | Вписать Team ID в `project.yml` (`DEVELOPMENT_TEAM`). В UI Xcode ничего не настраивать: `.xcodeproj` пересоздаётся каждым `make gen` |
+| 1.4 | Агент+Пользователь | `make install` (`scripts/install-device.sh`): подписанная сборка **под подключённый телефон** — `xcodebuild -destination "id=<UDID>" -allowProvisioningUpdates -allowProvisioningDeviceRegistration` → проверка, что entitlements попали в подпись app и appex → `xcrun devicectl device install app` + `process launch` (без отладчика). Пользователь у Mac: диалог Связки ключей → «Всегда разрешать». Если на телефоне iOS 16 — `ios-deploy` |
+| 1.5 | **Пользователь** | Первое нажатие «Подключить» → системное окно «…хочет добавить конфигурации VPN» → Allow |
+| 1.6 | Агент+Пользователь | `make logs` — агент сам читает `tunnel.log` / `app.log` с телефона; довести `ContentView`/`LogView` до проверки M1 |
 
-**Проверка (из PLAN.md):** значок VPN в статус-баре, статус «Подключено» (пустышка, узкий маршрут `10.8.0.0/24`); выключение убирает значок; обычный интернет работает; LogView показывает строки, записанные расширением (доказательство App Group). Типичный камень — ошибки entitlements/профилей: читаем точный текст `xcodebuild`, чиним в `project.yml`.
+*Почему телефон раньше сборки: у новой команды нет зарегистрированных устройств, а без них Apple не выпускает development-профиль — сборка с `generic/platform=iOS` падает с «Your team has no devices». Сборка по UDID с `-allowProvisioningDeviceRegistration` регистрирует телефон сама; Xcode заодно выпускает сертификат, оба App ID и App Group (для packet-tunnel портал самообслуживаемый).*
+
+**Проверка (из PLAN.md):** статус «Подключено», в Настройки → VPN профиль «Подключено», значок VPN в Пункте управления (на iPhone с Face ID в статус-баре его нет); пустышка, узкий маршрут `10.8.0.0/24`; выключение убирает значок; обычный интернет работает; LogView показывает строки, записанные расширением (доказательство App Group). Типичный камень — ошибки entitlements/профилей: читаем точный текст `xcodebuild`, чиним в `project.yml`.
 
 ### M2 — Фреймворк в процессе расширения (1 сессия; +1–2 при запасном пути)
 
 - Если 0.5 не делалась — выполнить её содержимое сейчас (по шагам 0.2 → 0.5).
 - Агент: в `startTunnel` (ветка пустышки) создать `OpenVPNAdapter()` и записать в лог «OpenVPNAdapter loaded»; `make install`; убедиться, что расширение не падает при загрузке фреймворка (ошибки встраивания/подписи вылезают здесь, не в M3).
+- *Фаза 0.5 уже слинковала расширение с фреймворком, поэтому dyld грузит его при любом старте appex — M1 и M2 проходят одной установкой (маркер в логе уже есть). Приложение фреймворк только встраивает (`link: false`), в его процесс Go-runtime не попадает.*
 - **Проверка:** `verify-framework.sh` — 3 PASS; пустышка подключается; в логе «OpenVPNAdapter loaded».
 
 ### M3 — Настоящее соединение на зашитом конфиге (2–4 сессии; главный риск-этап)
@@ -257,11 +262,11 @@ xcodebuild -project PersonalVPN.xcodeproj -scheme PersonalVPN \
 
 | Вопрос | Блокирует? | Когда закроется |
 |---|---|---|
-| **Team ID** (нет одобренного аккаунта; сейчас 0 identities) | Блокирует M1+ (всё на устройстве). **Не** блокирует Фазу 0/0.5 | После одобрения Apple; пользователь называет Team ID (шаг 1.1) |
+| ~~**Team ID**~~ — закрыт 2026-09-19: аккаунт одобрен, Team ID вписан в `project.yml` | — | — |
 | Точная сигнатура `setPTCloak` и тип completion делегата | Блокирует написание кода провайдера (0.5/M2) | Шаг 0.2 — из реальных заголовков скачанного фреймворка |
 | Пригодность релиза v1.0.42 (символы Cloak, линковка с SDK 26) | Может переключить на запасной источник/сборку из исходников | Шаг 0.2 (символы/заголовки) и M2 (загрузка на устройстве) |
 | Реальный `vpn://`-ключ пользователя | Блокирует M3 (шаг 3.1), не раньше | Пользователь экспортирует из Amnezia к началу M3 |
-| Версия iOS на рабочем iPhone (devicectl требует iOS 17+ на устройстве) | Не блокирует; влияет только на `install-device.sh` (devicectl vs ios-deploy) | Спросим при подключении телефона (шаг 1.3) |
+| ~~Версия iOS на рабочем iPhone~~ — закрыт 2026-09-19: iPhone 16 Pro, iOS 26.6.2 → штатный путь через `devicectl` | — | — |
 | App Store Connect: запись приложения + API key (Key ID, Issuer ID) | Блокирует только M6 | Пользователь создаёт после одобрения аккаунта (шаг 6.1) |
 | Имя «PersonalVPN» — финальное? | Не блокирует; переименование дёшево до M6 (display name — вообще в любой момент) | До создания записи в App Store Connect |
 

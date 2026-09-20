@@ -91,11 +91,11 @@ personal-ios-client/
 │   └── Resources/default.vpnkey   # ОПЦИОНАЛЬНО, в .gitignore: вшитый ключ для семейной сборки
 │
 ├── PacketTunnel/          # ── расширение (сам VPN) ──
-│   ├── PacketTunnelProvider.swift # ядро VPN: запуск туннеля, маршруты, DNS, обработка ошибок (детали ниже)
-│   └── RingLogger.swift          # запись логов в файл в App Group + os.Logger
+│   └── PacketTunnelProvider.swift # ядро VPN: запуск туннеля, маршруты, DNS, обработка ошибок (детали ниже)
 │
 ├── Shared/                # компилируется в ОБЕ цели
-│   ├── SharedPaths.swift         # ID App Group и пути к общим файлам (config.json, tunnel.log, last_error.txt)
+│   ├── SharedPaths.swift         # ID App Group и пути к общим файлам (config.json, tunnel.log, app.log, last_error.txt)
+│   ├── RingLogger.swift          # запись логов в файл в App Group + os.Logger (расширение → tunnel.log, приложение → app.log)
 │   └── TunnelIPC.swift           # ключи словаря providerConfiguration, которыми приложение передаёт конфиг расширению
 │
 ├── ConfigKit/             # ── локальный Swift-пакет: ВСЯ логика разбора ключа, тестируется на Mac без телефона ──
@@ -116,7 +116,9 @@ personal-ios-client/
     ├── verify-framework.sh       # ГЛАВНАЯ проверка: arm64? есть символы Cloak? есть setPTCloak? (см. M2)
     ├── build-framework-source.sh # ЗАПАСНОЙ путь: собрать фреймворк из исходников форка Amnezia
     ├── decode-vpnkey.py          # dev-утилита на Mac: распаковать твой ключ в читаемый JSON (для M3)
-    ├── install-device.sh         # собрать и поставить на телефон по кабелю
+    ├── find-device.py            # найти подключённый iPhone (UDID) в выводе devicectl
+    ├── install-device.sh         # `make install`: подписанная сборка под телефон → проверка entitlements → установка → запуск
+    ├── device-logs.sh            # `make logs` / `make crashlogs`: забрать логи и отчёты о падениях с телефона
     └── upload-testflight.sh      # собрать архив и залить в TestFlight
 ```
 
@@ -135,7 +137,7 @@ personal-ios-client/
 
 Цель: убедиться, что подписи, entitlements, App Group и профили работают, **до** появления любой сложности с VPN.
 
-**Проверка:** первое нажатие «Подключить» → системное окно «PersonalVPN хочет добавить конфигурацию VPN» → Allow → **в статус-баре появляется значок VPN**, статус «Подключено»; выключение убирает его; обычный интернет продолжает работать; в LogView видны строки, записанные расширением (это доказывает, что App Group работает).
+**Проверка:** первое нажатие «Подключить» → системное окно «PersonalVPN хочет добавить конфигурацию VPN» → Allow → **появляется значок VPN** (на iPhone с Face ID — в Пункте управления; в Настройки → VPN профиль «Подключено»), статус «Подключено»; выключение убирает его; обычный интернет продолжает работать; в LogView видны строки, записанные расширением (это доказывает, что App Group работает).
 
 ### M2 — Получение фреймворка и проверка символов (1 сессия; +1–2 если понадобится запасной путь)
 Скрипт скачивает готовый `OpenVPNAdapter.framework` из релизов Amnezia (`3rd-build-ga`, релиз v1.0.42). Скрипт `verify-framework.sh` — **это ворота качества, гоняем до того, как что-то подключать**:

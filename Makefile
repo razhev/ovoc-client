@@ -3,7 +3,7 @@
 PROJECT := PersonalVPN.xcodeproj
 SCHEME  := PersonalVPN
 
-.PHONY: gen build test fetch verify devices ddi install logs crashlogs clean
+.PHONY: gen build test framework fetch verify devices ddi install push-key connect disconnect logs crashlogs clean
 
 ## Сгенерировать PersonalVPN.xcodeproj из project.yml
 gen:
@@ -19,7 +19,13 @@ build: gen
 test:
 	cd ConfigKit && swift test
 
-## Скачать OpenVPNAdapter.framework (с фиксацией SHA-256)
+## Собрать OpenVPNAdapter.framework из исходников Amnezia с нашим исправлением
+## (patches/openvpn3-aead-auth-tag.patch). ОСНОВНОЙ способ получить фреймворк.
+framework:
+	./scripts/build-framework-source.sh
+
+## Скачать ГОТОВЫЙ фреймворк v1.0.42. НЕ для работы: в нём дефект метки GCM, VPN с ним
+## не передаёт ни одного пакета (см. docs/DEVICE-TESTING.md). Оставлено для сравнения.
 fetch:
 	./scripts/fetch-framework.sh
 
@@ -40,6 +46,19 @@ ddi:
 ## Несколько устройств: make install DEVICE=<udid|имя>
 install: gen
 	./scripts/install-device.sh
+
+## DEBUG-мост M3: доставить Secrets/my.vpnkey в установленное приложение (ключ
+## не попадает в сборку). Другой файл: make push-key KEY=путь
+push-key:
+	@./scripts/push-key.sh $(KEY)
+
+## Отладка с Mac: перезапустить приложение на телефоне и сразу подключить / отключить
+## VPN (только DEBUG-сборка; телефон должен быть разблокирован)
+connect:
+	@./scripts/launch-app.sh -autoconnect
+
+disconnect:
+	@./scripts/launch-app.sh -autodisconnect
 
 ## Забрать логи с телефона в build/logs/latest/ (tunnel.log, app.log, last_error.txt)
 logs:

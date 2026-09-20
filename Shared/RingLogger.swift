@@ -27,6 +27,10 @@ final class RingLogger {
     private let queue = DispatchQueue(label: "com.razhev.personalvpn.ringlogger")
     private var heartbeatTimer: DispatchSourceTimer?
 
+    /// Добавка к строке heartbeat (расширение подставляет счётчики пакетов):
+    /// по ней видно, что туннель жив и сколько через него прошло.
+    var heartbeatExtra: (() -> String)?
+
     init(fileURL: URL?, maxBytes: Int, category: String) {
         self.fileURL = fileURL
         self.maxBytes = maxBytes
@@ -54,7 +58,9 @@ final class RingLogger {
         let timer = DispatchSource.makeTimerSource(queue: queue)
         timer.schedule(deadline: .now() + 30, repeating: 30)
         timer.setEventHandler { [weak self] in
-            self?.log("heartbeat: memory=\(Self.memoryFootprintMB()) MB")
+            guard let self else { return }
+            let extra = self.heartbeatExtra.map { ", " + $0() } ?? ""
+            self.log("heartbeat: memory=\(Self.memoryFootprintMB()) MB\(extra)")
         }
         timer.resume()
         heartbeatTimer = timer

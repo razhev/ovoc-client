@@ -12,6 +12,8 @@ final class TunnelManager: ObservableObject {
 
     @Published private(set) var status: NEVPNStatus = .invalid
     @Published private(set) var lastError: String?
+    /// Нейтральное сообщение под кнопкой (например, «ключ импортирован»).
+    @Published private(set) var notice: String?
     /// true, когда в профиле лежит боевой конфиг (а не пустышка M1).
     @Published private(set) var hasRealConfig = false
 
@@ -54,8 +56,74 @@ final class TunnelManager: ObservableObject {
             loadFailed = true
             logger.log("load FAILED: \(Self.raw(error))")
             lastError = explain(error)
+            return
+        }
+        #if DEBUG
+        await importDebugKeyIfPresent()
+        #endif
+    }
+
+    #if DEBUG
+    /// DEBUG-мост M3 (экрана импорта ещё нет — он появится в M4). `make push-key`
+    /// кладёт ключ в Documents приложения через devicectl; здесь он проходит тот же
+    /// путь, что пройдёт при импорте в M4: ConfigKit → профиль туннеля. Ключ не
+    /// входит ни в один вход сборки, а этого кода нет в Release — в TestFlight
+    /// ключ попасть не может. Файл удаляется сразу после чтения.
+    private func importDebugKeyIfPresent() async {
+        guard let url = Self.findDebugKey() else { return }
+        defer { try? FileManager.default.removeItem(at: url) }
+        do {
+            let key = try String(contentsOf: url, encoding: .utf8)
+            let config: ImportedConfig
+            if url.pathExtension == "ovpn" {
+                // Диагностика: готовый .ovpn без Cloak (например, к временному
+                // тестовому серверу). Мимо ConfigKit — там обязателен контейнер Cloak.
+                config = try Self.rawProfileConfig(key)
+            } else {
+                config = try await Task.detached(priority: .userInitiated) {
+                    try ImportedConfig.make(fromKey: key)
+                }.value
+            }
+            try await apply(config: config)
+            // В лог — только размеры: ни ключ, ни адреса туда не попадают.
+            logger.log("debug key imported: profile=\(config.ovpnProfile.utf8.count) bytes")
+            lastError = nil
+            notice = "Ключ импортирован: «\(config.description)»"
+        } catch {
+            let text = (error as? LocalizedError)?.errorDescription ?? Self.raw(error)
+            logger.log("debug key import FAILED: \(text)")
+            lastError = "Не удалось импортировать ключ: \(text)"
         }
     }
+
+    /// Сырой .ovpn → ImportedConfig: адрес сервера берём из строки `remote`.
+    private static func rawProfileConfig(_ ovpn: String) throws -> ImportedConfig {
+        let remote = ovpn.split(whereSeparator: \.isNewline)
+            .map { $0.split(separator: " ", omittingEmptySubsequences: true) }
+            .first { $0.first == "remote" && $0.count >= 2 }
+        guard let host = remote.map({ String($0[1]) }), ImportedConfig.isIPv4Literal(host) else {
+            throw VPNKeyError.missingField("remote <IPv4> в .ovpn")
+        }
+        return ImportedConfig(ovpnProfile: ovpn, serverIP: host, dns1: "1.1.1.1", dns2: "1.0.0.1",
+                              description: "DEBUG .ovpn → \(host)")
+    }
+
+    /// devicectl может положить файл как Documents/debug.vpnkey или как
+    /// Documents/debug.vpnkey/<имя исходного файла> — ищем *.vpnkey / *.ovpn на двух уровнях.
+    private static func findDebugKey() -> URL? {
+        let fm = FileManager.default
+        guard let documents = fm.urls(for: .documentDirectory, in: .userDomainMask).first,
+              let enumerator = fm.enumerator(at: documents, includingPropertiesForKeys: [.isRegularFileKey]) else {
+            return nil
+        }
+        for case let url as URL in enumerator {
+            if enumerator.level > 2 { enumerator.skipDescendants(); continue }
+            let isFile = (try? url.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile) ?? false
+            if isFile, ["vpnkey", "ovpn"].contains(url.pathExtension) { return url }
+        }
+        return nil
+    }
+    #endif
 
     /// Сохраняет боевой конфиг в профиль туннеля.
     func apply(config: ImportedConfig) async throws {
@@ -113,6 +181,7 @@ final class TunnelManager: ObservableObject {
     /// «мёртвой» кнопки без сообщения быть не должно.
     func connect() async {
         lastError = nil
+        notice = nil
         userRequestedStop = false
         do {
             if manager == nil {

@@ -21,8 +21,16 @@
 процессов, `OpenVPNAdapter.framework` загружается в процессе расширения (4 МБ памяти при лимите
 ~50 МБ), обычный интернет при этом работает, отключение и повторное подключение — тоже.
 
-Сейчас: **M3** — реальное соединение OpenVPN over Cloak, этап D в
-[docs/DEVICE-TESTING.md](docs/DEVICE-TESTING.md).
+**M3 пройден по основным проверкам 2026-09-20**: реальное соединение OpenVPN over Cloak
+работает — сайт-определитель показывает IP сервера, сайты открываются, соединение держалось
+11+ минут без единой ошибки и переподключения, память расширения до 18 МБ при лимите ~50 МБ,
+на сервере 0 ошибок расшифровки. Для этого пришлось найти и исправить дефект готового
+фреймворка Amnezia (разбор — в [docs/DEVICE-TESTING.md](docs/DEVICE-TESTING.md)); фреймворк
+теперь собирается из исходников: `make framework`.
+
+Ещё не проверено (хвост гейта M3): утечка IPv6, переключение Wi-Fi ↔ LTE, отключение и
+повторное подключение на исправленной сборке. Дальше — M4: экран импорта ключа вместо
+отладочного `make push-key`.
 
 ## Команды
 
@@ -32,11 +40,14 @@
 make gen        # сгенерировать PersonalVPN.xcodeproj из project.yml
 make build      # собрать оба таргета БЕЗ подписи — быстрая проверка компиляции
 make test       # юнит-тесты ConfigKit — на Mac, телефон не нужен
-make fetch      # скачать OpenVPNAdapter.framework (SHA-256 зафиксирован)
+make framework  # собрать OpenVPNAdapter.framework из исходников Amnezia + наш патч (основной способ)
+make fetch      # готовый бинарь v1.0.42 — НЕРАБОЧИЙ (дефект метки GCM), только для сравнения
 make verify     # ворота: arm64? символы Cloak? setPTCloak в заголовках?
 
 make devices    # какие iPhone видит Mac и готовы ли они к установке
+make ddi        # смонтировать на телефон образ разработчика (VPN на Mac выключить)
 make install    # подписанная сборка → установка на подключённый iPhone → запуск
+make push-key   # M3: доставить Secrets/my.vpnkey в установленное приложение
 make logs       # забрать логи с телефона в build/logs/latest/
 make crashlogs  # то же + отчёты о падениях расширения/приложения
 ```
@@ -50,11 +61,19 @@ make crashlogs  # то же + отчёты о падениях расширен�
 python3 scripts/decode-vpnkey.py Secrets/my.vpnkey > Secrets/my-decoded.json
 ```
 
+Только структура ключа, без секретов (можно показывать в чате):
+
+```bash
+python3 scripts/decode-vpnkey.py --schema Secrets/my.vpnkey
+```
+
 ## Архитектура (коротко)
 
 - SwiftUI-приложение + одно расширение `NEPacketTunnelProvider`. Device-only
   (VPN не работает в симуляторе), deployment target iOS 16.0.
-- Готовый бинарный `OpenVPNAdapter.framework` от Amnezia: Cloak скомпилирован
+- `OpenVPNAdapter.framework` от Amnezia, **собранный из исходников с нашим патчем**
+  (`make framework`, `patches/`): в их готовом бинаре клиент не записывает метку
+  подлинности GCM, и сервер отбрасывает каждый пакет. Cloak скомпилирован
   внутрь OpenVPN3 как транспорт. Со стороны Swift: `setPTCloak()` + блок
   `<cloak>` в тексте профиля.
 - **ConfigKit** — локальный SPM-пакет со всей логикой разбора ключа `vpn://…`

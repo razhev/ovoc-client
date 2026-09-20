@@ -8,9 +8,18 @@ import OpenVPNAdapter
 ///
 /// Сигнатуры фреймворка зафиксированы в docs/FRAMEWORK-API.md — код написан
 /// строго по ним, не по упоминаниям в блогах (форк Amnezia менял API).
+///
+/// Потоки. Система, делегат адаптера (его собственный поток) и сторожевые
+/// таймеры приходят с разных потоков, а completion'ы системы можно вызвать
+/// ровно один раз — двойной вызов убивает расширение. Поэтому ВСЁ изменяемое
+/// состояние живёт на stateQueue, и заходят на неё только через async:
+/// поток адаптера в это время ждёт наш completion, sync дал бы взаимоблокировку.
 final class PacketTunnelProvider: NEPacketTunnelProvider {
 
+    private static let errorDomain = "com.razhev.personalvpn.tunnel"
+
     private let logger = RingLogger.shared
+    private let stateQueue = DispatchQueue(label: "com.razhev.personalvpn.tunnel.state")
 
     private lazy var adapter: OpenVPNAdapter = {
         let adapter = OpenVPNAdapter()
@@ -18,19 +27,32 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
         return adapter
     }()
 
-    /// Состояние старта/остановки. Completion'ы системы можно вызвать ровно
-    /// один раз — храним и обнуляем.
+    /// Поток пакетов адаптер получает через мост (см. PacketFlowBridge), а не
+    /// напрямую: так сделано в починенной версии клиента Amnezia, и только
+    /// в мосте видно размеры пакетов.
+    private lazy var packetBridge = PacketFlowBridge(flow: packetFlow, logger: logger)
+
+    // ── Состояние: читать и менять только на stateQueue ──
+
+    private enum Phase { case idle, starting, connected, stopping, stopped }
+    private var phase: Phase = .idle
+
     private var startCompletion: ((Error?) -> Void)?
     private var stopCompletion: (() -> Void)?
-    private var adapterStarted = false
 
     /// Сторожевой таймер старта: рукопожатие Cloak многосекундное, а через
-    /// ~60 сек (недокументировано) систем­а молча убивает расширение.
+    /// ~60 сек (недокументировано) система молча убивает расширение.
     /// 30 сек — понятная ошибка вместо тихой смерти.
     private var startWatchdog: DispatchSourceTimer?
     /// Страховка стопа: если адаптер не отдал .disconnected за 5 сек —
     /// завершаем стоп сами.
     private var stopWatchdog: DispatchSourceTimer?
+
+    /// Последняя ошибка адаптера — объясняет следующий за ней обрыв.
+    private var lastAdapterError: Error?
+    /// Наш собственный отказ поднять туннель (см. configureTunnel): его текст
+    /// важнее общей ошибки адаптера «TUN setup failed», которая придёт следом.
+    private var refusalReason: String?
 
     private var serverIP: String?
     private var fallbackDNS: [String] = []
@@ -48,6 +70,17 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
             return
         }
 
+        stateQueue.async {
+            self.startRealTunnel(ovpn: ovpn, providerConfig: providerConfig, completionHandler: completionHandler)
+        }
+    }
+
+    /// Только на stateQueue.
+    private func startRealTunnel(
+        ovpn: String,
+        providerConfig: [String: Any]?,
+        completionHandler: @escaping (Error?) -> Void
+    ) {
         ovpnText = ovpn
         serverIP = providerConfig?[TunnelConfigKeys.serverIP] as? String
         fallbackDNS = [
@@ -55,18 +88,54 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
             providerConfig?[TunnelConfigKeys.dns2] as? String,
         ].compactMap { $0 }
 
-        logger.log("real tunnel: serverIP=\(serverIP ?? "nil") profile=\(ovpn.count) bytes")
+        logger.log("real tunnel: serverIP=\(serverIP ?? "nil") profile=\(ovpn.utf8.count) bytes")
+
+        // Без IPv4-литерала сервера нельзя поставить маршрут-исключение — а без
+        // него трафик к серверу завернётся в сам туннель (петля). Не стартуем.
+        guard let serverIP, Self.isIPv4Literal(serverIP) else {
+            let message = "В профиле нет IPv4-адреса сервера — импортируйте ключ заново"
+            logger.log("start REFUSED: \(message)")
+            writeLastError(message)
+            completionHandler(Self.makeError(2, message))
+            return
+        }
 
         let configuration = OpenVPNConfiguration()
         configuration.fileContent = ovpn.data(using: .utf8)
-        configuration.tunPersist = true
+        // tunPersist НЕ включаем: рабочий код Amnezia (4.8.12.x) его не ставит.
+        // С ним при цикле переподключений туннель продолжал забирать весь трафик,
+        // и телефон оставался без интернета.
+        //
+        // Проверено и отброшено: compressionMode / peerInfo из более позднего
+        // рецепта Amnezia (PR #2360). В этой сборке ядра пользовательский
+        // peer-info уходит серверу только при директиве push-peer-info в профиле,
+        // а заглушки сжатия объявляются только при compress/comp-lzo — у нас нет
+        // ни того, ни другого, в Peer Info ничего не менялось.
+
         // Включает Cloak-транспорт; сам конфиг Cloak фреймворк читает
         // из блока <cloak> внутри fileContent (метод аргументов не имеет).
-        configuration.setPTCloak()
+        // Только при наличии блока — как в клиенте Amnezia: профиль без <cloak>
+        // (диагностический, make push-key KEY=….ovpn) идёт обычным OpenVPN по TCP.
+        let usesCloak = ovpn.contains("<cloak>")
+        if usesCloak {
+            configuration.setPTCloak()
+        }
+        logger.log("transport: \(usesCloak ? "Cloak (pluggable transport)" : "plain OpenVPN, no Cloak")")
 
         do {
             let evaluation = try adapter.apply(configuration: configuration)
-            logger.log("apply OK: remoteHost=\(evaluation.remoteHost ?? "?")")
+            logger.log("apply OK: remote=\(evaluation.remoteHost ?? "?"):\(evaluation.remotePort) "
+                       + "autologin=\(evaluation.autologin) externalPki=\(evaluation.externalPki) "
+                       + "keyPassword=\(evaluation.isPrivateKeyPasswordRequired)")
+            // Логин/пароль не поддерживаем: без этой проверки такой профиль
+            // выглядел бы как 30-секундный таймаут без объяснений.
+            if !evaluation.autologin, ovpn.contains("auth-user-pass") {
+                let message = "Профиль требует логин и пароль (auth-user-pass) — такие ключи не поддерживаются"
+                logger.log("start REFUSED: \(message)")
+                writeLastError(message)
+                completionHandler(Self.makeError(5, message))
+                return
+            }
         } catch {
             // Ошибки разбора конфига — самый вероятный класс багов; лог дословный.
             logger.log("apply FAILED: \(describe(error))")
@@ -74,11 +143,15 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
             completionHandler(error)
             return
         }
+        logger.logMemory("after apply")
 
+        phase = .starting
         startCompletion = completionHandler
         armStartWatchdog()
-        adapterStarted = true
-        adapter.connect(using: packetFlow)
+        packetBridge.serverAddress = serverIP.split(separator: ".").compactMap { UInt8($0) }
+        packetBridge.reset()
+        logger.heartbeatExtra = { [weak self] in self?.packetBridge.summary() ?? "" }
+        adapter.connect(using: packetBridge)
     }
 
     private func startDummyTunnel(completionHandler: @escaping (Error?) -> Void) {
@@ -88,12 +161,9 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
         // пишется, поэтому падаем громко: приложение покажет причину под кнопкой
         // (она доходит через fetchLastDisconnectError).
         guard SharedPaths.containerURL != nil else {
-            completionHandler(NSError(
-                domain: "com.razhev.personalvpn.tunnel", code: 3,
-                userInfo: [NSLocalizedDescriptionKey:
-                    "App Group \(SharedPaths.appGroupID) недоступна расширению — проверьте "
-                    + "entitlements PacketTunnel и App Groups у App ID на портале"]
-            ))
+            completionHandler(Self.makeError(3,
+                "App Group \(SharedPaths.appGroupID) недоступна расширению — проверьте "
+                + "entitlements PacketTunnel и App Groups у App ID на портале"))
             return
         }
 
@@ -126,71 +196,88 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
 
     override func stopTunnel(with reason: NEProviderStopReason, completionHandler: @escaping () -> Void) {
         logger.log("stopTunnel: reason=\(Self.stopReasonName(reason))")
-        cancelStartWatchdog()
+        stateQueue.async {
+            let adapterRunning = self.phase == .starting || self.phase == .connected
+            if self.phase == .starting {
+                // Система отменила ещё не завершённый старт — закрываем его.
+                self.finishStart(Self.makeError(6, "Подключение отменено"))
+            }
+            guard adapterRunning else {
+                // Пустышка либо адаптер уже остановлен.
+                completionHandler()
+                return
+            }
 
-        guard adapterStarted else {
-            completionHandler()
-            return
+            self.phase = .stopping
+            self.stopCompletion = completionHandler
+
+            let watchdog = DispatchSource.makeTimerSource(queue: self.stateQueue)
+            watchdog.schedule(deadline: .now() + 5)
+            watchdog.setEventHandler { [weak self] in
+                self?.logger.log("stop watchdog fired: adapter didn't report .disconnected in 5s")
+                self?.finishStop()
+            }
+            watchdog.resume()
+            self.stopWatchdog = watchdog
+
+            self.adapter.disconnect()
         }
+    }
 
-        stopCompletion = completionHandler
-        let watchdog = DispatchSource.makeTimerSource(queue: .global())
-        watchdog.schedule(deadline: .now() + 5)
-        watchdog.setEventHandler { [weak self] in
-            self?.logger.log("stop watchdog fired: adapter didn't report .disconnected in 5s")
-            self?.finishStop()
-        }
-        watchdog.resume()
-        stopWatchdog = watchdog
+    // MARK: - Одноразовые завершения (только на stateQueue)
 
-        adapter.disconnect()
+    /// Второй и последующие вызовы игнорируются: completion системы вызывается один раз.
+    private func finishStart(_ error: Error?) {
+        guard let completion = startCompletion else { return }
+        startCompletion = nil
+        startWatchdog?.cancel()
+        startWatchdog = nil
+        phase = error == nil ? .connected : .stopped
+        completion(error)
     }
 
     private func finishStop() {
+        guard let completion = stopCompletion else { return }
+        stopCompletion = nil
         stopWatchdog?.cancel()
         stopWatchdog = nil
-        adapterStarted = false
-        stopCompletion?()
-        stopCompletion = nil
+        phase = .stopped
+        completion()
     }
 
-    // MARK: - Sleep/wake (v1 — простой проброс; tunPersist держит туннель)
+    // MARK: - Sleep/wake (v1 — простой проброс)
 
     override func sleep(completionHandler: @escaping () -> Void) {
+        logger.log("sleep")
         completionHandler()
     }
 
     override func wake() {
+        logger.log("wake")
     }
 
     // MARK: - Вспомогательное
 
+    /// Только на stateQueue.
     private func armStartWatchdog() {
-        let watchdog = DispatchSource.makeTimerSource(queue: .global())
+        let watchdog = DispatchSource.makeTimerSource(queue: stateQueue)
         watchdog.schedule(deadline: .now() + 30)
         watchdog.setEventHandler { [weak self] in
-            guard let self, let completion = self.startCompletion else { return }
+            guard let self, self.phase == .starting else { return }
             self.logger.log("start watchdog fired: no .connected event in 30s")
-            self.writeLastError("Не удалось подключиться за 30 секунд — сервер недоступен или конфигурация неверна")
-            self.startCompletion = nil
+            let message = self.refusalReason
+                ?? "Не удалось подключиться за 30 секунд — сервер недоступен или конфигурация неверна"
+            self.writeLastError(message)
+            self.finishStart(Self.makeError(1, message))
             self.adapter.disconnect()
-            completion(NSError(
-                domain: "com.razhev.personalvpn.tunnel", code: 1,
-                userInfo: [NSLocalizedDescriptionKey: "Connection timed out after 30s"]
-            ))
         }
         watchdog.resume()
         startWatchdog = watchdog
     }
 
-    private func cancelStartWatchdog() {
-        startWatchdog?.cancel()
-        startWatchdog = nil
-    }
-
     /// dhcp-option DNS x.x.x.x из текста конфига — второй уровень DNS-fallback.
     private func dnsFromProfile() -> [String] {
-        ovpnText.split(separator: "\n").compactMap { line in
+        ovpnText.split(whereSeparator: \.isNewline).compactMap { line in
             let parts = line.split(separator: " ", omittingEmptySubsequences: true)
             guard parts.count >= 3, parts[0] == "dhcp-option", parts[1] == "DNS" else { return nil }
             return String(parts[2])
@@ -208,6 +295,21 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
             14: "connectionFailed", 15: "sleep", 16: "appUpdate", 17: "internalError",
         ]
         return names[reason.rawValue].map { "\($0)(\(reason.rawValue))" } ?? "#\(reason.rawValue)"
+    }
+
+    private static func makeError(_ code: Int, _ message: String) -> NSError {
+        NSError(domain: errorDomain, code: code, userInfo: [NSLocalizedDescriptionKey: message])
+    }
+
+    private static func isIPv4Literal(_ string: String) -> Bool {
+        var address = in_addr()
+        return string.withCString { inet_pton(AF_INET, $0, &address) } == 1
+    }
+
+    private static func isIPLiteral(_ string: String) -> Bool {
+        if isIPv4Literal(string) { return true }
+        var address = in6_addr()
+        return string.withCString { inet_pton(AF_INET6, $0, &address) } == 1
     }
 
     private func writeLastError(_ text: String) {
@@ -229,10 +331,22 @@ extension PacketTunnelProvider: OpenVPNAdapterDelegate {
 
     /// Здесь закрываем главный риск проекта — петлю маршрутов: CloakTransport
     /// игнорирует endpoint из строки remote, поэтому tunnelRemoteAddress будет
-    /// 127.0.0.1 и автоисключение IP сервера у iOS НЕ сработает. Исключаем сами.
+    /// 127.0.0.1 и автоисключение IP сервера у iOS НЕ сработает. Исключаем сами,
+    /// а если исключить нельзя — туннель не поднимаем (fail-closed): «подключено,
+    /// но трафика нет» хуже честной ошибки.
     func openVPNAdapter(
         _ openVPNAdapter: OpenVPNAdapter,
         configureTunnelWithNetworkSettings networkSettings: NEPacketTunnelNetworkSettings?,
+        completionHandler: @escaping (Error?) -> Void
+    ) {
+        stateQueue.async {
+            self.configureTunnel(networkSettings, completionHandler: completionHandler)
+        }
+    }
+
+    /// Только на stateQueue.
+    private func configureTunnel(
+        _ networkSettings: NEPacketTunnelNetworkSettings?,
         completionHandler: @escaping (Error?) -> Void
     ) {
         guard let settings = networkSettings else {
@@ -241,28 +355,66 @@ extension PacketTunnelProvider: OpenVPNAdapterDelegate {
             return
         }
 
-        // Весь DNS — в туннель (иначе часть запросов уйдёт мимо VPN).
-        let dnsServers = settings.dnsSettings?.servers ?? []
-        if dnsServers.isEmpty {
-            let fallback = dnsFromProfile().isEmpty ? fallbackDNS : dnsFromProfile()
+        func refuse(_ message: String) {
+            logger.log("configureTunnel REFUSED: \(message)")
+            refusalReason = message
+            writeLastError(message)
+            completionHandler(Self.makeError(4, message))
+        }
+
+        // ── DNS: весь — в туннель (иначе часть запросов уйдёт мимо VPN) ──
+        let adapterDNS = (settings.dnsSettings?.servers ?? []).filter(Self.isIPLiteral)
+        if adapterDNS.isEmpty {
+            let fromProfile = dnsFromProfile().filter(Self.isIPLiteral)
+            let fallback = fromProfile.isEmpty ? fallbackDNS.filter(Self.isIPLiteral) : fromProfile
             logger.log("adapter gave no DNS, fallback: \(fallback.joined(separator: ","))")
+            // matchDomains = [""] забирает ВСЕ запросы: с пустым списком серверов
+            // это «подключено, но ничего не резолвится».
+            guard !fallback.isEmpty else {
+                refuse("Нет ни одного DNS-сервера: ни от сервера, ни в профиле, ни в ключе")
+                return
+            }
             settings.dnsSettings = NEDNSSettings(servers: fallback)
         }
         settings.dnsSettings?.matchDomains = [""]
 
-        // Вторая половина защиты от петли (первая — route ... net_gateway в профиле).
-        if let serverIP {
-            let ipv4 = settings.ipv4Settings
-            var excluded = ipv4?.excludedRoutes ?? []
-            excluded.append(NEIPv4Route(destinationAddress: serverIP, subnetMask: "255.255.255.255"))
-            ipv4?.excludedRoutes = excluded
+        // ── Вторая половина защиты от петли (первая — route … net_gateway в профиле) ──
+        guard let serverIP, Self.isIPv4Literal(serverIP) else {
+            refuse("Неизвестен IPv4-адрес сервера — нельзя исключить его из туннеля")
+            return
+        }
+        guard let ipv4 = settings.ipv4Settings else {
+            refuse("Адаптер не выдал IPv4-настройки — нельзя исключить адрес сервера из туннеля")
+            return
+        }
+        var excludedRoutes = ipv4.excludedRoutes ?? []
+        let alreadyExcluded = excludedRoutes.contains {
+            $0.destinationAddress == serverIP && $0.destinationSubnetMask == "255.255.255.255"
+        }
+        if !alreadyExcluded {
+            excludedRoutes.append(NEIPv4Route(destinationAddress: serverIP, subnetMask: "255.255.255.255"))
+        }
+        ipv4.excludedRoutes = excludedRoutes
+        // Свойство объявлено copy — присваиваем обратно явно, не полагаясь на то,
+        // что геттер вернул тот же объект.
+        settings.ipv4Settings = ipv4
+
+        // MTU задаём явно: сервер его не присылает, а значение «по умолчанию»
+        // у iOS не документировано. Сервер OpenVPN в TCP-режиме рвёт соединение
+        // на первом же пакете длиннее своего предела («Bad encapsulated packet
+        // length») — снаружи это выглядит ровно как наш обрыв сразу после
+        // connected. 1400 — с запасом под tun-mtu 1500 на сервере.
+        if settings.mtu == nil {
+            settings.mtu = 1400
         }
 
         let included = settings.ipv4Settings?.includedRoutes?.count ?? 0
         let excluded = settings.ipv4Settings?.excludedRoutes?.count ?? 0
         logger.log("configureTunnel: remote=\(settings.tunnelRemoteAddress) "
-                   + "routes incl=\(included) excl=\(excluded) "
-                   + "dns=\(settings.dnsSettings?.servers.joined(separator: ",") ?? "none")")
+                   + "routes incl=\(included) excl=\(excluded) serverExcluded=\(alreadyExcluded ? "by-profile" : "added") "
+                   + "ipv6=\(settings.ipv6Settings == nil ? "none" : "set") "
+                   + "dns=\(settings.dnsSettings?.servers.joined(separator: ",") ?? "none") "
+                   + "mtu=\(settings.mtu?.stringValue ?? "default")")
 
         setTunnelNetworkSettings(settings) { [weak self] error in
             if let error {
@@ -274,37 +426,45 @@ extension PacketTunnelProvider: OpenVPNAdapterDelegate {
 
     func openVPNAdapter(_ openVPNAdapter: OpenVPNAdapter, handleEvent event: OpenVPNAdapterEvent, message: String?) {
         logger.log("event: \(eventName(event))" + (message.map { " — \($0)" } ?? ""))
+        stateQueue.async { self.handle(event) }
+    }
 
+    /// Только на stateQueue.
+    private func handle(_ event: OpenVPNAdapterEvent) {
         switch event {
         case .connected:
-            cancelStartWatchdog()
-            // Успешный старт: очищаем прошлую ошибку, чтобы приложение её не показывало.
-            if let url = SharedPaths.lastErrorURL { try? FileManager.default.removeItem(at: url) }
-            startCompletion?(nil)
-            startCompletion = nil
+            reasserting = false
+            lastAdapterError = nil
+            if phase == .starting {
+                // Успешный старт: очищаем прошлую ошибку, чтобы приложение её не показывало.
+                if let url = SharedPaths.lastErrorURL { try? FileManager.default.removeItem(at: url) }
+                logger.logMemory("connected")
+                finishStart(nil)
+            }
 
         case .disconnected:
-            adapterStarted = false
-            if stopCompletion != nil {
-                finishStop()
-            } else if startCompletion == nil {
-                // Неожиданный обрыв уже установленного соединения.
+            switch phase {
+            case .starting:
+                // Клиент завершился, не дойдя до .connected — не ждём 30 секунд.
+                let error = lastAdapterError
+                    ?? Self.makeError(7, refusalReason ?? "Соединение разорвано до установления")
+                finishStart(error)
+            case .connected:
                 logger.log("unexpected disconnect — cancelling tunnel")
-                cancelTunnelWithError(nil)
+                phase = .stopped
+                cancelTunnelWithError(lastAdapterError)
+            case .stopping:
+                finishStop()
+            case .idle, .stopped:
+                break
             }
 
         case .reconnecting:
             reasserting = true
-
-        case .assignIP, .addRoutes, .getConfig, .connecting, .wait, .resolve:
-            break
+            packetBridge.reset()
 
         default:
             break
-        }
-
-        if event == .connected {
-            reasserting = false
         }
     }
 
@@ -312,21 +472,34 @@ extension PacketTunnelProvider: OpenVPNAdapterDelegate {
         let nsError = error as NSError
         let fatal = (nsError.userInfo[OpenVPNAdapterErrorFatalKey] as? Bool) ?? false
         logger.log("error(fatal=\(fatal)): \(describe(error))")
+        // Что успело пройти через туннель к моменту ошибки — главный след
+        // для обрывов вида PT_SIZE_ERROR.
+        logger.log("packets at error: \(packetBridge.summary())")
 
-        guard fatal else { return }
+        stateQueue.async {
+            self.lastAdapterError = error
+            guard fatal else { return }
 
-        writeLastError(describe(error))
-        cancelStartWatchdog()
-        if let completion = startCompletion {
-            startCompletion = nil
-            completion(error)
-        } else {
-            cancelTunnelWithError(error)
+            // Если туннель отказались поднимать мы сами, наш текст понятнее.
+            let reported: Error = self.refusalReason.map { Self.makeError(4, $0) } ?? error
+            self.writeLastError(self.refusalReason ?? self.describe(error))
+
+            switch self.phase {
+            case .starting:
+                self.finishStart(reported)
+            case .connected:
+                self.phase = .stopped
+                self.cancelTunnelWithError(reported)
+            case .idle, .stopping, .stopped:
+                break
+            }
         }
     }
 
     func openVPNAdapter(_ openVPNAdapter: OpenVPNAdapter, handleLogMessage logMessage: String) {
-        logger.log("ovpn: \(logMessage)")
+        // Сообщения ядра приходят с хвостовым переводом строки — без обрезки
+        // лог наполовину состоит из пустых строк.
+        logger.log("ovpn: \(logMessage.trimmingCharacters(in: .whitespacesAndNewlines))")
     }
 
     private func eventName(_ event: OpenVPNAdapterEvent) -> String {
@@ -355,8 +528,3 @@ extension PacketTunnelProvider: OpenVPNAdapterDelegate {
         }
     }
 }
-
-/// Протокол фреймворка в точности повторяет методы NEPacketTunnelFlow —
-/// мост между ними пустой. @retroactive: конформанс чужого типа чужому
-/// протоколу здесь осознанный (документированный паттерн OpenVPNAdapter).
-extension NEPacketTunnelFlow: @retroactive OpenVPNAdapterPacketFlow {}

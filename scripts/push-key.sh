@@ -25,7 +25,12 @@ if [[ ! -s "$KEY_FILE" ]]; then
     echo "      mkdir -p Secrets && pbpaste > Secrets/my.vpnkey"
     exit 2
 fi
-if [[ "$(head -c 6 "$KEY_FILE")" != "vpn://" ]]; then
+# Диагностика: готовый .ovpn без Cloak (например, к временному тестовому серверу)
+# принимается как есть; всё остальное обязано быть ключом vpn://.
+REMOTE_NAME="debug.vpnkey"
+if [[ "$KEY_FILE" == *.ovpn ]]; then
+    REMOTE_NAME="debug.ovpn"
+elif [[ "$(head -c 6 "$KEY_FILE")" != "vpn://" ]]; then
     echo "FAIL: $KEY_FILE не начинается с vpn:// — это не ключ формата «For the AmneziaVPN app»."
     exit 2
 fi
@@ -36,12 +41,12 @@ IFS=$'\t' read -r UDID DEVICE_NAME OS_VERSION <<<"$DEVICE_LINE"
 # Копируем под фиксированным именем: исходное имя файла приложению не важно.
 STAGE="$(mktemp -d)"
 trap 'rm -rf "$STAGE"' EXIT
-cp "$KEY_FILE" "$STAGE/debug.vpnkey"
+cp "$KEY_FILE" "$STAGE/$REMOTE_NAME"
 
 echo "Копирую ключ в приложение на «${DEVICE_NAME}»…"
 if ! xcrun devicectl device copy to --device "$UDID" \
         --domain-type appDataContainer --domain-identifier "$APP_BUNDLE_ID" \
-        --source "$STAGE/debug.vpnkey" --destination "Documents/debug.vpnkey" >"$STAGE/copy.log" 2>&1; then
+        --source "$STAGE/$REMOTE_NAME" --destination "Documents/$REMOTE_NAME" >"$STAGE/copy.log" 2>&1; then
     echo "FAIL: не удалось скопировать ключ:"
     grep -v "^[0-9][0-9]:" "$STAGE/copy.log" | tail -6 | sed 's/^/    /'
     echo "      Приложение установлено? (make install). Телефон разблокирован?"

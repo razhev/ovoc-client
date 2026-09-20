@@ -114,7 +114,13 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
 
         // Включает Cloak-транспорт; сам конфиг Cloak фреймворк читает
         // из блока <cloak> внутри fileContent (метод аргументов не имеет).
-        configuration.setPTCloak()
+        // Только при наличии блока — как в клиенте Amnezia: профиль без <cloak>
+        // (диагностический, make push-key KEY=….ovpn) идёт обычным OpenVPN по TCP.
+        let usesCloak = ovpn.contains("<cloak>")
+        if usesCloak {
+            configuration.setPTCloak()
+        }
+        logger.log("transport: \(usesCloak ? "Cloak (pluggable transport)" : "plain OpenVPN, no Cloak")")
 
         do {
             let evaluation = try adapter.apply(configuration: configuration)

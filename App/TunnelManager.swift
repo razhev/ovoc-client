@@ -74,9 +74,16 @@ final class TunnelManager: ObservableObject {
         defer { try? FileManager.default.removeItem(at: url) }
         do {
             let key = try String(contentsOf: url, encoding: .utf8)
-            let config = try await Task.detached(priority: .userInitiated) {
-                try ImportedConfig.make(fromKey: key)
-            }.value
+            let config: ImportedConfig
+            if url.pathExtension == "ovpn" {
+                // Диагностика: готовый .ovpn без Cloak (например, к временному
+                // тестовому серверу). Мимо ConfigKit — там обязателен контейнер Cloak.
+                config = try Self.rawProfileConfig(key)
+            } else {
+                config = try await Task.detached(priority: .userInitiated) {
+                    try ImportedConfig.make(fromKey: key)
+                }.value
+            }
             try await apply(config: config)
             // В лог — только размеры: ни ключ, ни адреса туда не попадают.
             logger.log("debug key imported: profile=\(config.ovpnProfile.utf8.count) bytes")
@@ -89,8 +96,20 @@ final class TunnelManager: ObservableObject {
         }
     }
 
+    /// Сырой .ovpn → ImportedConfig: адрес сервера берём из строки `remote`.
+    private static func rawProfileConfig(_ ovpn: String) throws -> ImportedConfig {
+        let remote = ovpn.split(whereSeparator: \.isNewline)
+            .map { $0.split(separator: " ", omittingEmptySubsequences: true) }
+            .first { $0.first == "remote" && $0.count >= 2 }
+        guard let host = remote.map({ String($0[1]) }), ImportedConfig.isIPv4Literal(host) else {
+            throw VPNKeyError.missingField("remote <IPv4> в .ovpn")
+        }
+        return ImportedConfig(ovpnProfile: ovpn, serverIP: host, dns1: "1.1.1.1", dns2: "1.0.0.1",
+                              description: "DEBUG .ovpn → \(host)")
+    }
+
     /// devicectl может положить файл как Documents/debug.vpnkey или как
-    /// Documents/debug.vpnkey/<имя исходного файла> — ищем *.vpnkey на двух уровнях.
+    /// Documents/debug.vpnkey/<имя исходного файла> — ищем *.vpnkey / *.ovpn на двух уровнях.
     private static func findDebugKey() -> URL? {
         let fm = FileManager.default
         guard let documents = fm.urls(for: .documentDirectory, in: .userDomainMask).first,
@@ -100,7 +119,7 @@ final class TunnelManager: ObservableObject {
         for case let url as URL in enumerator {
             if enumerator.level > 2 { enumerator.skipDescendants(); continue }
             let isFile = (try? url.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile) ?? false
-            if isFile, url.pathExtension == "vpnkey" { return url }
+            if isFile, ["vpnkey", "ovpn"].contains(url.pathExtension) { return url }
         }
         return nil
     }

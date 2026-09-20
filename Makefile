@@ -3,7 +3,7 @@
 PROJECT := PersonalVPN.xcodeproj
 SCHEME  := PersonalVPN
 
-.PHONY: gen build test fetch verify devices ddi install logs crashlogs clean
+.PHONY: gen build test fetch verify devices ddi install push-key logs crashlogs clean
 
 ## Сгенерировать PersonalVPN.xcodeproj из project.yml
 gen:
@@ -40,6 +40,11 @@ ddi:
 ## Несколько устройств: make install DEVICE=<udid|имя>
 install: gen
 	./scripts/install-device.sh
+
+## DEBUG-мост M3: доставить Secrets/my.vpnkey в установленное приложение (ключ
+## не попадает в сборку). Другой файл: make push-key KEY=путь
+push-key:
+	@./scripts/push-key.sh $(KEY)
 
 ## Забрать логи с телефона в build/logs/latest/ (tunnel.log, app.log, last_error.txt)
 logs:

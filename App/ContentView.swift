@@ -20,6 +20,13 @@ struct ContentView: View {
                 Text(tunnel.status.localizedText)
                     .font(.title2)
 
+                // Видно, что именно поднимет кнопка: боевой туннель или пустышку M1.
+                if tunnel.status != .invalid {
+                    Text(tunnel.hasRealConfig ? "Профиль: сервер" : "Профиль: тестовая пустышка")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
                 Button(action: toggle) {
                     Text(buttonTitle)
                         .font(.headline)
@@ -29,6 +36,14 @@ struct ContentView: View {
                 .buttonStyle(.borderedProminent)
                 .padding(.horizontal, 40)
                 .disabled(busy || tunnel.status == .disconnecting)
+
+                if let notice = tunnel.notice {
+                    Text(notice)
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, 24)
+                }
 
                 if let error = tunnel.lastError {
                     Text(error)

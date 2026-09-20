@@ -16,9 +16,13 @@ APP_BUNDLE_ID="com.razhev.personalvpn"
 DEVICE_LINE="$(python3 scripts/find-device.py)" || exit $?
 UDID="$(cut -f1 <<<"$DEVICE_LINE")"
 
+# «--» обязателен: без него devicectl разбирает -autoconnect как свои опции (-a -u -t …).
+LAUNCH_LOG="$(mktemp)"
+trap 'rm -f "$LAUNCH_LOG"' EXIT
 if ! xcrun devicectl device process launch --device "$UDID" --terminate-existing \
-        "$APP_BUNDLE_ID" "$@" >/dev/null 2>&1; then
-    echo "FAIL: приложение не запустилось — телефон заблокирован или приложение не установлено."
+        "$APP_BUNDLE_ID" -- "$@" >"$LAUNCH_LOG" 2>&1; then
+    echo "FAIL: приложение не запустилось (телефон заблокирован? приложение установлено?):"
+    grep -v -E "^[0-9]{2}:[0-9]{2}:[0-9]{2}" "$LAUNCH_LOG" | head -6 | sed 's/^/    /'
     exit 7
 fi
 echo "OK: PersonalVPN перезапущен${*:+ с аргументами: $*}"

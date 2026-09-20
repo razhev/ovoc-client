@@ -17,6 +17,11 @@ final class PacketFlowBridge: NSObject, OpenVPNAdapterPacketFlow {
     private let flow: NEPacketTunnelFlow
     private let logger: RingLogger
 
+    /// IPv4 VPN-сервера (4 байта). Пакет с таким адресом назначения внутри туннеля —
+    /// это петля маршрутов: собственное соединение Cloak завернулось в наш же туннель.
+    var serverAddress: [UInt8]?
+    private var loopedPackets = 0
+
     private let lock = NSLock()
     private var outbound = Counter()
     private var inbound = Counter()
@@ -40,6 +45,7 @@ final class PacketFlowBridge: NSObject, OpenVPNAdapterPacketFlow {
         lock.lock()
         outbound = Counter()
         inbound = Counter()
+        loopedPackets = 0
         detailedBatchesLeft = 24
         lock.unlock()
     }
@@ -49,7 +55,8 @@ final class PacketFlowBridge: NSObject, OpenVPNAdapterPacketFlow {
         lock.lock()
         defer { lock.unlock() }
         return "tun→vpn \(outbound.packets) pkt / \(outbound.bytes) B (max \(outbound.maxSize)), "
-             + "vpn→tun \(inbound.packets) pkt / \(inbound.bytes) B (max \(inbound.maxSize))"
+             + "vpn→tun \(inbound.packets) pkt / \(inbound.bytes) B (max \(inbound.maxSize)), "
+             + "to-server-inside-tunnel \(loopedPackets)"
     }
 
     // MARK: - OpenVPNAdapterPacketFlow
@@ -74,7 +81,18 @@ final class PacketFlowBridge: NSObject, OpenVPNAdapterPacketFlow {
         guard !packets.isEmpty else { return }
         let sizes = packets.map(\.count)
 
+        // Петля: исходящий IPv4-пакет, адресованный самому VPN-серверу (байты 16–19 заголовка).
+        var looped = 0
+        if isOutbound, let server = serverAddress {
+            for packet in packets where packet.count >= 20 && packet[packet.startIndex] >> 4 == 4 {
+                let start = packet.startIndex + 16
+                if Array(packet[start..<start + 4]) == server { looped += 1 }
+            }
+        }
+
         lock.lock()
+        loopedPackets += looped
+        let firstLoop = looped > 0 && loopedPackets == looped
         var counter = isOutbound ? outbound : inbound
         counter.packets += sizes.count
         counter.bytes += sizes.reduce(0, +)
@@ -86,6 +104,10 @@ final class PacketFlowBridge: NSObject, OpenVPNAdapterPacketFlow {
         if detailed { detailedBatchesLeft -= 1 }
         lock.unlock()
 
+        if firstLoop {
+            logger.log("ROUTING LOOP: packets to the VPN server are entering the tunnel (n=\(looped), "
+                       + "sizes=\(sizes.map(String.init).joined(separator: ",")))")
+        }
         if detailed {
             logger.log("pkt \(direction) n=\(sizes.count) sizes=\(sizes.prefix(12).map(String.init).joined(separator: ","))")
         } else if counter.maxSize > previousMax, counter.maxSize > 1400 {

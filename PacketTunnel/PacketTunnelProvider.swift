@@ -142,6 +142,7 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
         phase = .starting
         startCompletion = completionHandler
         armStartWatchdog()
+        packetBridge.serverAddress = serverIP.split(separator: ".").compactMap { UInt8($0) }
         packetBridge.reset()
         adapter.connect(using: packetBridge)
     }

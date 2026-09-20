@@ -1,0 +1,55 @@
+diff --git a/openvpn/mbedtls/crypto/cipher.hpp b/openvpn/mbedtls/crypto/cipher.hpp
+index 1e322a4..136fdff 100644
+--- a/openvpn/mbedtls/crypto/cipher.hpp
++++ b/openvpn/mbedtls/crypto/cipher.hpp
+@@ -52,13 +52,17 @@ class CipherContextCommon
+     };
+ 
+     /**
+-     * This crypto library requires the auth tag to be at the end for
+-     * encryption and decryption
+-     * @return
++     * The AEAD calls below use the mbed TLS 2.x API (mbedtls_cipher_auth_encrypt /
++     * mbedtls_cipher_auth_decrypt), which takes the auth tag through a SEPARATE
++     * pointer. Returning true here (correct only for the 3.x *_ext API, which
++     * appends the tag to the output) made crypto_aead.hpp copy 16 uninitialized
++     * bytes from the end of the work buffer over the freshly computed tag, so every
++     * outgoing data packet carried a garbage tag and any OpenVPN server rejected it
++     * with "AEAD Decrypt error: cipher final failed".
+      */
+     bool constexpr requires_authtag_at_end()
+     {
+-        return true;
++        return false;
+     }
+ 
+   protected:
+diff --git a/openvpn/mbedtls/crypto/cipheraead.hpp b/openvpn/mbedtls/crypto/cipheraead.hpp
+index d8e1663..df91612 100644
+--- a/openvpn/mbedtls/crypto/cipheraead.hpp
++++ b/openvpn/mbedtls/crypto/cipheraead.hpp
+@@ -128,17 +128,17 @@ class CipherContextAEAD : public CipherContextCommon
+     {
+         check_initialized();
+ 
+-        size_t olen;
++        size_t olen = 0;
+ 
+         // Older versions of mbed TLS have the tag a non const, even though it is
+-
+-        // not modified, const cast it here
+-
+-        const int status = mbedtls_cipher_auth_encrypt(&ctx, iv, IV_LEN, ad, ad_len, input, length, output, &length,
+-
++        // not modified, const cast it here.
++        // This MUST be auth_decrypt: it verifies the tag. The previous code called
++        // mbedtls_cipher_auth_encrypt here, which "succeeds" for any input, i.e.
++        // incoming data packets were never authenticated.
++        const int status = mbedtls_cipher_auth_decrypt(&ctx, iv, IV_LEN, ad, ad_len, input, length, output, &olen,
+                                    const_cast<unsigned char*>(tag), AUTH_TAG_LEN);
+ 
+-        return status == 0;
++        return (olen == length) && (status == 0);
+ 
+ 
+     }

@@ -21,8 +21,10 @@
 процессов, `OpenVPNAdapter.framework` загружается в процессе расширения (4 МБ памяти при лимите
 ~50 МБ), обычный интернет при этом работает, отключение и повторное подключение — тоже.
 
-Сейчас: **M3** — реальное соединение OpenVPN over Cloak, этап D в
-[docs/DEVICE-TESTING.md](docs/DEVICE-TESTING.md).
+**M3 (2026-09-20): реальное соединение OpenVPN over Cloak поднимается и держится** — после
+того как найден и исправлен дефект готового фреймворка (разбор — в
+[docs/DEVICE-TESTING.md](docs/DEVICE-TESTING.md)). Идёт проверка гейта M3: IP сервера,
+стабильность 10 минут, память, переподключение, IPv6, Wi-Fi ↔ LTE.
 
 ## Команды
 
@@ -32,7 +34,8 @@
 make gen        # сгенерировать PersonalVPN.xcodeproj из project.yml
 make build      # собрать оба таргета БЕЗ подписи — быстрая проверка компиляции
 make test       # юнит-тесты ConfigKit — на Mac, телефон не нужен
-make fetch      # скачать OpenVPNAdapter.framework (SHA-256 зафиксирован)
+make framework  # собрать OpenVPNAdapter.framework из исходников Amnezia + наш патч (основной способ)
+make fetch      # готовый бинарь v1.0.42 — НЕРАБОЧИЙ (дефект метки GCM), только для сравнения
 make verify     # ворота: arm64? символы Cloak? setPTCloak в заголовках?
 
 make devices    # какие iPhone видит Mac и готовы ли они к установке
@@ -62,7 +65,9 @@ python3 scripts/decode-vpnkey.py --schema Secrets/my.vpnkey
 
 - SwiftUI-приложение + одно расширение `NEPacketTunnelProvider`. Device-only
   (VPN не работает в симуляторе), deployment target iOS 16.0.
-- Готовый бинарный `OpenVPNAdapter.framework` от Amnezia: Cloak скомпилирован
+- `OpenVPNAdapter.framework` от Amnezia, **собранный из исходников с нашим патчем**
+  (`make framework`, `patches/`): в их готовом бинаре клиент не записывает метку
+  подлинности GCM, и сервер отбрасывает каждый пакет. Cloak скомпилирован
   внутрь OpenVPN3 как транспорт. Со стороны Swift: `setPTCloak()` + блок
   `<cloak>` в тексте профиля.
 - **ConfigKit** — локальный SPM-пакет со всей логикой разбора ключа `vpn://…`

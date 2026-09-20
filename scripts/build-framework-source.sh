@@ -1,51 +1,84 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# ЗАПАСНОЙ ПУТЬ: сборка OpenVPNAdapter.framework из исходников форка Amnezia.
-# Нужен только если:
-#   - готовый бинарь не прошёл ворота verify-framework.sh, ИЛИ
-#   - на iOS 26 воспроизвёлся баг «подключено, но трафика нет»
-#     (amnezia-client#2072 — чинится фиксами марта 2026 в HEAD master-amnezia).
+# ОСНОВНОЙ способ получить OpenVPNAdapter.framework: сборка из исходников форка
+# Amnezia с нашим исправлением — `make framework`.
 #
-# ВАЖНО: SPM у форка сломан (OpenVPN3 — сабмодуль, не резолвится),
-# podspec указывает на чужой upstream — поэтому ТОЛЬКО клон + их .xcodeproj.
-# Требуется Go (Cloak-плагин собирается на этапе их сборки).
+# Почему не готовый бинарь (scripts/fetch-framework.sh, релиз v1.0.42): в нём дефект,
+# из-за которого VPN не работает вообще. Клиент шифрует пакеты данных правильно, но
+# вместо 16-байтной метки подлинности GCM отправляет мусор из памяти, и любой сервер
+# OpenVPN рвёт соединение («AEAD Decrypt error: cipher final failed»; на клиенте —
+# «PT_SIZE_ERROR» и переподключение каждые 5 секунд; тот же симптом —
+# amnezia-client#2072). Разбор — docs/DEVICE-TESTING.md, «Итог первой попытки M3».
+# Исправление — patches/openvpn3-aead-auth-tag.patch (заодно включает проверку метки
+# у ВХОДЯЩИХ пакетов, которой в форке не было совсем).
+#
+# Что фиксируем:
+#   - коммит адаптера 8bb3da5 — тот, из которого собран релиз v1.0.42; его подмодуль
+#     OpenVPN3 (e901077, «3.8.5») — последняя линия форка, где есть транспорт Cloak.
+#     HEAD ветки master-amnezia НЕ годится: там OpenVPN3 без Cloak;
+#   - Cloak подключается готовой Go-библиотекой из их репозитория
+#     (Lib/ios/arm64/ck-ovpn-plugin.a) — её мы не пересобираем.
+# SPM у форка сломан (OpenVPN3 — сабмодуль), podspec указывает на чужой upstream —
+# поэтому только клон + их .xcodeproj.
+
+ADAPTER_REPO="https://github.com/amnezia-vpn/OpenVPNAdapter"
+ADAPTER_COMMIT="8bb3da5"
+OPENVPN3_COMMIT="e901077a05a5e3d018260d0955acb1a21e05578d"
+DEPLOYMENT_TARGET="16.0"   # как у приложения; в проекте форка стоит 10.0 — Xcode 26 его не поддерживает
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 SRC="$ROOT/build/OpenVPNAdapter-src"
-DEST="$ROOT/Frameworks"
 DERIVED="$ROOT/build/DerivedData-OpenVPNAdapter"
+PATCH="$ROOT/patches/openvpn3-aead-auth-tag.patch"
+DEST="$ROOT/Frameworks"
+BUILD_LOG="$ROOT/build/framework-build.log"
 
-if [[ ! -d "$SRC" ]]; then
-    git clone --recursive -b master-amnezia \
-        https://github.com/amnezia-vpn/OpenVPNAdapter "$SRC"
-else
-    echo "Источники уже склонированы: $SRC (git pull — вручную, чтобы не съехать с проверенного коммита)"
+# ── 1. Исходники на зафиксированных коммитах ──
+if [[ ! -d "$SRC/.git" ]]; then
+    git clone --filter=blob:none -b master-amnezia "$ADAPTER_REPO" "$SRC"
+fi
+cd "$SRC"
+git checkout -q "$ADAPTER_COMMIT"
+git submodule update --init --depth 1
+
+ACTUAL_OPENVPN3="$(git -C Sources/OpenVPN3 rev-parse HEAD)"
+if [[ "$ACTUAL_OPENVPN3" != "$OPENVPN3_COMMIT" ]]; then
+    echo "FAIL: подмодуль OpenVPN3 на коммите $ACTUAL_OPENVPN3, ожидали $OPENVPN3_COMMIT"
+    exit 1
+fi
+if [[ "$(shasum -a 256 Lib/ios/arm64/ck-ovpn-plugin.a | awk '{print $1}')" != \
+      "$(grep -o -E '[0-9a-f]{64}' Lib/ios/arm64/ck-ovpn-plugin.a.sha256 | head -1)" ]]; then
+    echo "FAIL: ck-ovpn-plugin.a не совпадает со своим .sha256 из репозитория"
+    exit 1
 fi
 
-cd "$SRC"
-echo "Доступные схемы:"
-xcodebuild -list -project OpenVPNAdapter.xcodeproj
+# ── 2. Наше исправление ──
+git -C Sources/OpenVPN3 checkout -q -- .                  # чистое дерево перед патчем
+git -C Sources/OpenVPN3 apply --check "$PATCH"
+git -C Sources/OpenVPN3 apply "$PATCH"
+echo "PASS патч применён: ${PATCH#"$ROOT"/}"
 
-# Имя схемы сверяем с выводом -list; ожидаемое — фреймворк-таргет для iOS.
-SCHEME="${SCHEME:-OpenVPNAdapter (iOS)}"
+# ── 3. Сборка ──
+echo "Сборка фреймворка… (полный лог: ${BUILD_LOG#"$ROOT"/})"
+if ! xcodebuild -project OpenVPNAdapter.xcodeproj -scheme OpenVPNAdapter \
+        -configuration Release -destination 'generic/platform=iOS' \
+        -derivedDataPath "$DERIVED" build \
+        CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO \
+        IPHONEOS_DEPLOYMENT_TARGET="$DEPLOYMENT_TARGET" >"$BUILD_LOG" 2>&1; then
+    echo "FAIL: сборка не прошла. Ошибки дословно:"
+    grep -E "error:" "$BUILD_LOG" | sort -u | head -20 | sed 's/^/    /'
+    exit 1
+fi
 
-xcodebuild -project OpenVPNAdapter.xcodeproj \
-    -scheme "$SCHEME" \
-    -configuration Release \
-    -destination 'generic/platform=iOS' \
-    -derivedDataPath "$DERIVED" \
-    build \
-    CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO
-
-FW_PATH="$(find "$DERIVED/Build/Products" -name 'OpenVPNAdapter.framework' -type d | head -1)"
-if [[ -z "$FW_PATH" ]]; then
-    echo "FAIL: собранный OpenVPNAdapter.framework не найден в $DERIVED"
+FW_PATH="$DERIVED/Build/Products/Release-iphoneos/OpenVPNAdapter.framework"
+if [[ ! -d "$FW_PATH" ]]; then
+    echo "FAIL: собранный OpenVPNAdapter.framework не найден: $FW_PATH"
     exit 1
 fi
 
 rm -rf "$DEST/OpenVPNAdapter.framework"
 mkdir -p "$DEST"
 cp -R "$FW_PATH" "$DEST/"
-echo "OK: $DEST/OpenVPNAdapter.framework (из исходников)"
-echo "Дальше обязательно: ./scripts/verify-framework.sh"
+echo "OK: ${DEST#"$ROOT"/}/OpenVPNAdapter.framework (из исходников, с исправлением метки GCM)"
+echo "Дальше обязательно: make verify"

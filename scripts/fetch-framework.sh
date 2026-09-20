@@ -4,6 +4,11 @@ set -euo pipefail
 # Скачивает готовый OpenVPNAdapter.framework от Amnezia
 # (внутри: OpenVPN3 + mbedTLS + Cloak, iOS arm64 only) и фиксирует SHA-256.
 #
+# ВНИМАНИЕ: этот бинарь (v1.0.42) НЕРАБОЧИЙ — клиент отправляет мусор вместо метки
+# подлинности GCM, и сервер OpenVPN отбрасывает каждый пакет данных. Для работы нужен
+# `make framework` (сборка из исходников с исправлением). Скрипт оставлен только
+# для сравнения и воспроизведения дефекта.
+#
 # Запасной источник, если релиз пропадёт (см. docs/IMPLEMENTATION.md, шаг 0.2):
 #   репозиторий amnezia-vpn/3rd-prebuilt, ветка feature/special-handshake,
 #   путь openvpn/apple/OpenVPNAdapter-ios/OpenVPNAdapter.framework

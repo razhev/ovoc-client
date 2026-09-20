@@ -36,7 +36,9 @@ make fetch      # скачать OpenVPNAdapter.framework (SHA-256 зафикс�
 make verify     # ворота: arm64? символы Cloak? setPTCloak в заголовках?
 
 make devices    # какие iPhone видит Mac и готовы ли они к установке
+make ddi        # смонтировать на телефон образ разработчика (VPN на Mac выключить)
 make install    # подписанная сборка → установка на подключённый iPhone → запуск
+make push-key   # M3: доставить Secrets/my.vpnkey в установленное приложение
 make logs       # забрать логи с телефона в build/logs/latest/
 make crashlogs  # то же + отчёты о падениях расширения/приложения
 ```
@@ -48,6 +50,12 @@ make crashlogs  # то же + отчёты о падениях расширен�
 
 ```bash
 python3 scripts/decode-vpnkey.py Secrets/my.vpnkey > Secrets/my-decoded.json
+```
+
+Только структура ключа, без секретов (можно показывать в чате):
+
+```bash
+python3 scripts/decode-vpnkey.py --schema Secrets/my.vpnkey
 ```
 
 ## Архитектура (коротко)

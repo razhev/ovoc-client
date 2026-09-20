@@ -27,6 +27,11 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
         return adapter
     }()
 
+    /// Поток пакетов адаптер получает через мост (см. PacketFlowBridge), а не
+    /// напрямую: так сделано в починенной версии клиента Amnezia, и только
+    /// в мосте видно размеры пакетов.
+    private lazy var packetBridge = PacketFlowBridge(flow: packetFlow, logger: logger)
+
     // ── Состояние: читать и менять только на stateQueue ──
 
     private enum Phase { case idle, starting, connected, stopping, stopped }
@@ -97,22 +102,16 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
 
         let configuration = OpenVPNConfiguration()
         configuration.fileContent = ovpn.data(using: .utf8)
-        configuration.tunPersist = true
-        // Рецепт самой Amnezia (amnezia-client PR #2360 «fix: ios ovpn fix»).
-        // Значение enum по умолчанию — 0 (.enabled, сжатие в обе стороны), а серверу
-        // нужен режим «только заглушки». Без этого клиент не объявляет серверу
-        // поддержку заглушек сжатия, и соединение рвётся, как только идут данные:
-        // у нас это выглядело как PT_SIZE_ERROR и переподключение каждые 5 секунд
-        // (тот же симптом — amnezia-client#2072).
-        configuration.compressionMode = .disabled
-        // Заглушки объявляем и явно: в этой сборке ядра peerInfo только ДОПОЛНЯЕТ
-        // peer-info (переопределять IV_VER/IV_PROTO она не умеет), поэтому берём
-        // из рецепта Amnezia лишь те ключи, которых ядро само не отправляет.
-        configuration.peerInfo = [
-            "IV_LZO_STUB": "1",
-            "IV_COMP_STUB": "1",
-            "IV_COMP_STUBv2": "1",
-        ]
+        // tunPersist НЕ включаем: рабочий код Amnezia (4.8.12.x) его не ставит.
+        // С ним при цикле переподключений туннель продолжал забирать весь трафик,
+        // и телефон оставался без интернета.
+        //
+        // Проверено и отброшено: compressionMode / peerInfo из более позднего
+        // рецепта Amnezia (PR #2360). В этой сборке ядра пользовательский
+        // peer-info уходит серверу только при директиве push-peer-info в профиле,
+        // а заглушки сжатия объявляются только при compress/comp-lzo — у нас нет
+        // ни того, ни другого, в Peer Info ничего не менялось.
+
         // Включает Cloak-транспорт; сам конфиг Cloak фреймворк читает
         // из блока <cloak> внутри fileContent (метод аргументов не имеет).
         configuration.setPTCloak()
@@ -143,7 +142,8 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
         phase = .starting
         startCompletion = completionHandler
         armStartWatchdog()
-        adapter.connect(using: packetFlow)
+        packetBridge.reset()
+        adapter.connect(using: packetBridge)
     }
 
     private func startDummyTunnel(completionHandler: @escaping (Error?) -> Void) {
@@ -237,7 +237,7 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
         completion()
     }
 
-    // MARK: - Sleep/wake (v1 — простой проброс; tunPersist держит туннель)
+    // MARK: - Sleep/wake (v1 — простой проброс)
 
     override func sleep(completionHandler: @escaping () -> Void) {
         logger.log("sleep")
@@ -391,6 +391,15 @@ extension PacketTunnelProvider: OpenVPNAdapterDelegate {
         // что геттер вернул тот же объект.
         settings.ipv4Settings = ipv4
 
+        // MTU задаём явно: сервер его не присылает, а значение «по умолчанию»
+        // у iOS не документировано. Сервер OpenVPN в TCP-режиме рвёт соединение
+        // на первом же пакете длиннее своего предела («Bad encapsulated packet
+        // length») — снаружи это выглядит ровно как наш обрыв сразу после
+        // connected. 1400 — с запасом под tun-mtu 1500 на сервере.
+        if settings.mtu == nil {
+            settings.mtu = 1400
+        }
+
         let included = settings.ipv4Settings?.includedRoutes?.count ?? 0
         let excluded = settings.ipv4Settings?.excludedRoutes?.count ?? 0
         logger.log("configureTunnel: remote=\(settings.tunnelRemoteAddress) "
@@ -444,6 +453,7 @@ extension PacketTunnelProvider: OpenVPNAdapterDelegate {
 
         case .reconnecting:
             reasserting = true
+            packetBridge.reset()
 
         default:
             break
@@ -454,6 +464,9 @@ extension PacketTunnelProvider: OpenVPNAdapterDelegate {
         let nsError = error as NSError
         let fatal = (nsError.userInfo[OpenVPNAdapterErrorFatalKey] as? Bool) ?? false
         logger.log("error(fatal=\(fatal)): \(describe(error))")
+        // Что успело пройти через туннель к моменту ошибки — главный след
+        // для обрывов вида PT_SIZE_ERROR.
+        logger.log("packets at error: \(packetBridge.summary())")
 
         stateQueue.async {
             self.lastAdapterError = error
@@ -507,8 +520,3 @@ extension PacketTunnelProvider: OpenVPNAdapterDelegate {
         }
     }
 }
-
-/// Протокол фреймворка в точности повторяет методы NEPacketTunnelFlow —
-/// мост между ними пустой. @retroactive: конформанс чужого типа чужому
-/// протоколу здесь осознанный (документированный паттерн OpenVPNAdapter).
-extension NEPacketTunnelFlow: @retroactive OpenVPNAdapterPacketFlow {}

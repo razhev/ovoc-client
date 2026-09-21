@@ -22,7 +22,4 @@ enum SharedPaths {
 
     /// Последняя фатальная ошибка туннеля — приложение показывает её под кнопкой.
     static var lastErrorURL: URL? { containerURL?.appendingPathComponent("last_error.txt") }
-
-    /// Импортированный конфиг (ImportedConfig в JSON).
-    static var configURL: URL? { containerURL?.appendingPathComponent("config.json") }
 }

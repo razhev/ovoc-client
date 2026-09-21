@@ -1,13 +1,13 @@
 import SwiftUI
 import NetworkExtension
 
-/// Единственный экран v1: статус + большая кнопка «Подключить».
-/// Пока нет импортёра (M4), первое нажатие создаёт профиль-пустышку —
-/// ровно то, что проверяет M1.
+/// Главный экран: статус + большая кнопка «Подключить». Пока ключ не
+/// импортирован, вместо неё — приглашение добавить ключ (экран ImportView).
 struct ContentView: View {
     @StateObject private var tunnel = TunnelManager()
     @State private var busy = false
     @State private var launchActionDone = false
+    @State private var showingImport = false
 
     var body: some View {
         NavigationStack {
@@ -18,25 +18,42 @@ struct ContentView: View {
                     .font(.system(size: 64))
                     .foregroundStyle(tunnel.status == .connected ? .green : .secondary)
 
-                Text(tunnel.status.localizedText)
-                    .font(.title2)
+                if needsKey {
+                    // Первый запуск (или профиль удалён в Настройках): подключаться
+                    // некуда — предлагаем импорт, а не кнопку «Подключить».
+                    Text("Ключ не добавлен")
+                        .font(.title2)
 
-                // Видно, что именно поднимет кнопка: боевой туннель или пустышку M1.
-                if tunnel.status != .invalid {
-                    Text(tunnel.hasRealConfig ? "Профиль: сервер" : "Профиль: тестовая пустышка")
-                        .font(.caption)
+                    Text("Чтобы подключаться к серверу, добавьте ключ vpn://… — его выдаёт владелец сервера.")
+                        .font(.callout)
                         .foregroundStyle(.secondary)
-                }
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, 32)
 
-                Button(action: toggle) {
-                    Text(buttonTitle)
-                        .font(.headline)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 14)
+                    Button {
+                        showingImport = true
+                    } label: {
+                        Text("Добавить ключ")
+                            .font(.headline)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 14)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .padding(.horizontal, 40)
+                } else {
+                    Text(tunnel.status.localizedText)
+                        .font(.title2)
+
+                    Button(action: toggle) {
+                        Text(buttonTitle)
+                            .font(.headline)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 14)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .padding(.horizontal, 40)
+                    .disabled(busy || !tunnel.isLoaded || tunnel.status == .disconnecting)
                 }
-                .buttonStyle(.borderedProminent)
-                .padding(.horizontal, 40)
-                .disabled(busy || tunnel.status == .disconnecting)
 
                 if let notice = tunnel.notice {
                     Text(notice)
@@ -60,13 +77,28 @@ struct ContentView: View {
             }
             .navigationTitle("PersonalVPN")
             .toolbar {
+                // Смена ключа; пока ключа нет, вход в импорт — большая кнопка по центру.
+                ToolbarItem(placement: .navigationBarLeading) {
+                    if tunnel.hasRealConfig {
+                        Button {
+                            showingImport = true
+                        } label: {
+                            Image(systemName: "key")
+                        }
+                        .accessibilityLabel("Сменить ключ")
+                    }
+                }
                 ToolbarItem(placement: .primaryAction) {
                     NavigationLink {
                         LogView()
                     } label: {
                         Image(systemName: "doc.text")
                     }
+                    .accessibilityLabel("Логи")
                 }
+            }
+            .sheet(isPresented: $showingImport) {
+                ImportView(tunnel: tunnel)
             }
             .task {
                 await tunnel.load()
@@ -82,13 +114,25 @@ struct ContentView: View {
                     await tunnel.connect()
                 } else if arguments.contains("-autodisconnect") {
                     tunnel.stop()
+                } else if arguments.contains("-dummyprofile") {
+                    await tunnel.connectDummy()
                 }
                 #endif
             }
         }
     }
 
+    /// Профили прочитаны, и боевого среди них нет. До конца загрузки — false,
+    /// чтобы приглашение к импорту не мигало при каждом запуске.
+    /// Поднятый туннель без боевого профиля — это диагностическая пустышка
+    /// (`make dummy`): ей нужны обычный статус и кнопка «Отключить».
+    private var needsKey: Bool {
+        tunnel.isLoaded && !tunnel.hasRealConfig
+            && (tunnel.status == .invalid || tunnel.status == .disconnected)
+    }
+
     private var iconName: String {
+        if needsKey { return "key" }
         switch tunnel.status {
         case .connected: return "lock.shield.fill"
         case .connecting, .reasserting: return "arrow.triangle.2.circlepath"
@@ -111,8 +155,6 @@ struct ContentView: View {
             busy = true
             Task {
                 defer { busy = false }
-                // M1: профиля ещё нет — connect() создаст пустышку (системный
-                // диалог «…хочет добавить конфигурации VPN» появится здесь).
                 // Любая ошибка окажется в tunnel.lastError под кнопкой.
                 await tunnel.connect()
             }

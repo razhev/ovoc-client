@@ -3,7 +3,7 @@
 PROJECT := PersonalVPN.xcodeproj
 SCHEME  := PersonalVPN
 
-.PHONY: gen build test framework fetch verify devices ddi install push-key connect disconnect logs crashlogs clean
+.PHONY: gen build test framework fetch verify devices ddi install push-key connect disconnect dummy release-check logs crashlogs clean
 
 ## Сгенерировать PersonalVPN.xcodeproj из project.yml
 gen:
@@ -47,8 +47,9 @@ ddi:
 install: gen
 	./scripts/install-device.sh
 
-## DEBUG-мост M3: доставить Secrets/my.vpnkey в установленное приложение (ключ
-## не попадает в сборку). Другой файл: make push-key KEY=путь
+## DEBUG-мост: доставить Secrets/my.vpnkey в установленное приложение — тот же код
+## импорта, что у экрана «Добавить ключ», но без рук (ключ не попадает в сборку).
+## Другой файл: make push-key KEY=путь
 push-key:
 	@./scripts/push-key.sh $(KEY)
 
@@ -59,6 +60,15 @@ connect:
 
 disconnect:
 	@./scripts/launch-app.sh -autodisconnect
+
+## Диагностика без сервера: профиль-пустышка M1 (подпись, entitlements, App Group,
+## загрузка фреймворка). ЗАТИРАЕТ боевой профиль — после неё ключ импортировать заново.
+dummy:
+	@./scripts/launch-app.sh -dummyprofile
+
+## Ворота Release: в сборке нет DEBUG-моста и нет ни одного файла ключа
+release-check: gen
+	./scripts/check-release.sh
 
 ## Забрать логи с телефона в build/logs/latest/ (tunnel.log, app.log, last_error.txt)
 logs:

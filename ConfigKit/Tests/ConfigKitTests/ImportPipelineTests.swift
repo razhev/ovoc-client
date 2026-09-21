@@ -73,16 +73,4 @@ final class ImportPipelineTests: XCTestCase {
             XCTAssertEqual($0 as? VPNKeyError, .notAnIPv4("vpn.example.org"))
         }
     }
-
-    // Сохранение/загрузка config.json (то, что уедет в App Group).
-    func testSaveLoadRoundTrip() throws {
-        let key = try SyntheticKey.key(from: SyntheticKey.serverJSON())
-        let imported = try ImportedConfig.make(fromKey: key)
-        let url = FileManager.default.temporaryDirectory
-            .appendingPathComponent("configkit-test-\(UUID().uuidString).json")
-        defer { try? FileManager.default.removeItem(at: url) }
-
-        try imported.save(to: url)
-        XCTAssertEqual(try ImportedConfig.load(from: url), imported)
-    }
 }

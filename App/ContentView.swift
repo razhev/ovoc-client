@@ -75,7 +75,7 @@ struct ContentView: View {
 
                 Spacer()
             }
-            .navigationTitle("PersonalVPN")
+            .navigationTitle(Bundle.main.displayName)
             .toolbar {
                 // Смена ключа; пока ключа нет, вход в импорт — большая кнопка по центру.
                 ToolbarItem(placement: .navigationBarLeading) {

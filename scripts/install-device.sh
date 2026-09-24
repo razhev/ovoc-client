@@ -158,10 +158,10 @@ fi
 # ── 5. Запуск (без отладчика) ──
 if ! xcrun devicectl device process launch --device "$UDID" --terminate-existing "$APP_BUNDLE_ID"; then
     echo "FAIL: приложение установлено, но не запустилось — скорее всего телефон заблокирован."
-    echo "      Разблокируйте и откройте PersonalVPN пальцем."
+    echo "      Разблокируйте и откройте OVoC Client пальцем."
     exit 7
 fi
 
 echo ""
-echo "Готово: PersonalVPN установлен и запущен на «${DEVICE_NAME}»."
+echo "Готово: OVoC Client установлен и запущен на «${DEVICE_NAME}»."
 echo "Дальше: «Подключить» → системный диалог про конфигурации VPN → «Разрешить». Логи: make logs"

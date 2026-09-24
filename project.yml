@@ -61,7 +61,9 @@ targets:
     info:
       path: App/Info.plist
       properties:
-        CFBundleDisplayName: PersonalVPN
+        # Видимое имя (домашний экран, системный диалог VPN). Код берёт его
+        # отсюда же — Bundle.main.displayName в App/OVoCClientApp.swift.
+        CFBundleDisplayName: OVoC Client
         # Версии — из build settings (MARKETING_VERSION / CURRENT_PROJECT_VERSION),
         # иначе XcodeGen зашивает 1.0 / 1 и настройки выше не действуют.
         CFBundleShortVersionString: $(MARKETING_VERSION)

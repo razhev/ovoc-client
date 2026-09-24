@@ -60,7 +60,7 @@ fi
 # Перезапуск: DEBUG-сборка импортирует ключ при старте и удаляет файл.
 if ! xcrun devicectl device process launch --device "$UDID" --terminate-existing "$APP_BUNDLE_ID" >/dev/null 2>&1; then
     echo "Ключ скопирован, но приложение не перезапустилось — разблокируйте телефон"
-    echo "и откройте PersonalVPN пальцем: ключ импортируется при запуске."
+    echo "и откройте OVoC Client пальцем: ключ импортируется при запуске."
     exit 7
 fi
 

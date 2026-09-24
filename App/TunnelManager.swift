@@ -243,7 +243,7 @@ final class TunnelManager: ObservableObject {
         ]
 
         manager.protocolConfiguration = proto
-        manager.localizedDescription = "PersonalVPN"
+        manager.localizedDescription = Bundle.main.displayName
         manager.isEnabled = true
 
         do {
@@ -280,7 +280,7 @@ final class TunnelManager: ObservableObject {
         proto.providerConfiguration = ["dummy": true]
 
         manager.protocolConfiguration = proto
-        manager.localizedDescription = "PersonalVPN (тест)"
+        manager.localizedDescription = "\(Bundle.main.displayName) (тест)"
         manager.isEnabled = true
 
         try await manager.saveToPreferences()

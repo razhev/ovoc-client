@@ -46,6 +46,10 @@ bundle ID — `com.razhev.ovocclient` (расширение `com.razhev.ovocclie
 App ID и App Group, импорт ключа вставкой → «Подключено», в логах `connected`, heartbeat с
 трафиком в обе стороны, ни одного `Transport error`.
 
+Отключение кнопкой разобрано 2026-09-24: ложная фатальная ошибка #20 адаптера при `stopTunnel`
+и двоичный мусор в `tunnel.log` (сырой `close` в Go-плагине Cloak) — причины и что сделано в
+провайдере описаны в [docs/DEVICE-TESTING.md](docs/DEVICE-TESTING.md).
+
 Ещё не проверено (хвост гейта M3): утечка IPv6, переключение Wi-Fi ↔ LTE. Дальше — M5: доводка
 (ошибки, ru/en, иконка), затем M6 TestFlight.
 

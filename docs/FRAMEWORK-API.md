@@ -58,7 +58,12 @@ adapter.reconnect(afterTimeInterval:)
 func openVPNAdapter(_ openVPNAdapter: OpenVPNAdapter,
                     configureTunnelWithNetworkSettings networkSettings: NEPacketTunnelNetworkSettings?,
                     completionHandler: @escaping (Error?) -> Void)
-// networkSettings == nil означает «очистить настройки».
+// networkSettings == nil означает «очистить настройки». Приходит из resetTun адаптера:
+// перед каждым подключением (tun_builder_new) и при разборке tun (tun_builder_teardown,
+// в том числе после stopTunnel). Ошибка в completion → ФАТАЛЬНАЯ #20
+// OpenVPNAdapterErrorTUNSetupFailed с системной ошибкой в NSUnderlyingErrorKey.
+// Во время остановки setTunnelNetworkSettings(nil) у iOS проваливается —
+// мы отвечаем nil, иначе штатное отключение выглядит как фатальная ошибка.
 // Мы: дополняем settings (matchDomains, excludedRoutes, DNS-fallback) →
 //     setTunnelNetworkSettings(networkSettings) { completionHandler($0) }
 
@@ -120,6 +125,7 @@ startTunnel:
   setTunnelNetworkSettings(...) { completionHandler($0) }
 
 handleEvent .connected → снять таймер, completionHandler(nil) старта
-handleError fatal      → last_error.txt + cancelTunnelWithError
+handleError fatal      → last_error.txt + cancelTunnelWithError (только в фазах starting/connected;
+                         во время стопа — только строка в логе)
 stopTunnel             → adapter.disconnect() + страховочный таймер 5 сек
 ```

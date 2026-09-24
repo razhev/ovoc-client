@@ -291,6 +291,64 @@ AES-256-CBC как обход невозможен: адаптер не даёт
 возвращает `false` (метку пишет старый API по отдельному указателю), а `decrypt()` вызывает
 `mbedtls_cipher_auth_decrypt` и действительно проверяет метку входящих пакетов.
 
+### Ложная фатальная ошибка #20 при отключении и двоичный мусор в `tunnel.log` (разобрано 2026-09-24)
+
+**Симптом (сборки до 2026-09-24).** После `stopTunnel: reason=userInitiated(1)` в `tunnel.log`
+шли строки `configureTunnel: clearing network settings` и
+`error(fatal=true): me.ss-abramchuk.openvpn-adapter.error-domain#20 Failed to reset tunnel…`,
+появлялся `last_error.txt`, а иногда между строками лога оказывалось ~140 байт двоичного мусора.
+Соединение при этом отключалось штатно (`event: disconnected`).
+
+**Откуда #20.** При разборке tun ядро OpenVPN3 зовёт `tun_builder_teardown` → у адаптера
+`resetTun` (`OpenVPNAdapterImpl.mm`): он закрывает свой socketpair и вызывает делегата
+`configureTunnelWithNetworkSettings:nil`; если completion пришёл с ошибкой, адаптер сообщает
+**фатальную** `OpenVPNAdapterErrorTUNSetupFailed` (#20), пряча системную ошибку в
+`NSUnderlyingErrorKey`. Провайдер отвечал `setTunnelNetworkSettings(nil)`, а во время
+остановки iOS этот вызов отвергает — систему уже сама разбирает туннель. То есть ошибка
+рождалась на ровном месте, и та же `resetTun` штатно вызывается перед каждым подключением
+(`tun_builder_new`) — отсюда «clearing network settings» и до `assignIP`.
+
+**Откуда мусор.** Это не текст ошибки (текст вложенной ошибки в лог никогда не попадал), а
+ровно одна TLS-запись Cloak: заголовок `17 03 03 00 88` + 136 байт данных = 141 байт.
+Go-плагин Cloak (`cmd/ck-ovpn-plugin/ck-ovpn-plugin.go` в форке amnezia-vpn/Cloak,
+ветка master-amnezia) в `Cloak_close_connection` делает `syscall.Close(fd)` на номере
+TCP-сокета, пойманном через `Dialer.Control`, — за спиной рантайма Go. Горутины сессии Cloak
+при этом продолжают работать и пишут следующую запись в тот же номер дескриптора, который
+к этому моменту получил кто-то другой в процессе. Логгер открывал файл на каждую строку, и
+запись ложилась в `tunnel.log`. Плагин поставляется бинарём (`Lib/ios/arm64/ck-ovpn-plugin.a`),
+в исходниках OpenVPN3 и адаптера это не лечится. Куда попадёт такая запись в другой раз,
+предсказать нельзя — любой короткоживущий дескриптор процесса; порядок в ядре (`cliproto.hpp`:
+сначала `tun->stop()`, потом `transport->stop()`) объясняет, почему мусор шёл уже после
+наших строк об ошибке.
+
+**Что сделано.**
+
+- `configureTunnel(nil)` во время остановки (`phase == .stopping/.stopped`) отказ
+  `setTunnelNetworkSettings(nil)` только логирует (`clearing network settings failed: <домен>#<код>
+  — ignored, tunnel is stopping`) и отвечает адаптеру `nil` — ошибка #20 не рождается.
+- `handleError`: фатальная ошибка обрывает сессию и пишет `last_error.txt` только в фазах
+  `.starting` / `.connected`; в остальных — строка `error(fatal=true, ignored: stopping)` и всё.
+- В лог от вложенной ошибки — только `underlying: <домен>#<код>`, без описания.
+- `RingLogger` держит файл открытым весь срок жизни процесса: дескриптор открыт раньше любых
+  сокетов и не освобождается, чужой номер ему не достанется. Ротация закрывает и открывает его заново.
+
+**Проверка.** На Mac: `make build` и `make test` зелёные (2026-09-24). На телефоне (ещё не
+прогнано — телефон в этот момент был занят переходом на OVoC Client): `make install` →
+`make push-key` → «Подключить» → «Разрешить» → подождать → `make disconnect` → `make logs`.
+Ожидаемо в `tunnel.log`: `configureTunnel: clearing network settings (while stopping)`, возможно
+`clearing network settings failed: <домен>#<код> — ignored, tunnel is stopping`, затем
+`event: disconnected`; ни одной строки `error(fatal=true)`, файл читается как UTF-8, `last_error.txt`
+не появляется. Негативная проверка, что настоящие фатальные ошибки по-прежнему доходят до кнопки:
+профиль с чужим CA (`Secrets/broken-ca.ovpn`, собирается из ключа: `<ca>` заменён на самоподписанный)
+→ `make push-key KEY=Secrets/broken-ca.ovpn` → «Подключить»: сервер не проходит проверку сертификата,
+ядро отдаёт фатальную ошибку в фазе `.starting` → `last_error.txt` и текст под кнопкой.
+
+**Что осталось у фреймворка.** Сырой `close` в плагине никуда не делся: запись может
+попасть в любой другой свежий дескриптор. Возможная доработка — патч `fw.hpp`
+(`CloakTransport::close` не звать `Cloak_close_connection`), тогда сокет за спиной Go не
+закрывается вовсе; цена — локальный pipe плагина живёт до конца процесса. Не делали:
+расширение и так живёт одно подключение.
+
 ### Если боевое подключение не удалось
 
 | Симптом | Причина | Что делать |
@@ -301,6 +359,7 @@ AES-256-CBC как обход невозможен: адаптер не даёт
 | «Ключ скопирован не целиком…» / «нет протокола OpenVPN over Cloak» / «нет ключа Amnezia» | обрезан при копировании; ключ другого протокола; в тексте нет `vpn://` | скопировать заново целиком в формате «For the AmneziaVPN app»; на Mac: `python3 scripts/decode-vpnkey.py --schema Secrets/my.vpnkey` |
 | код `12` сразу после «Подключение…» | расширение упало; при боевом туннеле чаще всего память (лимит ~50 МБ) | `make crashlogs` → `JetsamEvent-*`, последние `heartbeat` в `tunnel.log` |
 | обрыв при блокировке экрана или смене сети | sleep/wake и Wi-Fi ↔ LTE пока простым пробросом | `make logs` → строки `sleep` / `wake` / `event: reconnecting`; доработка — по результатам теста |
+| при отключении кнопкой в `tunnel.log` `error(fatal=true) … #20 Failed to reset tunnel`, есть `last_error.txt`, в логе двоичный мусор | сборка до 2026-09-24: ложная ошибка `resetTun` адаптера + сырой `close` в Go-плагине Cloak (разбор выше) | обновить сборку (`make install`); в новой ожидается `clearing network settings (while stopping)` без `error(fatal=true)` |
 
 ---
 

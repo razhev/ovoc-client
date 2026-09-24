@@ -68,26 +68,46 @@ final class RingLogger {
 
     // MARK: - Файл
 
+    /// Файл держим открытым весь срок жизни процесса, а не открываем на каждую
+    /// строку. Причина — не скорость, а чужие дескрипторы: Go-плагин Cloak в
+    /// фреймворке при отключении закрывает свой TCP-сокет «сырым» close(2) за
+    /// спиной рантайма Go, а его сессия продолжает писать в тот же номер
+    /// дескриптора. Короткоживущий дескриптор лога получал этот номер, и в
+    /// tunnel.log попадала TLS-запись Cloak (двоичный мусор). Постоянный
+    /// дескриптор открыт раньше любых сокетов и не освобождается — чужой
+    /// номер ему не достанется. Только на queue.
+    private var handle: FileHandle?
+
     private func append(_ line: String) {
         guard let url = fileURL, let data = line.data(using: .utf8) else { return }
-        let fm = FileManager.default
-        if !fm.fileExists(atPath: url.path) {
-            fm.createFile(atPath: url.path, contents: nil)
+        if handle == nil {
+            handle = Self.openForAppend(url)
         }
-        guard let handle = try? FileHandle(forWritingTo: url) else { return }
-        defer { try? handle.close() }
+        guard let handle else { return }
         _ = try? handle.seekToEnd()
         try? handle.write(contentsOf: data)
         rotateIfNeeded(url: url)
     }
 
+    private static func openForAppend(_ url: URL) -> FileHandle? {
+        let fm = FileManager.default
+        if !fm.fileExists(atPath: url.path) {
+            fm.createFile(atPath: url.path, contents: nil)
+        }
+        return try? FileHandle(forWritingTo: url)
+    }
+
     /// Ротация усечением: когда файл превышает лимит, оставляем вторую половину.
-    /// Примитивно, зато без второго файла и лишней памяти.
+    /// Примитивно, зато без второго файла и лишней памяти. Атомарная запись
+    /// подменяет файл новым, поэтому открытый дескриптор после неё закрываем —
+    /// следующая строка откроет уже новый файл.
     private func rotateIfNeeded(url: URL) {
         guard let size = try? FileManager.default.attributesOfItem(atPath: url.path)[.size] as? Int,
               size > maxBytes,
               let data = try? Data(contentsOf: url) else { return }
         let tail = data.suffix(maxBytes / 2)
+        try? handle?.close()
+        handle = nil
         try? tail.write(to: url, options: .atomic)
     }
 

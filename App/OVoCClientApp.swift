@@ -1,7 +1,7 @@
 import SwiftUI
 
 @main
-struct PersonalVPNApp: App {
+struct OVoCClientApp: App {
     var body: some Scene {
         WindowGroup {
             ContentView()

@@ -1,6 +1,8 @@
 # Описание Xcode-проекта для XcodeGen — единый источник правды.
-# PersonalVPN.xcodeproj генерируется командой `make gen` и НЕ хранится в git.
-name: PersonalVPN
+# OVoCClient.xcodeproj генерируется командой `make gen` и НЕ хранится в git.
+# Имя проекта и таргета — без пробела (модуль Swift, пути в скриптах);
+# видимое имя «OVoC Client» — в CFBundleDisplayName ниже.
+name: OVoCClient
 
 options:
   bundleIdPrefix: com.razhev
@@ -28,7 +30,7 @@ packages:
     path: ConfigKit
 
 targets:
-  PersonalVPN:
+  OVoCClient:
     type: application
     platform: iOS
     sources:
@@ -51,7 +53,7 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.razhev.personalvpn
-        CODE_SIGN_ENTITLEMENTS: App/PersonalVPN.entitlements
+        CODE_SIGN_ENTITLEMENTS: App/OVoCClient.entitlements
         # Только iPhone (пресет XcodeGen иначе ставит "1,2").
         TARGETED_DEVICE_FAMILY: "1"
         # Пресет application_iOS.yml ставит устаревшее "iPhone Developer".

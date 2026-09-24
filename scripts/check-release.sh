@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # Ворота Release — `make release-check`. Собирает Release-конфигурацию БЕЗ подписи
-# и проверяет содержимое PersonalVPN.app:
+# и проверяет содержимое OVoCClient.app:
 #   1. в коде нет DEBUG-моста (`make push-key`, `make connect/disconnect/dummy`);
 #   2. в бандле нет ни одного файла ключа и ни одной строки vpn://… — клиент
 #      раздаётся пустым, ключ каждый добавляет сам на экране импорта.
@@ -19,7 +19,7 @@ mkdir -p build
 build_config() {
     local config="$1" log="build/release-check-$1.log"
     echo "Собираю ${config} без подписи (лог: ${log})…"
-    if ! xcodebuild -project PersonalVPN.xcodeproj -scheme PersonalVPN -configuration "$config" \
+    if ! xcodebuild -project OVoCClient.xcodeproj -scheme OVoCClient -configuration "$config" \
             -destination 'generic/platform=iOS' -derivedDataPath "$DERIVED" build \
             CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO >"$log" 2>&1; then
         echo "FAIL сборка ${config}:"
@@ -29,8 +29,8 @@ build_config() {
 }
 build_config Release
 build_config Debug
-APP="${DERIVED}/Build/Products/Release-iphoneos/PersonalVPN.app"
-DEBUG_APP="${DERIVED}/Build/Products/Debug-iphoneos/PersonalVPN.app"
+APP="${DERIVED}/Build/Products/Release-iphoneos/OVoCClient.app"
+DEBUG_APP="${DERIVED}/Build/Products/Debug-iphoneos/OVoCClient.app"
 echo "PASS сборка: ${APP}"
 
 # Имена функций и длинные строковые литералы, существующие только под #if DEBUG.
@@ -98,7 +98,7 @@ else
 fi
 
 echo
-echo "Состав PersonalVPN.app (без фреймворка):"
+echo "Состав OVoCClient.app (без фреймворка):"
 ( cd "$APP" && find . -type f -not -path "./Frameworks/*" | sort | sed 's/^/    /' )
 
 exit $FAILED

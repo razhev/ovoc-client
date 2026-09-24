@@ -19,12 +19,12 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
-PROJECT="PersonalVPN.xcodeproj"
-SCHEME="PersonalVPN"
+PROJECT="OVoCClient.xcodeproj"
+SCHEME="OVoCClient"
 APP_BUNDLE_ID="com.razhev.personalvpn"
 APP_GROUP_ID="group.com.razhev.personalvpn"
 DERIVED="$ROOT/build/DerivedData"
-APP="$DERIVED/Build/Products/Debug-iphoneos/PersonalVPN.app"
+APP="$DERIVED/Build/Products/Debug-iphoneos/OVoCClient.app"
 LOG_DIR="$ROOT/build/logs"
 BUILD_LOG="$LOG_DIR/xcodebuild-install.log"
 

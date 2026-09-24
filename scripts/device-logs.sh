@@ -69,14 +69,14 @@ def walk(node):
             walk(value)
     elif isinstance(node, str) and node.endswith(".ips"):
         base = node.rsplit("/", 1)[-1]
-        if base.startswith(("PacketTunnel", "PersonalVPN", "JetsamEvent")):
+        if base.startswith(("PacketTunnel", "OVoCClient", "JetsamEvent")):
             found.add(node)
 walk(data)
 print("\n".join(sorted(found)[-15:]))
 PY
 )"
     if [[ -z "$NAMES" ]]; then
-        echo "Отчётов о падениях PacketTunnel / PersonalVPN / Jetsam на устройстве нет."
+        echo "Отчётов о падениях PacketTunnel / OVoCClient / Jetsam на устройстве нет."
     else
         while IFS= read -r NAME; do
             [[ -z "$NAME" ]] && continue

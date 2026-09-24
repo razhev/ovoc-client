@@ -1,11 +1,11 @@
 # Короткие команды проекта. Все сборки — CLI, без кликов в Xcode.
 
-PROJECT := PersonalVPN.xcodeproj
-SCHEME  := PersonalVPN
+PROJECT := OVoCClient.xcodeproj
+SCHEME  := OVoCClient
 
 .PHONY: gen build test framework fetch verify devices ddi install push-key connect disconnect dummy release-check logs crashlogs clean
 
-## Сгенерировать PersonalVPN.xcodeproj из project.yml
+## Сгенерировать OVoCClient.xcodeproj из project.yml
 gen:
 	xcodegen generate
 

@@ -346,3 +346,9 @@ stopping before profile change` → `import OK`.
 3. Ключ — как в гейте M4 (пункты 1 и 3 этапа E). Профиль в Настройки → VPN появляется только после
    «Разрешить» и называется «OVoC Client».
 4. `make logs` читает уже новую App Group; в Console.app — фильтр `subsystem:com.razhev.ovocclient`.
+
+**Пройдено 2026-09-24** (iPhone 16 Pro, iOS 26.6.2): `make install` выпустил профиль «iOS Team
+Provisioning Profile: com.razhev.ovocclient», оба `PASS подпись` с `group.com.razhev.ovocclient`;
+первый запуск — `load: profiles=0 appGroup=ok`; импорт вставкой — `import OK: profile=8882 bytes`;
+`event: connected` через Cloak, `heartbeat: memory=8 MB` с пакетами в обе стороны, без
+`Transport error`.

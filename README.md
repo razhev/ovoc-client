@@ -42,7 +42,9 @@ VPN при этом сначала отключается). Клиент раз�
 bundle ID — `com.razhev.ovocclient` (расширение `com.razhev.ovocclient.tunnel`, App Group
 `group.com.razhev.ovocclient`). Для iOS это новое приложение: старое PersonalVPN удаляется с
 телефона руками, ключ импортируется заново ([docs/DEVICE-TESTING.md](docs/DEVICE-TESTING.md),
-«Переход с PersonalVPN»).
+«Переход с PersonalVPN»). Проверено на телефоне в тот же день: `make install` сам завёл новые
+App ID и App Group, импорт ключа вставкой → «Подключено», в логах `connected`, heartbeat с
+трафиком в обе стороны, ни одного `Transport error`.
 
 Ещё не проверено (хвост гейта M3): утечка IPv6, переключение Wi-Fi ↔ LTE. Дальше — M5: доводка
 (ошибки, ru/en, иконка), затем M6 TestFlight.

@@ -63,7 +63,7 @@ make release-check # ворота Release: DEBUG-моста нет, файлов
 
 **iOS 16 на телефоне.** `devicectl` работает только с iOS 17+. Для iOS 16: `brew install
 ios-deploy`, сборка та же (блок `xcodebuild` из `scripts/install-device.sh`), установка —
-`ios-deploy --id <UDID> --bundle build/DerivedData/Build/Products/Debug-iphoneos/PersonalVPN.app`,
+`ios-deploy --id <UDID> --bundle build/DerivedData/Build/Products/Debug-iphoneos/OVoCClient.app`,
 приложение открыть пальцем. `make logs` не сработает — логи только через экран «Логи» → «Поделиться».
 
 ---
@@ -92,15 +92,15 @@ M2: `OpenVPNAdapter.framework` реально загружается в проц
    Ожидаемый вывод:
    ```
    PASS сборка: BUILD SUCCEEDED
-   PASS подпись PersonalVPN.app: packet-tunnel-provider + group.com.razhev.personalvpn
-   PASS подпись PacketTunnel.appex: packet-tunnel-provider + group.com.razhev.personalvpn
+   PASS подпись OVoCClient.app: packet-tunnel-provider + group.com.razhev.ovocclient
+   PASS подпись PacketTunnel.appex: packet-tunnel-provider + group.com.razhev.ovocclient
    Подписано командой: <Team ID>
-   Готово: PersonalVPN установлен и запущен на «…».
+   Готово: OVoC Client установлен и запущен на «…».
    ```
-4. На телефоне: **«Подключить»** → системный диалог «PersonalVPN хочет добавить конфигурации
+4. На телефоне: **«Подключить»** → системный диалог «OVoC Client хочет добавить конфигурации
    VPN» → **Разрешить** → код-пароль / Face ID.
 5. **Гейт — всё из списка должно быть правдой:**
-   - [ ] статус в приложении «Подключено»; Настройки → VPN → «PersonalVPN (тест)» — Подключено;
+   - [ ] статус в приложении «Подключено»; Настройки → VPN → «OVoC Client (тест)» — Подключено;
          значок VPN виден в Пункте управления (на iPhone с Face ID в статус-баре его нет);
    - [ ] Safari открывает сайты — пустышка забирает только `10.8.0.0/24`;
    - [ ] экран «Логи» → «Туннель»: шапка `App Group: OK`, строки по порядку
@@ -122,8 +122,8 @@ M2: `OpenVPNAdapter.framework` реально загружается в проц
 |---|---|---|
 | Экран «Логи» в приложении | всегда; единственный канал у родственников | переключатель Туннель / Приложение, кнопка «Поделиться» |
 | `make logs` | телефон подключён к Mac | файлы из App Group → `build/logs/latest/` |
-| `make crashlogs` | расширение упало (код 12) | `.ips` для `PacketTunnel`, `PersonalVPN`, `JetsamEvent` (убийство по памяти) |
-| Console.app | нужен живой поток, или App Group не работает | выбрать iPhone слева, фильтр `subsystem:com.razhev.personalvpn`; категории `tunnel` и `app` |
+| `make crashlogs` | расширение упало (код 12) | `.ips` для `PacketTunnel`, `OVoCClient`, `JetsamEvent` (убийство по памяти) |
+| Console.app | нужен живой поток, или App Group не работает | выбрать iPhone слева, фильтр `subsystem:com.razhev.ovocclient`; категории `tunnel` и `app` |
 | `sudo log collect --device-name "<iPhone>" --last 10m` | нужен архив системных логов | требует sudo — запускает человек |
 
 Что пишется куда: `tunnel.log` — расширение (кольцевой, 256 КБ, heartbeat памяти раз в 30 сек);
@@ -148,7 +148,7 @@ M2: `OpenVPNAdapter.framework` реально загружается в проц
 | «agree to the latest Program License Agreement» | не приняты соглашения | этап A, шаг 1 |
 | «Your team has no devices…» | сборка `generic/platform=iOS` до регистрации устройства | собирать только через `make install` |
 | «Personal development teams … do not support Network Extensions» | выбран Team ID бесплатной Personal Team | вписать Team ID платной команды |
-| «app identifier … is not available» / то же про App Group | идентификатор занят кем-то глобально | сменить префикс в `project.yml`, обоих `.entitlements`, `SharedPaths.appGroupID`, `TunnelManager.tunnelBundleID` |
+| «app identifier … is not available» / то же про App Group | идентификатор занят кем-то глобально | сменить `com.razhev.ovocclient` согласованно везде — полный список даёт `git grep -n ovocclient -- ':!*.md'`: `project.yml` (оба таргета), оба `.entitlements`, `SharedPaths.appGroupID`, `TunnelManager.tunnelBundleID`, `APP_BUNDLE_ID` / `APP_GROUP_ID` в `scripts/`, subsystem в `RingLogger`, домен ошибок в `PacketTunnelProvider`; затем документация. Для iOS это новое приложение — см. «Переход с PersonalVPN» |
 | «provisioning profile doesn't include the … networkextension entitlement» / App Groups | capability ещё не включена на App ID | повторить `make install`; иначе портал → Identifiers → у **обоих** App ID включить Network Extensions и App Groups, привязать группу |
 | сборка висит на CodeSign / `errSecInternalComponent` | ждёт диалог Связки ключей либо запущено не из GUI-сессии | пароль Mac → «Всегда разрешать»; запускать из Terminal.app |
 | `FAIL подпись …` (ворота скрипта) | сборка прошла, но в подписи нет права на VPN или App Group | то же, что строкой выше про capability |
@@ -308,7 +308,7 @@ AES-256-CBC как обход невозможен: адаптер не даёт
 
 Ключ добавляется на экране «Добавить ключ»: вставкой из буфера (`PasteButton` — без системного
 вопроса «Разрешить вставку?») или файлом из «Файлов». Можно вставить сообщение целиком — ключ
-внутри найдётся сам. Первый импорт вызывает системный диалог «PersonalVPN хочет добавить
+внутри найдётся сам. Первый импорт вызывает системный диалог «OVoC Client хочет добавить
 конфигурации VPN» → **Разрешить** → код-пароль; «Не разрешать» даёт читаемую ошибку, прежний
 профиль (если был) не портится. Смена ключа — кнопка-ключ в тулбаре; поднятый VPN при этом
 сначала отключается.
@@ -316,7 +316,8 @@ AES-256-CBC как обход невозможен: адаптер не даёт
 **Гейт M4 (чистая установка):**
 1. На Mac положить ключ в буфер, не показывая: `pbcopy < Secrets/my.vpnkey` (общий буфер
    обмена Mac ↔ iPhone: Handoff включён на обоих).
-2. На телефоне удалить PersonalVPN (профиль VPN удалится вместе с ним) → `make install`.
+2. На телефоне удалить OVoC Client (до переименования — PersonalVPN; профиль VPN удалится вместе
+   с ним) → `make install`.
 3. В приложении: «Добавить ключ» → «Вставить» → «Импортировать» → «Разрешить» → код-пароль →
    «Ключ импортирован: …» → «Подключить» → сайт-определитель показывает IP сервера.
 4. `make logs`: в `app.log` — `import[paste]: start` … `import OK: profile=N bytes`, ни ключа,
@@ -327,3 +328,21 @@ AES-256-CBC как обход невозможен: адаптер не даёт
 `import FAILED: parse: notAVPNKey` (обрезанный ключ — `truncated`, ключ AWG — `noCloakContainer`),
 приложение не падает; `make push-key` с настоящим ключом при поднятом VPN → `tunnel is up —
 stopping before profile change` → `import OK`.
+
+---
+
+## Переход с PersonalVPN на OVoC Client (2026-09-24)
+
+С переименованием сменился bundle ID: `com.razhev.personalvpn` → `com.razhev.ovocclient`
+(расширение `com.razhev.ovocclient.tunnel`, App Group `group.com.razhev.ovocclient`). Для iOS это
+другое приложение: поверх старого оно не встанет, а появится рядом. Один раз:
+
+1. На телефоне удалить старое **PersonalVPN**: удерживать иконку → «Удалить приложение» →
+   «Удалить». Вместе с ним удалятся его VPN-профиль и логи в старой App Group; то, что уже скачано
+   в `build/logs/`, остаётся.
+2. `make install`. Первая подпись с новым bundle ID сама заведёт на портале два App ID и App Group
+   (как в M1). Ожидаемо: `PASS подпись OVoCClient.app: … + group.com.razhev.ovocclient`. Старые
+   App ID и группа остаются на портале и ничему не мешают.
+3. Ключ — как в гейте M4 (пункты 1 и 3 этапа E). Профиль в Настройки → VPN появляется только после
+   «Разрешить» и называется «OVoC Client».
+4. `make logs` читает уже новую App Group; в Console.app — фильтр `subsystem:com.razhev.ovocclient`.

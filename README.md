@@ -1,7 +1,10 @@
-# personal-ios-client
+# OVoC Client
 
-Минимальный нативный iOS-клиент для личного сервера **AmneziaVPN** (протокол **OpenVPN over Cloak**).
+**OVoC Client** (OpenVPN over Cloak Client) — минимальный нативный iOS-клиент для личного сервера
+**AmneziaVPN** (протокол **OpenVPN over Cloak**).
 Для установки себе и нескольким родственникам через **TestFlight**. Не для публикации в App Store (пока).
+
+Репозиторий — `personal-ios-client`; до 2026-09-24 приложение называлось PersonalVPN.
 
 ## Что где
 
@@ -35,6 +38,12 @@ VPN при этом сначала отключается). Клиент раз�
 свой. Отладочный `make push-key` оставлен — он идёт через тот же код импорта, что и экран, и
 вырезан из Release (`make release-check` это проверяет).
 
+**Переименование 2026-09-24**: PersonalVPN → **OVoC Client**. Проект, таргет и схема — `OVoCClient`;
+bundle ID — `com.razhev.ovocclient` (расширение `com.razhev.ovocclient.tunnel`, App Group
+`group.com.razhev.ovocclient`). Для iOS это новое приложение: старое PersonalVPN удаляется с
+телефона руками, ключ импортируется заново ([docs/DEVICE-TESTING.md](docs/DEVICE-TESTING.md),
+«Переход с PersonalVPN»).
+
 Ещё не проверено (хвост гейта M3): утечка IPv6, переключение Wi-Fi ↔ LTE. Дальше — M5: доводка
 (ошибки, ru/en, иконка), затем M6 TestFlight.
 
@@ -43,7 +52,7 @@ VPN при этом сначала отключается). Клиент раз�
 Требуются: Xcode 26+, [XcodeGen](https://github.com/yonaskolb/XcodeGen) (`brew install xcodegen`).
 
 ```bash
-make gen        # сгенерировать PersonalVPN.xcodeproj из project.yml
+make gen        # сгенерировать OVoCClient.xcodeproj из project.yml
 make build      # собрать оба таргета БЕЗ подписи — быстрая проверка компиляции
 make test       # юнит-тесты ConfigKit — на Mac, телефон не нужен
 make framework  # собрать OpenVPNAdapter.framework из исходников Amnezia + наш патч (основной способ)
@@ -59,7 +68,7 @@ make logs       # забрать логи с телефона в build/logs/late
 make crashlogs  # то же + отчёты о падениях расширения/приложения
 ```
 
-`PersonalVPN.xcodeproj` пересоздаётся каждым `make gen` — все настройки подписи живут в
+`OVoCClient.xcodeproj` пересоздаётся каждым `make gen` — все настройки подписи живут в
 `project.yml`, в интерфейсе Xcode ничего не настраиваем.
 
 Разобрать ключ Amnezia в читаемый JSON (вывод сохранять только в `Secrets/`):
@@ -99,7 +108,7 @@ python3 scripts/decode-vpnkey.py --schema Secrets/my.vpnkey
 - экран «Логи» в приложении: `tunnel.log` (расширение) и `app.log` (приложение)
   из App Group, кнопка «Поделиться»;
 - `make logs` / `make crashlogs` — те же файлы и отчёты о падениях на Mac, без sudo;
-- Console.app с фильтром по subsystem `com.razhev.personalvpn`;
+- Console.app с фильтром по subsystem `com.razhev.ovocclient`;
 - `sudo log collect --device-name "<iPhone>" --last 10m` по кабелю.
 
 Подробности и разбор типовых ошибок — [docs/DEVICE-TESTING.md](docs/DEVICE-TESTING.md).

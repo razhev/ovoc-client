@@ -70,7 +70,7 @@
 
 ## Структура проекта
 
-Кодовое имя проекта — **PersonalVPN** (можно переименовать). Bundle ID: приложение `com.razhev.personalvpn`, расширение `com.razhev.personalvpn.tunnel`, App Group `group.com.razhev.personalvpn`.
+Имя приложения — **OVoC Client** (OpenVPN over Cloak Client; до 2026-09-24 — рабочее имя PersonalVPN), проект и таргет — `OVoCClient`. Bundle ID: приложение `com.razhev.ovocclient`, расширение `com.razhev.ovocclient.tunnel`, App Group `group.com.razhev.ovocclient`.
 
 ```
 personal-ios-client/
@@ -80,7 +80,7 @@ personal-ios-client/
 ├── .gitignore             # прячет: *.xcodeproj, Frameworks/, Secrets/, *.vpnkey, build/, DerivedData/
 │
 ├── App/                   # ── приложение (то, что видит пользователь) ──
-│   ├── PersonalVPNApp.swift      # точка входа SwiftUI; авто-импорт вшитого ключа при первом запуске
+│   ├── OVoCClientApp.swift       # точка входа SwiftUI; авто-импорт вшитого ключа при первом запуске
 │   ├── ContentView.swift         # один экран: большая кнопка Подключить, статус, строка последней ошибки, шестерёнка
 │   ├── TunnelManager.swift       # обёртка NETunnelProviderManager: создать/загрузить профиль, старт/стоп, слежение за статусом
 │   ├── ImportView.swift          # экран вставки ключа vpn://…, показ ошибок разбора
@@ -137,7 +137,7 @@ personal-ios-client/
 
 Цель: убедиться, что подписи, entitlements, App Group и профили работают, **до** появления любой сложности с VPN.
 
-**Проверка:** первое нажатие «Подключить» → системное окно «PersonalVPN хочет добавить конфигурацию VPN» → Allow → **появляется значок VPN** (на iPhone с Face ID — в Пункте управления; в Настройки → VPN профиль «Подключено»), статус «Подключено»; выключение убирает его; обычный интернет продолжает работать; в LogView видны строки, записанные расширением (это доказывает, что App Group работает).
+**Проверка:** первое нажатие «Подключить» → системное окно «OVoC Client хочет добавить конфигурацию VPN» → Allow → **появляется значок VPN** (на iPhone с Face ID — в Пункте управления; в Настройки → VPN профиль «Подключено»), статус «Подключено»; выключение убирает его; обычный интернет продолжает работать; в LogView видны строки, записанные расширением (это доказывает, что App Group работает).
 
 ### M2 — Получение фреймворка и проверка символов (1 сессия; +1–2 если понадобится запасной путь)
 Скрипт скачивает готовый `OpenVPNAdapter.framework` из релизов Amnezia (`3rd-build-ga`, релиз v1.0.42). Скрипт `verify-framework.sh` — **это ворота качества, гоняем до того, как что-то подключать**:

@@ -6,7 +6,7 @@ import Foundation
 /// Расширение живёт отдельным процессом и иначе не может передать
 /// приложению ни логи, ни текст последней ошибки.
 enum SharedPaths {
-    static let appGroupID = "group.com.razhev.personalvpn"
+    static let appGroupID = "group.com.razhev.ovocclient"
 
     /// nil возможен только при неправильных entitlements —
     /// это ошибка конфигурации сборки, а не рантайм-ситуация.

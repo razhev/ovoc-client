@@ -14,7 +14,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
-APP_GROUP_ID="group.com.razhev.personalvpn"
+APP_GROUP_ID="group.com.razhev.ovocclient"
 WITH_CRASHES=0
 [[ "${1:-}" == "--crashes" ]] && WITH_CRASHES=1
 

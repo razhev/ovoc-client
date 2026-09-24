@@ -11,7 +11,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
-APP_BUNDLE_ID="com.razhev.personalvpn"
+APP_BUNDLE_ID="com.razhev.ovocclient"
 
 DEVICE_LINE="$(python3 scripts/find-device.py)" || exit $?
 UDID="$(cut -f1 <<<"$DEVICE_LINE")"

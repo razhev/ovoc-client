@@ -34,7 +34,7 @@ final class TunnelManager: ObservableObject {
     /// написать в tunnel.log хоть строку.
     private var startRequestedAt: Date?
 
-    private static let tunnelBundleID = "com.razhev.personalvpn.tunnel"
+    private static let tunnelBundleID = "com.razhev.ovocclient.tunnel"
 
     init() {
         // object: nil — уведомления приходят обо всех VPN системы; обработчик

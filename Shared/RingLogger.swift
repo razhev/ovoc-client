@@ -24,7 +24,7 @@ final class RingLogger {
     private let fileURL: URL?
     private let maxBytes: Int
     private let osLog: Logger
-    private let queue = DispatchQueue(label: "com.razhev.personalvpn.ringlogger")
+    private let queue = DispatchQueue(label: "com.razhev.ovocclient.ringlogger")
     private var heartbeatTimer: DispatchSourceTimer?
 
     /// Добавка к строке heartbeat (расширение подставляет счётчики пакетов):
@@ -34,7 +34,7 @@ final class RingLogger {
     init(fileURL: URL?, maxBytes: Int, category: String) {
         self.fileURL = fileURL
         self.maxBytes = maxBytes
-        self.osLog = Logger(subsystem: "com.razhev.personalvpn", category: category)
+        self.osLog = Logger(subsystem: "com.razhev.ovocclient", category: category)
     }
 
     func log(_ message: String) {

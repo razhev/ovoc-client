@@ -19,7 +19,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
-APP_BUNDLE_ID="com.razhev.personalvpn"
+APP_BUNDLE_ID="com.razhev.ovocclient"
 KEY_FILE="${1:-Secrets/my.vpnkey}"
 
 if [[ ! -s "$KEY_FILE" ]]; then

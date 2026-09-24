@@ -16,10 +16,10 @@ import OpenVPNAdapter
 /// поток адаптера в это время ждёт наш completion, sync дал бы взаимоблокировку.
 final class PacketTunnelProvider: NEPacketTunnelProvider {
 
-    private static let errorDomain = "com.razhev.personalvpn.tunnel"
+    private static let errorDomain = "com.razhev.ovocclient.tunnel"
 
     private let logger = RingLogger.shared
-    private let stateQueue = DispatchQueue(label: "com.razhev.personalvpn.tunnel.state")
+    private let stateQueue = DispatchQueue(label: "com.razhev.ovocclient.tunnel.state")
 
     private lazy var adapter: OpenVPNAdapter = {
         let adapter = OpenVPNAdapter()

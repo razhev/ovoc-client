@@ -52,7 +52,7 @@ targets:
         link: false
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.razhev.personalvpn
+        PRODUCT_BUNDLE_IDENTIFIER: com.razhev.ovocclient
         CODE_SIGN_ENTITLEMENTS: App/OVoCClient.entitlements
         # Только iPhone (пресет XcodeGen иначе ставит "1,2").
         TARGETED_DEVICE_FAMILY: "1"
@@ -88,7 +88,7 @@ targets:
         embed: false
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.razhev.personalvpn.tunnel
+        PRODUCT_BUNDLE_IDENTIFIER: com.razhev.ovocclient.tunnel
         CODE_SIGN_ENTITLEMENTS: PacketTunnel/PacketTunnel.entitlements
         TARGETED_DEVICE_FAMILY: "1"
         LD_RUNPATH_SEARCH_PATHS:

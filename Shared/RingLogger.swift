@@ -84,8 +84,20 @@ final class RingLogger {
             handle = Self.openForAppend(url)
         }
         guard let handle else { return }
-        _ = try? handle.seekToEnd()
-        try? handle.write(contentsOf: data)
+        do {
+            try handle.seekToEnd()
+            try handle.write(contentsOf: data)
+        } catch {
+            // Дескриптор закрыли под нами (та же болезнь фреймворка, см. выше):
+            // открываем файл заново и оставляем след, чтобы это было видно в логе.
+            try? handle.close()
+            self.handle = Self.openForAppend(url)
+            guard let reopened = self.handle else { return }
+            let marker = "\(Self.timestamp()) LOGGER: file handle was closed underneath us — reopened\n"
+            _ = try? reopened.seekToEnd()
+            try? reopened.write(contentsOf: Data(marker.utf8))
+            try? reopened.write(contentsOf: data)
+        }
         rotateIfNeeded(url: url)
     }
 

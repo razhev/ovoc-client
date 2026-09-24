@@ -65,8 +65,35 @@ final class TunnelManager: ObservableObject {
         }
         #if DEBUG
         await importDebugKeyIfPresent()
+        startDebugCommandWatcher()
         #endif
     }
+
+    #if DEBUG
+    private var debugCommandTimer: DispatchSourceTimer?
+
+    /// DEBUG-мост для `make disconnect`: команда приходит файлом Documents/debug.disconnect
+    /// (scripts/debug-command.sh), а не перезапуском приложения — принудительный перезапуск
+    /// через devicectl (--terminate-existing) убивает и процесс расширения (в логе приложения
+    /// NEVPNConnectionErrorDomain 12, stopTunnel в расширении не вызывается), и остановку
+    /// по кнопке так не проверить. Выполняется тем же `stop()`, что и кнопка.
+    private func startDebugCommandWatcher() {
+        guard debugCommandTimer == nil,
+              let documents = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first
+        else { return }
+        let marker = documents.appendingPathComponent("debug.disconnect")
+        let timer = DispatchSource.makeTimerSource(queue: .main)
+        timer.schedule(deadline: .now() + 1, repeating: 1)
+        timer.setEventHandler { [weak self] in
+            guard let self, FileManager.default.fileExists(atPath: marker.path) else { return }
+            try? FileManager.default.removeItem(at: marker)
+            self.logger.log("debug command: disconnect")
+            self.stop()
+        }
+        timer.resume()
+        debugCommandTimer = timer
+    }
+    #endif
 
     // MARK: - Импорт ключа
 
@@ -358,8 +385,12 @@ final class TunnelManager: ObservableObject {
         status = newStatus
         logger.log("status: \(newStatus.localizedText)")
 
-        if newStatus == .disconnected, !userRequestedStop, startRequestedAt != nil {
-            Task { await explainDisconnect() }
+        // Причину от системы пишем в лог всегда — и при остановке по кнопке:
+        // так видно, дошёл ли stopTunnel до расширения или систему что-то убило.
+        // Под кнопку — только когда отключились не по нашей команде.
+        if newStatus == .disconnected {
+            let show = !userRequestedStop && startRequestedAt != nil
+            Task { await explainDisconnect(showToUser: show) }
         }
     }
 
@@ -371,15 +402,16 @@ final class TunnelManager: ObservableObject {
 
     /// Почему туннель отключился сам. Источники: причина от системы
     /// (fetchLastDisconnectError) и last_error.txt, который пишет расширение.
-    private func explainDisconnect() async {
+    private func explainDisconnect(showToUser: Bool) async {
         guard let connection = manager?.connection else { return }
         let systemError: NSError? = await withCheckedContinuation { continuation in
             connection.fetchLastDisconnectError { continuation.resume(returning: $0 as NSError?) }
         }
+        logger.log("disconnect reason: \(systemError.map(Self.raw) ?? "none")")
+        guard showToUser else { return }
 
         var parts: [String] = []
         if let systemError {
-            logger.log("disconnect reason: \(Self.raw(systemError))")
             parts.append(Self.describeDisconnect(systemError) + "\n[\(Self.raw(systemError))]")
         }
         if let url = SharedPaths.lastErrorURL,

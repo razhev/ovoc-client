@@ -59,7 +59,7 @@ connect:
 	@./scripts/launch-app.sh -autoconnect
 
 disconnect:
-	@./scripts/launch-app.sh -autodisconnect
+	@./scripts/debug-command.sh disconnect
 
 ## Диагностика без сервера: профиль-пустышка M1 (подпись, entitlements, App Group,
 ## загрузка фреймворка). ЗАТИРАЕТ боевой профиль — после неё ключ импортировать заново.

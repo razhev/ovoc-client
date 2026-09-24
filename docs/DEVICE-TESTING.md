@@ -21,7 +21,7 @@ make crashlogs  # то же + отчёты о падениях расширен�
 make build      # сборка БЕЗ подписи — быстрая проверка, что всё компилируется
 make framework  # собрать OpenVPNAdapter.framework из исходников с исправлением (основной способ)
 make connect    # DEBUG: перезапустить приложение на телефоне и сразу подключить VPN
-make disconnect # DEBUG: то же, но отключить
+make disconnect # DEBUG: отключить VPN командой-файлом, без перезапуска приложения (перезапуск убил бы расширение)
 make dummy      # DEBUG: профиль-пустышка M1 (диагностика без сервера; ЗАТИРАЕТ боевой профиль)
 make release-check # ворота Release: DEBUG-моста нет, файлов ключа в бандле нет
 ```
@@ -332,16 +332,25 @@ TCP-сокета, пойманном через `Dialer.Control`, — за сп�
 - `RingLogger` держит файл открытым весь срок жизни процесса: дескриптор открыт раньше любых
   сокетов и не освобождается, чужой номер ему не достанется. Ротация закрывает и открывает его заново.
 
-**Проверка.** На Mac: `make build` и `make test` зелёные (2026-09-24). На телефоне (ещё не
-прогнано — телефон в этот момент был занят переходом на OVoC Client): `make install` →
-`make push-key` → «Подключить» → «Разрешить» → подождать → `make disconnect` → `make logs`.
-Ожидаемо в `tunnel.log`: `configureTunnel: clearing network settings (while stopping)`, возможно
-`clearing network settings failed: <домен>#<код> — ignored, tunnel is stopping`, затем
-`event: disconnected`; ни одной строки `error(fatal=true)`, файл читается как UTF-8, `last_error.txt`
-не появляется. Негативная проверка, что настоящие фатальные ошибки по-прежнему доходят до кнопки:
-профиль с чужим CA (`Secrets/broken-ca.ovpn`, собирается из ключа: `<ca>` заменён на самоподписанный)
-→ `make push-key KEY=Secrets/broken-ca.ovpn` → «Подключить»: сервер не проходит проверку сертификата,
-ядро отдаёт фатальную ошибку в фазе `.starting` → `last_error.txt` и текст под кнопкой.
+**Проверка.** На Mac: `make build` и `make test` зелёные (2026-09-24). На телефоне прогон
+2026-09-24 упёрся в отладочный канал: `make disconnect` перезапускал приложение через
+devicectl (`--terminate-existing`), а такой перезапуск на iPhone 16 Pro / iOS 26.6.2 убивает и
+процесс расширения — в `app.log` причина `NEVPNConnectionErrorDomain 12`, в `tunnel.log` ни
+`stopTunnel`, ни строк после него (проверено и на сборке без исправления, и после удаления второго
+приложения с телефона). Утром того же дня стоп, нажатый пальцем, доходил до расширения штатно.
+Поэтому `make disconnect` теперь доставляет команду файлом `Documents/debug.disconnect`
+(`scripts/debug-command.sh`), DEBUG-сборка приложения подхватывает его раз в секунду и зовёт тот
+же `stop()`, что и кнопка; приложение при этом не перезапускается. Сам прогон с новым каналом ещё
+не сделан (телефон отключили от кабеля): `make install` → `make connect` → подождать →
+`make disconnect` → `make logs`. Ожидаемо в `tunnel.log`: `stopTunnel: reason=userInitiated(1)`,
+`configureTunnel: clearing network settings (while stopping)`, возможно `clearing network settings
+failed: <домен>#<код> — ignored, tunnel is stopping`, затем `event: disconnected`; ни одной строки
+`error(fatal=true)`, файл читается как UTF-8, `last_error.txt` не появляется; в `app.log` —
+`debug command: disconnect` и `disconnect reason: none`. Негативная проверка, что настоящие
+фатальные ошибки по-прежнему доходят до кнопки: профиль с чужим CA (`Secrets/broken-ca.ovpn`,
+собирается из ключа: `<ca>` заменён на самоподписанный) → `make push-key KEY=Secrets/broken-ca.ovpn`
+→ «Подключить»: сервер не проходит проверку сертификата, ядро отдаёт фатальную ошибку в фазе
+`.starting` → `last_error.txt` и текст под кнопкой.
 
 **Что осталось у фреймворка.** Сырой `close` в плагине никуда не делся: запись может
 попасть в любой другой свежий дескриптор. Возможная доработка — патч `fw.hpp`
@@ -359,6 +368,7 @@ TCP-сокета, пойманном через `Dialer.Control`, — за сп�
 | «Ключ скопирован не целиком…» / «нет протокола OpenVPN over Cloak» / «нет ключа Amnezia» | обрезан при копировании; ключ другого протокола; в тексте нет `vpn://` | скопировать заново целиком в формате «For the AmneziaVPN app»; на Mac: `python3 scripts/decode-vpnkey.py --schema Secrets/my.vpnkey` |
 | код `12` сразу после «Подключение…» | расширение упало; при боевом туннеле чаще всего память (лимит ~50 МБ) | `make crashlogs` → `JetsamEvent-*`, последние `heartbeat` в `tunnel.log` |
 | обрыв при блокировке экрана или смене сети | sleep/wake и Wi-Fi ↔ LTE пока простым пробросом | `make logs` → строки `sleep` / `wake` / `event: reconnecting`; доработка — по результатам теста |
+| после `make disconnect` старого образца (перезапуск приложения) в `app.log` `NEVPNConnectionErrorDomain 12`, в `tunnel.log` нет `stopTunnel` | принудительный перезапуск приложения через devicectl убивает и расширение | это не ошибка провайдера; `make disconnect` теперь шлёт команду файлом; для проверки стопа — он либо кнопка |
 | при отключении кнопкой в `tunnel.log` `error(fatal=true) … #20 Failed to reset tunnel`, есть `last_error.txt`, в логе двоичный мусор | сборка до 2026-09-24: ложная ошибка `resetTun` адаптера + сырой `close` в Go-плагине Cloak (разбор выше) | обновить сборку (`make install`); в новой ожидается `clearing network settings (while stopping)` без `error(fatal=true)` |
 
 ---

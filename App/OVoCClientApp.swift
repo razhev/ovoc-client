@@ -2,6 +2,23 @@ import SwiftUI
 
 @main
 struct OVoCClientApp: App {
+    init() {
+        // Системная шапка (логи, импорт) — в цветах «Печки». Шрифт заголовков
+        // задают сами экраны (ToolbarItem .principal): подмена шрифта через
+        // UINavigationBarAppearance на iOS 26 прячет крупный заголовок.
+        let bar = UINavigationBarAppearance()
+        bar.configureWithOpaqueBackground()
+        bar.backgroundColor = UIColor(Pk.smetana)
+        bar.shadowColor = .clear
+        let ink = UIColor(Pk.sazha)
+        bar.titleTextAttributes = [.foregroundColor: ink]
+        bar.largeTitleTextAttributes = [.foregroundColor: ink]
+        UINavigationBar.appearance().standardAppearance = bar
+        UINavigationBar.appearance().scrollEdgeAppearance = bar
+        UINavigationBar.appearance().compactAppearance = bar
+        UINavigationBar.appearance().tintColor = ink
+    }
+
     var body: some Scene {
         WindowGroup {
             ContentView()

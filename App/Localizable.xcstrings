@@ -45,6 +45,28 @@
         }
       }
     },
+    "VPN включён": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "VPN is on"
+          }
+        }
+      }
+    },
+    "VPN выключен": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "VPN is off"
+          }
+        }
+      }
+    },
     "VPN сейчас включён — на время смены ключа он будет отключён.": {
       "extractionState": "manual",
       "localizations": {
@@ -122,6 +144,17 @@
         }
       }
     },
+    "Гасим печь…": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Banking the fire…"
+          }
+        }
+      }
+    },
     "Дальше iOS спросит: «%@ хочет добавить конфигурации VPN». Нажмите «Разрешить» и введите код-пароль — без этого разрешения приложение не может включать VPN. Спрашивают один раз.": {
       "extractionState": "manual",
       "localizations": {
@@ -177,6 +210,17 @@
         }
       }
     },
+    "Испеклось!": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fresh out of the oven!"
+          }
+        }
+      }
+    },
     "Источник": {
       "extractionState": "manual",
       "localizations": {
@@ -217,17 +261,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Key imported: “%@”"
-          }
-        }
-      }
-    },
-    "Ключ не добавлен": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "No key yet"
           }
         }
       }
@@ -298,6 +331,28 @@
         }
       }
     },
+    "Нажмите «Подключить» — Вовка растопит печь.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tap “Connect” — Vovka will light the stove."
+          }
+        }
+      }
+    },
+    "Не подключилось": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Didn’t connect"
+          }
+        }
+      }
+    },
     "Не удалось импортировать ключ: %@": {
       "extractionState": "manual",
       "localizations": {
@@ -364,6 +419,17 @@
         }
       }
     },
+    "Нет ключа": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No key"
+          }
+        }
+      }
+    },
     "Нет профиля VPN": {
       "extractionState": "manual",
       "localizations": {
@@ -393,6 +459,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "Refresh"
+          }
+        }
+      }
+    },
+    "Обычно это занимает несколько секунд.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This usually takes a few seconds."
+          }
+        }
+      }
+    },
+    "Отключаемся…": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Disconnecting…"
           }
         }
       }
@@ -430,6 +518,28 @@
         }
       }
     },
+    "Отменить": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cancel"
+          }
+        }
+      }
+    },
+    "Переподключаемся…": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reconnecting…"
+          }
+        }
+      }
+    },
     "Переподключение…": {
       "extractionState": "manual",
       "localizations": {
@@ -437,6 +547,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Reconnecting…"
+          }
+        }
+      }
+    },
+    "Печь остыла": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The stove is cold"
           }
         }
       }
@@ -459,6 +580,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "Share Logs"
+          }
+        }
+      }
+    },
+    "Подкидываем дров…": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Adding firewood…"
+          }
+        }
+      }
+    },
+    "Подключаемся…": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Connecting…"
           }
         }
       }
@@ -584,6 +727,17 @@
         }
       }
     },
+    "Рецепт потерялся": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The recipe is lost"
+          }
+        }
+      }
+    },
     "Сеть изменилась — соединение восстанавливается, ничего нажимать не нужно.": {
       "extractionState": "manual",
       "localizations": {
@@ -672,6 +826,28 @@
         }
       }
     },
+    "Тесто порвалось": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The dough tore"
+          }
+        }
+      }
+    },
+    "Трафик идёт через сервер.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Traffic goes through the server."
+          }
+        }
+      }
+    },
     "Туннель": {
       "extractionState": "manual",
       "localizations": {
@@ -701,6 +877,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "The tunnel is shutting down, this takes a couple of seconds."
+          }
+        }
+      }
+    },
+    "Тянем-потянем…": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Heave-ho…"
+          }
+        }
+      }
+    },
+    "Ушат пустой": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The tub is empty"
           }
         }
       }

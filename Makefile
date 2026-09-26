@@ -3,7 +3,7 @@
 PROJECT := OVoCClient.xcodeproj
 SCHEME  := OVoCClient
 
-.PHONY: gen build test framework fetch verify devices ddi install push-key connect disconnect dummy release-check strings-check icon testflight logs crashlogs clean
+.PHONY: scene gen build test framework fetch verify devices ddi install push-key connect disconnect dummy release-check strings-check icon testflight logs crashlogs clean
 
 ## Сгенерировать OVoCClient.xcodeproj из project.yml
 gen:
@@ -74,6 +74,11 @@ release-check: gen
 ## App/Localizable.xcstrings и переведён; мёртвых ключей нет
 strings-check:
 	@python3 scripts/check-localization.py
+
+## Пересобрать сцену главного экрана App/Scene/scene.html (изба, печь, Вовка, анимации)
+## из scripts/pechka/scene.mjs — того же кода, что рисует холст Design. Нужен Node.js.
+scene:
+	node scripts/pechka/build-scene.mjs
 
 ## Перерисовать иконку 1024×1024 (App/Assets.xcassets/AppIcon.appiconset/AppIcon.png)
 ## скриптом на CoreGraphics — без внешних зависимостей

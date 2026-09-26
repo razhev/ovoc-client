@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- Параметры `xcodebuild -exportArchive` для scripts/upload-testflight.sh.
+	     method app-store-connect + destination upload: xcodebuild сам переподписывает
+	     архив distribution-профилем и загружает его в App Store Connect (TestFlight),
+	     без altool и fastlane. Авторизация — API-ключом (флаги -authenticationKey* в скрипте). -->
+	<key>method</key>
+	<string>app-store-connect</string>
+	<key>destination</key>
+	<string>upload</string>
+	<!-- Автоподпись: distribution-профили для приложения и расширения Xcode
+	     заводит сам (нужен -allowProvisioningUpdates + API-ключ). -->
+	<key>signingStyle</key>
+	<string>automatic</string>
+	<!-- Team ID — тот же, что DEVELOPMENT_TEAM в project.yml; скрипт сверяет их. -->
+	<key>teamID</key>
+	<string>222A4867MA</string>
+	<!-- dSYM в App Store Connect: отчёты о падениях из TestFlight будут с символами. -->
+	<key>uploadSymbols</key>
+	<true/>
+	<!-- Номер сборки поднимаем руками в project.yml (CURRENT_PROJECT_VERSION):
+	     тогда номер в логах и в TestFlight — один и тот же. При true Xcode
+	     молча подставил бы свой. -->
+	<key>manageAppVersionAndBuildNumber</key>
+	<false/>
+</dict>
+</plist>

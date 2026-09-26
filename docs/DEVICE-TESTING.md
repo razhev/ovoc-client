@@ -223,8 +223,9 @@ hostname); директивы `.ovpn` — имя и число аргумент�
    На экране: «Ключ импортирован: …» и «Профиль: сервер».
 4. «Подключить» → несколько секунд «Подключение…» (рукопожатие Cloak) → «Подключено».
 5. `make logs` — агент читает `tunnel.log`. Ключевые строки: `apply OK: … autologin=true`,
-   `configureTunnel: remote=127.0.0.1 routes incl=… excl=… serverExcluded=… dns=…`,
-   `event: connected`, `memory connected: N MB`, далее `heartbeat`.
+   `reachability: wifi (tracking)`, `configureTunnel: remote=127.0.0.1 routes incl=… excl=…
+   serverExcluded=… ipv6=sink(fd00:6f76:6f63::2/64→tunnel) dns=…`, `event: connected`,
+   `memory connected: N MB`, далее `heartbeat`.
 
 **Гейт M3 — всё должно быть правдой:**
 - [ ] сайт-определитель IP показывает **IP сервера**, а не провайдера;
@@ -233,7 +234,11 @@ hostname); директивы `.ovpn` — имя и число аргумент�
 - [ ] «Отключить» → чистое отключение; повторное подключение работает;
 - [ ] тестом: сайт-определитель IPv6 не показывает адрес провайдера (утечка мимо туннеля);
 - [ ] тестом: переключение Wi-Fi ↔ LTE — соединение восстанавливается или честно рвётся с
-      читаемой ошибкой.
+      читаемой ошибкой;
+- [ ] тестом: блокировка экрана на несколько минут — после разблокировки туннель жив.
+
+Три последних пункта — «хвост гейта M3», чек-лист с ожидаемыми строками лога — в разделе
+[«Хвост гейта M3»](#хвост-гейта-m3-ipv6-смена-сети-блокировка-экрана-2026-09-26) ниже.
 
 ### Как устроена защита (что сделано перед первым запуском)
 
@@ -372,9 +377,93 @@ CA (`Secrets/broken-ca.ovpn` — из ключа, `<ca>` заменён на с�
 | «Подключено», но сайты не открываются | петля маршрутов или DNS | в `tunnel.log` строка `configureTunnel:` — `excl` должно быть ≥ 1, `dns` не пуст; на iOS 26 известен баг amnezia-client#2072 → `scripts/build-framework-source.sh`, затем `make verify` и заново этап C |
 | «Ключ скопирован не целиком…» / «нет протокола OpenVPN over Cloak» / «нет ключа Amnezia» | обрезан при копировании; ключ другого протокола; в тексте нет `vpn://` | скопировать заново целиком в формате «For the AmneziaVPN app»; на Mac: `python3 scripts/decode-vpnkey.py --schema Secrets/my.vpnkey` |
 | код `12` сразу после «Подключение…» | расширение упало; при боевом туннеле чаще всего память (лимит ~50 МБ) | `make crashlogs` → `JetsamEvent-*`, последние `heartbeat` в `tunnel.log` |
-| обрыв при блокировке экрана или смене сети | sleep/wake и Wi-Fi ↔ LTE пока простым пробросом | `make logs` → строки `sleep` / `wake` / `event: reconnecting`; доработка — по результатам теста |
+| после смены сети «Переподключение…» не сменяется на «Подключено» | новый интерфейс не достаёт до сервера, либо Cloak не переподнимается | `make logs` → после `reachability: … — reconnecting in 2s` ждём `event: reconnecting` → `configureTunnel: … (reconnect #1)` → `event: connected`; если вместо этого цикл `Transport error` — см. раздел «Хвост гейта M3» |
+| после долгой блокировки экрана сайты не открываются | сокет Cloak умер во сне, ядро ещё не заметило (ping-restart — до 120 с) | подождать до 2 минут: в логе `wake after Ns` → `event: reconnecting` → `event: connected`; если дольше — `make logs`, искать `error(fatal=true)` |
+| сайт-определитель показывает IPv6-адрес домашней сети / оператора | утечка IPv6: в `configureTunnel:` нет `ipv6=sink(…)` — сборка до 2026-09-26 | обновить сборку (`make install`); в новой heartbeat считает `ipv6-sunk N` |
 | в `app.log` `NEVPNConnectionErrorDomain 12` сразу после перезапуска приложения через devicectl, в `tunnel.log` нет `stopTunnel` | принудительный перезапуск приложения (`--terminate-existing`) убивает и расширение | это не ошибка провайдера; стоп проверять через `make disconnect` (команда файлом) либо кнопкой |
 | при отключении кнопкой в `tunnel.log` `error(fatal=true) … #20 Failed to reset tunnel`, есть `last_error.txt`, в логе двоичный мусор | сборка до 2026-09-24: ложная ошибка `resetTun` адаптера + сырой `close` в Go-плагине Cloak (разбор выше) | обновить сборку (`make install`); в новой — `clearing network settings (while stopping)`, `NEAgentErrorDomain#1 — ignored`, без `error(fatal=true)` |
+
+### Хвост гейта M3: IPv6, смена сети, блокировка экрана (2026-09-26)
+
+**Что было.** Расширение отдавало iOS только IPv4-настройки (`ipv6=none` в строке
+`configureTunnel:`): если у сети телефона есть IPv6 (у операторов и многих домашних роутеров —
+есть), всё, что резолвится в AAAA, шло мимо туннеля с настоящим адресом телефона. Смена сети и
+sleep/wake были простым пробросом — ядро OpenVPN3 на iOS о смене интерфейса не узнаёт вовсе.
+
+**Что выяснилось в исходниках фреймворка** (`OpenVPN3/openvpn/client/cliconnect.hpp`,
+`OpenVPNAdapter/library/OpenVPNAdapterImpl.mm`, `OpenVPNClient.mm`):
+- Объект lifecycle (сон, пробуждение, смена интерфейса) в ядре есть только для macOS
+  (`MacLifeCycle`); на iOS ядро переподключается **только** по ошибке транспорта либо по
+  тишине: сервер шлёт `ping 10` / `ping-restart 120`, то есть мёртвый сокет замечается не позже
+  чем через 2 минуты. Переподключение — `new_client()`: событие `RECONNECTING`, новая сессия,
+  `tun_builder_new` → у адаптера `resetTun` → наш `configureTunnel(nil)`, затем настройки из
+  свежего PUSH_REPLY → `configureTunnel(settings)` → `CONNECTED`. `tunPersist` выключен, поэтому
+  tun каждый раз собирается заново — тем же кодом, что и при первом подключении.
+- `adapter.reconnect(afterTimeInterval:)` — таймер и тот же `new_client()`. `pause` — остановка
+  сессии **с разборкой tun**: маршруты снимаются, и на время паузы трафик идёт мимо VPN;
+  `resume` — полное рукопожатие Cloak заново. Для sleep/wake это не подходит: iOS дёргает
+  их очень часто (в логах пары `sleep`/`wake` через 2–3 секунды), а разобранный tun во сне —
+  утечка фонового трафика.
+- IPv6-настройки адаптер строит только при `ifconfig-ipv6` от сервера; `tun_builder_set_block_ipv6`
+  у адаптера — пустышка. `OpenVPNReachability` (SCNetworkReachability на главном run loop)
+  в фреймворке есть, README адаптера рекомендует по её колбэку звать `reconnect`.
+
+**Что сделано в провайдере** (`PacketTunnel/PacketTunnelProvider.swift`, `PacketFlowBridge.swift`):
+- **IPv6 — в раковину.** Если сервер не дал IPv6, ставим `NEIPv6Settings` с ULA-адресом
+  `fd00:6f76:6f63::2/64` и default-маршрутом IPv6 в туннель; мост отбрасывает пакеты `AF_INET6`,
+  не передавая их адаптеру, и считает их (`ipv6-sunk N` в heartbeat). Почему ULA: по RFC 6724
+  такой источник «не того класса» для глобальных адресатов, и iOS сама предпочитает IPv4 — сайты
+  не ждут таймаута IPv6. IPv4, DNS (IPv4-литералы) и fail-closed с `/32`-исключением не задеты.
+- **Смена сети.** С момента старта следим за `OpenVPNReachability`; при переходе wifi ↔ cellular
+  и при возврате сети после `none` в фазе `.connected` зовём `adapter.reconnect(afterTimeInterval: 2)`.
+  Без этого после LTE → Wi-Fi старый TCP-сокет Cloak жил бы через сотовую сеть.
+- **Переподключение.** `.reconnecting` → `reasserting = true` (приложение: «Переподключение…»),
+  `.connected` повторно → `reasserting = false`; completion старта одноразовый и второй раз не
+  зовётся. `configureTunnel(nil)` (очистка перед каждым переподключением) теперь **никогда** не
+  отвечает адаптеру ошибкой — отказ очистки ничего не значит, следом придут новые настройки, а
+  адаптер сделал бы из него фатальную #20.
+- **sleep/wake** — по-прежнему проброс (обоснование выше); на `wake` пишется, сколько спали.
+
+**Чек-лист (руками, телефон у человека).** Перед всем: `make install`, ключ на месте,
+«Подключить» → «Подключено». Логи после каждого пункта — `make logs` (телефон по кабелю).
+
+1. **IPv6.**
+   1. При поднятом VPN в Safari открыть `test-ipv6.com` (или `ipv6-test.com`).
+   2. Ожидаем: IPv4 — **IP сервера**; IPv6 — «нет» / «not supported». Адреса вида `2a00:…`,
+      `2001:…` домашней сети или оператора быть **не должно**.
+   3. В `tunnel.log`: в `configureTunnel:` — `ipv6=sink(fd00:6f76:6f63::2/64→tunnel)`; после
+      захода на сайт — `ipv6 sink: first IPv6 packet entered the tunnel and was dropped (n=…)`,
+      в следующих `heartbeat` — `ipv6-sunk N` с N > 0. Если сеть телефона без IPv6, N останется 0 —
+      это нормально, тест повторить в сети с IPv6 (LTE почти всегда).
+   4. Контроль: отключить VPN, обновить страницу — IPv6-адрес сети появился; включить — исчез.
+2. **Wi-Fi ↔ LTE.**
+   1. На Wi-Fi, VPN поднят, в Safari открыт сайт-определитель IP.
+   2. Пункт управления → выключить Wi-Fi. В приложении на несколько секунд «Переподключение…»,
+      затем «Подключено». Обновить страницу — по-прежнему IP сервера.
+   3. Включить Wi-Fi обратно — то же самое: «Переподключение…» → «Подключено».
+   4. В `tunnel.log` на каждый переход: `reachability: wifi → cellular — reconnecting in 2s` (или
+      `cellular → wifi`), затем `event: reconnecting`, `reconnect #1: tun→vpn … pkt …`,
+      `configureTunnel: clearing network settings (reconnect #1)`, `event: assignIP`,
+      `configureTunnel: … ipv6=sink(…)`, `event: connected — …`, `memory reconnected (#1): N MB`.
+      Между `reconnecting` и `connected` допустимы `ovpn: Transport error`/`Client terminated,
+      restarting…` (старый сокет умирает) — но не `error(fatal=true)` и не `last_error.txt`.
+      Если ошибка транспорта пришла раньше колбэка reachability, порядок строк будет
+      `event: reconnecting` → `reachability: …` — это тоже штатно.
+   5. `app.log`: `status: Переподключение…` → `status: Подключено`, без `disconnect reason`.
+3. **Блокировка экрана.**
+   1. VPN поднят, заблокировать телефон кнопкой и оставить на 5–10 минут (лучше на LTE — на
+      Wi-Fi iOS держит сокеты дольше).
+   2. Разблокировать, открыть сайт — грузится; сайт-определитель показывает IP сервера.
+   3. `tunnel.log`: `sleep` → `wake after Ns`. Дальше два штатных исхода: либо ничего — сокет
+      пережил сон, `heartbeat` продолжает расти; либо в пределах 2 минут после `wake`
+      `event: reconnecting` → … → `event: connected` (сокет умер, ядро переподняло сессию по
+      ping-restart). Не должно быть: `error(fatal=true)`, `unexpected disconnect`, `last_error.txt`.
+   4. Штатный стоп после всего: «Отключить» → `stopTunnel: reason=userInitiated(1)` →
+      `event: disconnected`.
+
+Если после смены сети ядро крутится в `Transport error` дольше минуты — снять `make logs` и
+смотреть, есть ли вообще `reachability: …` строки (нет → колбэк не приходит, тогда сработает
+только `ping-restart` через ≤ 2 мин) и какая ошибка у Cloak при `Cloak_dial` на новом интерфейсе.
 
 ---
 

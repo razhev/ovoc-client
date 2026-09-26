@@ -52,6 +52,34 @@ adapter.reconnect(afterTimeInterval:)
 // readonly: sessionName, connectionInformation, interfaceStatistics, transportStatistics
 ```
 
+Что эти методы делают в ядре (`OpenVPN3/openvpn/client/cliconnect.hpp`, проверено по исходникам
+сборки `make framework`):
+
+| Метод | Ядро | События |
+|---|---|---|
+| `reconnect(afterTimeInterval: n)` | таймер n сек → `new_client()`: старая сессия останавливается, tun разбирается (`tun_builder_teardown` → `resetTun` → наш `configureTunnel(nil)`), новая сессия собирает tun заново из свежего PUSH_REPLY | `RECONNECTING` → … → `CONNECTED` |
+| `pause(withReason:)` | сессия останавливается **с разборкой tun** (маршруты сняты — трафик мимо VPN), io_context живёт | `PAUSE` |
+| `resume()` | `new_client()` — полное рукопожатие заново | `RESUME`, `RECONNECTING` → `CONNECTED` |
+| `disconnect()` | `graceful_stop()`: explicit-exit-notify, стоп | `DISCONNECTED` |
+
+На iOS у ядра **нет** объекта lifecycle (есть только `MacLifeCycle` для macOS): сон, пробуждение
+и смену интерфейса оно не видит; переподключается только по ошибке транспорта либо по тишине
+(`ping` / `ping-restart` с сервера). Смена сети — забота провайдера.
+
+## OpenVPNReachability
+
+```swift
+let reachability = OpenVPNReachability()                 // SCNetworkReachability (internet + wifi)
+reachability.reachabilityStatus                          // .notReachable / .reachableViaWiFi / .reachableViaWWAN
+reachability.isTracking
+reachability.startTracking { (status: OpenVPNReachabilityStatus) in … }  // колбэк — на главном run loop
+reachability.stopTracking()
+```
+Планирование/отмена трекера уходят на главную очередь через `dispatch_async`; колбэк приходит
+из `SCNetworkReachability` на главном run loop расширения. README адаптера рекомендует по
+смене статуса звать `reconnect(afterTimeInterval:)`. Мы: при переходе wifi ↔ cellular и при
+возврате сети в фазе `.connected` — `reconnect(afterTimeInterval: 2)`.
+
 ## OpenVPNAdapterDelegate (точные Swift-сигнатуры)
 
 ```swift
@@ -62,9 +90,12 @@ func openVPNAdapter(_ openVPNAdapter: OpenVPNAdapter,
 // перед каждым подключением (tun_builder_new) и при разборке tun (tun_builder_teardown,
 // в том числе после stopTunnel). Ошибка в completion → ФАТАЛЬНАЯ #20
 // OpenVPNAdapterErrorTUNSetupFailed с системной ошибкой в NSUnderlyingErrorKey.
-// Во время остановки setTunnelNetworkSettings(nil) у iOS проваливается —
-// мы отвечаем nil, иначе штатное отключение выглядит как фатальная ошибка.
-// Мы: дополняем settings (matchDomains, excludedRoutes, DNS-fallback) →
+// Во время остановки setTunnelNetworkSettings(nil) у iOS проваливается, а перед
+// переподключением следом всё равно придут новые настройки — на очистку мы
+// ВСЕГДА отвечаем nil, иначе штатное отключение или переподключение выглядит
+// как фатальная ошибка.
+// Мы: дополняем settings (matchDomains, excludedRoutes, DNS-fallback,
+//     IPv6-раковина при отсутствии ipv6Settings) →
 //     setTunnelNetworkSettings(networkSettings) { completionHandler($0) }
 
 func openVPNAdapter(_ openVPNAdapter: OpenVPNAdapter,
@@ -122,9 +153,12 @@ startTunnel:
   networkSettings.dnsSettings.matchDomains = [""]
   добавить NEIPv4Route(serverIP /32) в excludedRoutes   // tunnelRemoteAddress будет 127.0.0.1!
   DNS-fallback: адаптер → dhcp-option DNS из конфига → dns1/dns2
+  ipv6Settings == nil → NEIPv6Settings(fd00:6f76:6f63::2/64) + NEIPv6Route.default()  // раковина
   setTunnelNetworkSettings(...) { completionHandler($0) }
 
-handleEvent .connected → снять таймер, completionHandler(nil) старта
+handleEvent .connected → снять таймер, completionHandler(nil) старта; повторно — reasserting = false
+handleEvent .reconnecting → reasserting = true (tun соберётся заново тем же configureTunnel)
+reachability wifi ↔ cellular в .connected → adapter.reconnect(afterTimeInterval: 2)
 handleError fatal      → last_error.txt + cancelTunnelWithError (только в фазах starting/connected;
                          во время стопа — только строка в логе)
 stopTunnel             → adapter.disconnect() + страховочный таймер 5 сек

@@ -7,6 +7,11 @@ import ConfigKit
 ///
 /// Профиль — это то, что появляется в Настройках iOS после первого
 /// «Разрешить» (системный диалог «…хочет добавить конфигурации VPN»).
+///
+/// Локализация: всё, что уходит на экран (`lastError`, `notice`, тексты
+/// статусов), берётся из `Localizable.xcstrings` через `String(localized:)`;
+/// всё, что уходит в `app.log`, остаётся на английском и не локализуется —
+/// лог должен читаться одинаково, с какого бы телефона его ни прислали.
 @MainActor
 final class TunnelManager: ObservableObject {
 
@@ -105,7 +110,7 @@ final class TunnelManager: ObservableObject {
         #endif
     }
 
-    /// Ошибка импорта с готовым русским текстом для экрана.
+    /// Ошибка импорта с готовым (уже локализованным) текстом для экрана.
     struct ImportFailure: LocalizedError {
         let errorDescription: String?
     }
@@ -133,8 +138,7 @@ final class TunnelManager: ObservableObject {
             }.value
         } catch {
             logger.log("import FAILED: parse: \(Self.logCode(error))")
-            let text = (error as? LocalizedError)?.errorDescription ?? Self.raw(error)
-            throw ImportFailure(errorDescription: text)
+            throw ImportFailure(errorDescription: Self.explainParse(error))
         }
 
         // Менять профиль под работающим туннелем нельзя: расширение продолжит
@@ -143,8 +147,8 @@ final class TunnelManager: ObservableObject {
             logger.log("import: tunnel is up — stopping before profile change")
             guard await stopAndWait() else {
                 logger.log("import FAILED: tunnel did not stop in time")
-                throw ImportFailure(errorDescription:
-                    "Не удалось отключить VPN перед сменой ключа. Отключите его кнопкой и повторите импорт.")
+                throw ImportFailure(errorDescription: String(localized:
+                    "Не удалось отключить VPN перед сменой ключа. Отключите его кнопкой и повторите импорт."))
             }
         }
 
@@ -152,12 +156,13 @@ final class TunnelManager: ObservableObject {
             try await timed { try await self.apply(config: config) }
         } catch {
             logger.log("import FAILED: save profile: \(Self.raw(Self.unwrap(error).error))")
-            throw ImportFailure(errorDescription: explain(error, retry: "Повторите импорт"))
+            throw ImportFailure(errorDescription:
+                explain(error, retry: String(localized: "Повторите импорт")))
         }
 
         logger.log("import OK: profile=\(config.ovpnProfile.utf8.count) bytes")
         lastError = nil
-        notice = "Ключ импортирован: «\(config.description)»"
+        notice = String(localized: "Ключ импортирован: «\(config.description)»")
         return config.description
     }
 
@@ -198,6 +203,33 @@ final class TunnelManager: ObservableObject {
         }
     }
 
+    /// Текст ошибки разбора для экрана. ConfigKit — пакет без ресурсов, его
+    /// `errorDescription` не локализуется (и остаётся для логов и тестов);
+    /// перевод для интерфейса живёт здесь, в каталоге строк приложения.
+    private static func explainParse(_ error: Error) -> String {
+        guard let keyError = error as? VPNKeyError else {
+            return (error as? LocalizedError)?.errorDescription ?? raw(error)
+        }
+        switch keyError {
+        case .notAVPNKey:
+            return String(localized: "В этом тексте нет ключа Amnezia: ключ начинается с vpn://")
+        case .invalidBase64:
+            return String(localized: "Ключ повреждён: не удалось раскодировать base64 (возможно, строка скопирована не целиком)")
+        case .truncated:
+            return String(localized: "Ключ скопирован не целиком — конец строки обрезан. Скопируйте ключ заново полностью")
+        case .decompressionFailed:
+            return String(localized: "Ключ повреждён: не удалось распаковать данные")
+        case .malformedJSON(let detail):
+            return String(localized: "Внутри ключа не JSON-конфигурация Amnezia (\(detail))")
+        case .noCloakContainer:
+            return String(localized: "В ключе нет протокола OpenVPN over Cloak — экспортируйте ключ для контейнера amnezia-openvpn-cloak")
+        case .missingField(let field):
+            return String(localized: "В конфигурации не хватает поля «\(field)»")
+        case .notAnIPv4(let host):
+            return String(localized: "Не удалось определить IPv4-адрес сервера «\(host)»")
+        }
+    }
+
     #if DEBUG
     /// DEBUG-мост: `make push-key` кладёт ключ в Documents приложения через
     /// devicectl, здесь он проходит ТОТ ЖЕ `importKey`, что и ключ с экрана импорта.
@@ -216,13 +248,13 @@ final class TunnelManager: ObservableObject {
                 try await apply(config: config)
                 logger.log("debug .ovpn imported: profile=\(config.ovpnProfile.utf8.count) bytes")
                 lastError = nil
-                notice = "Ключ импортирован: «\(config.description)»"
+                notice = String(localized: "Ключ импортирован: «\(config.description)»")
             } else {
                 try await importKey(key, source: .debugBridge)
             }
         } catch {
             let text = (error as? LocalizedError)?.errorDescription ?? Self.raw(error)
-            lastError = "Не удалось импортировать ключ: \(text)"
+            lastError = String(localized: "Не удалось импортировать ключ: \(text)")
         }
     }
 
@@ -232,7 +264,7 @@ final class TunnelManager: ObservableObject {
             .map { $0.split(separator: " ", omittingEmptySubsequences: true) }
             .first { $0.first == "remote" && $0.count >= 2 }
         guard let host = remote.map({ String($0[1]) }), ImportedConfig.isIPv4Literal(host) else {
-            throw VPNKeyError.missingField("remote <IPv4> в .ovpn")
+            throw VPNKeyError.missingField("remote <IPv4> in .ovpn")
         }
         return ImportedConfig(ovpnProfile: ovpn, serverIP: host, dns1: "1.1.1.1", dns2: "1.0.0.1",
                               description: "DEBUG .ovpn → \(host)")
@@ -272,6 +304,10 @@ final class TunnelManager: ObservableObject {
         manager.protocolConfiguration = proto
         manager.localizedDescription = Bundle.main.displayName
         manager.isEnabled = true
+        // Авто-подключение (on-demand) сознательно выключено: при недоступном
+        // сервере iOS переподключалась бы бесконечно, а смена ключа (стоп →
+        // запись профиля) ломалась бы о немедленный перезапуск туннеля системой.
+        manager.isOnDemandEnabled = false
 
         do {
             try await manager.saveToPreferences()
@@ -307,7 +343,7 @@ final class TunnelManager: ObservableObject {
         proto.providerConfiguration = ["dummy": true]
 
         manager.protocolConfiguration = proto
-        manager.localizedDescription = "\(Bundle.main.displayName) (тест)"
+        manager.localizedDescription = "\(Bundle.main.displayName) (dummy)"
         manager.isEnabled = true
 
         try await manager.saveToPreferences()
@@ -324,7 +360,7 @@ final class TunnelManager: ObservableObject {
             await connect(allowDummy: true)
         } catch {
             logger.log("dummy profile FAILED: \(Self.raw(error))")
-            lastError = explain(error, retry: "Повторите make dummy")
+            lastError = explain(error, retry: "make dummy")
         }
     }
     #endif
@@ -342,7 +378,7 @@ final class TunnelManager: ObservableObject {
         userRequestedStop = false
         guard let manager, hasRealConfig || allowDummy else {
             logger.log("connect refused: no real profile")
-            lastError = "Сначала добавьте ключ: без него подключаться некуда."
+            lastError = String(localized: "Сначала добавьте ключ: без него подключаться некуда.")
             return
         }
         do {
@@ -383,7 +419,7 @@ final class TunnelManager: ObservableObject {
         let newStatus = manager.connection.status
         guard newStatus != status else { return }
         status = newStatus
-        logger.log("status: \(newStatus.localizedText)")
+        logger.log("status: \(newStatus.logName)")
 
         // Причину от системы пишем в лог всегда — и при остановке по кнопке:
         // так видно, дошёл ли stopTunnel до расширения или систему что-то убило.
@@ -416,11 +452,12 @@ final class TunnelManager: ObservableObject {
         }
         if let url = SharedPaths.lastErrorURL,
            let text = try? String(contentsOf: url, encoding: .utf8), !text.isEmpty {
+            // Текст расширения показываем как есть: он же лежит в tunnel.log.
             parts.append(text)
         }
         if !extensionWroteLogSince(startRequestedAt) {
-            parts.append("Расширение туннеля не написало в лог ни строки — оно не запустилось "
-                         + "или у него нет доступа к App Group.")
+            parts.append(String(localized:
+                "Расширение туннеля не написало в лог ни строки — оно не запустилось или у него нет доступа к App Group."))
         }
         guard !parts.isEmpty else { return }
         lastError = parts.joined(separator: "\n\n")
@@ -461,7 +498,9 @@ final class TunnelManager: ObservableObject {
 
     /// Человеческое объяснение + сырой код. Строки системных ошибок NE не
     /// документированы, подсказка эвристическая — поэтому код показываем всегда.
-    private func explain(_ error: Error, retry: String = "Нажмите «Подключить» ещё раз") -> String {
+    /// - Parameter retry: что сделать, чтобы повторить (уже локализованная строка).
+    private func explain(_ error: Error, retry: String? = nil) -> String {
+        let retry = retry ?? String(localized: "Нажмите «Подключить» ещё раз")
         let (underlying, elapsed) = Self.unwrap(error)
         let nsError = underlying as NSError
         let text = nsError.localizedDescription.lowercased()
@@ -469,30 +508,29 @@ final class TunnelManager: ObservableObject {
         let hint: String
         if text.contains("permission denied") || text.contains("ipc failed") {
             if loadFailed || (elapsed ?? 1) < 0.5 {
-                hint = "Система отказала сразу, без диалога: в подписи сборки нет права на "
-                     + "Network Extension. Это проблема сборки — смотрите ворота entitlements "
-                     + "в выводе make install."
+                hint = String(localized:
+                    "Система отказала сразу, без диалога: в подписи сборки нет права на Network Extension. Это проблема сборки — смотрите ворота entitlements в выводе make install.")
             } else {
-                hint = "Вы нажали «Не разрешать» (или VPN запрещён профилем управления). "
-                     + "\(retry) и выберите «Разрешить»."
+                hint = String(localized:
+                    "Вы нажали «Не разрешать» (или VPN запрещён профилем управления). \(retry) и выберите «Разрешить».")
             }
         } else if nsError.domain == NEVPNErrorDomain, let code = NEVPNError.Code(rawValue: nsError.code) {
             switch code {
             case .configurationInvalid:
-                hint = "Профиль VPN некорректен — обычно не совпал bundle id расширения."
+                hint = String(localized: "Профиль VPN некорректен — обычно не совпал bundle id расширения.")
             case .configurationDisabled:
-                hint = "Профиль VPN выключен: активен другой VPN. Отключите его и повторите."
+                hint = String(localized: "Профиль VPN выключен: активен другой VPN. Отключите его и повторите.")
             case .configurationStale:
-                hint = "Профиль VPN устарел — нажмите «Подключить» ещё раз."
+                hint = String(localized: "Профиль VPN устарел — нажмите «Подключить» ещё раз.")
             case .configurationReadWriteFailed:
-                hint = "Система не дала прочитать или сохранить профиль VPN."
+                hint = String(localized: "Система не дала прочитать или сохранить профиль VPN.")
             case .connectionFailed:
-                hint = "Система не смогла запустить туннель."
+                hint = String(localized: "Система не смогла запустить туннель.")
             default:
-                hint = "Не удалось создать или запустить профиль VPN."
+                hint = String(localized: "Не удалось создать или запустить профиль VPN.")
             }
         } else {
-            hint = "Не удалось создать или запустить профиль VPN."
+            hint = String(localized: "Не удалось создать или запустить профиль VPN.")
         }
         return "\(hint)\n[\(Self.raw(underlying))]"
     }
@@ -501,21 +539,21 @@ final class TunnelManager: ObservableObject {
     /// домена — это NSError, который расширение само передало системе.
     private static func describeDisconnect(_ error: NSError) -> String {
         guard error.domain == NEVPNConnectionErrorDomain else {
-            return "Туннель завершился с ошибкой: \(error.localizedDescription)"
+            return String(localized: "Туннель завершился с ошибкой: \(error.localizedDescription)")
         }
         switch error.code {
         case 12:
-            return "Расширение туннеля аварийно завершилось: не загрузился фреймворк, сбой "
-                 + "подписи или нехватка памяти. Отчёт о падении: make crashlogs."
+            return String(localized:
+                "Расширение туннеля аварийно завершилось: не загрузился фреймворк, сбой подписи или нехватка памяти. Отчёт о падении: make crashlogs.")
         case 14:
-            return "Система не нашла расширение туннеля (bundle id / NSExtension) либо "
-                 + "приложение только что переустановлено — попробуйте ещё раз."
+            return String(localized:
+                "Система не нашла расширение туннеля (bundle id / NSExtension) либо приложение только что переустановлено — попробуйте ещё раз.")
         case 4, 13:
-            return "Профиль VPN повреждён: удалите его в Настройки → VPN и подключитесь заново."
+            return String(localized: "Профиль VPN повреждён: удалите его в Настройки → VPN и подключитесь заново.")
         case 2:
-            return "Нет сети."
+            return String(localized: "Нет сети.")
         default:
-            return "Система разорвала VPN-соединение."
+            return String(localized: "Система разорвала VPN-соединение.")
         }
     }
 
@@ -526,15 +564,45 @@ final class TunnelManager: ObservableObject {
 }
 
 extension NEVPNStatus {
+    /// Текст статуса на экране — для всех значений `NEVPNStatus`.
     var localizedText: String {
         switch self {
-        case .invalid: return "Нет профиля VPN"
-        case .disconnected: return "Отключено"
-        case .connecting: return "Подключение…"
-        case .connected: return "Подключено"
-        case .reasserting: return "Переподключение…"
-        case .disconnecting: return "Отключение…"
-        @unknown default: return "Неизвестно"
+        case .invalid: return String(localized: "Нет профиля VPN")
+        case .disconnected: return String(localized: "Отключено")
+        case .connecting: return String(localized: "Подключение…")
+        case .connected: return String(localized: "Подключено")
+        case .reasserting: return String(localized: "Переподключение…")
+        case .disconnecting: return String(localized: "Отключение…")
+        @unknown default: return String(localized: "Неизвестное состояние")
+        }
+    }
+
+    /// Пояснение под статусом (когда оно нужно): что происходит и чего ждать.
+    var localizedHint: String? {
+        switch self {
+        case .invalid:
+            return String(localized:
+                "Профиль VPN недоступен: его удалили в Настройках или не разрешили создать. Импортируйте ключ заново.")
+        case .reasserting:
+            return String(localized: "Сеть изменилась — соединение восстанавливается, ничего нажимать не нужно.")
+        case .disconnecting:
+            return String(localized: "Туннель закрывается, это занимает пару секунд.")
+        default:
+            return nil
+        }
+    }
+
+    /// Имя статуса для app.log — не локализуется, чтобы лог читался одинаково
+    /// с любого телефона.
+    var logName: String {
+        switch self {
+        case .invalid: return "invalid"
+        case .disconnected: return "disconnected"
+        case .connecting: return "connecting"
+        case .connected: return "connected"
+        case .reasserting: return "reasserting"
+        case .disconnecting: return "disconnecting"
+        @unknown default: return "unknown(\(rawValue))"
         }
     }
 }

@@ -11,6 +11,7 @@
 - **[PLAN.md](PLAN.md)** — полный план разработки: архитектура, этапы (M0–M6) с проверками, риски.
 - **[docs/IMPLEMENTATION.md](docs/IMPLEMENTATION.md)** — детальный план имплементации по шагам (Фаза 0 → M6), тест-стратегия, план коммитов, открытые вопросы.
 - **[docs/DEVICE-TESTING.md](docs/DEVICE-TESTING.md)** — инструкция по тестированию на iPhone: подготовка аккаунта и телефона, чек-лист первого запуска, каналы отладки, таблица «симптом → что делать».
+- **[docs/TESTFLIGHT.md](docs/TESTFLIGHT.md)** — раздача через TestFlight по шагам: запись приложения и API-ключ в App Store Connect, `make testflight`, внешняя группа с публичной ссылкой, текст для Beta App Review, сообщение родственникам, памятка «90 дней».
 - **[docs/FRAMEWORK-API.md](docs/FRAMEWORK-API.md)** — зафиксированный API `OpenVPNAdapter.framework`, выписанный из реальных заголовков. По нему пишется код провайдера.
 - **[IMPLEMENTATION_PROMPT.md](IMPLEMENTATION_PROMPT.md)** — самодостаточный промпт для агента (выжимка исследования).
 
@@ -50,7 +51,19 @@ App ID и App Group, импорт ключа вставкой → «Подклю
 и двоичный мусор в `tunnel.log` (сырой `close` в Go-плагине Cloak) — причины и что сделано в
 провайдере описаны в [docs/DEVICE-TESTING.md](docs/DEVICE-TESTING.md).
 
-**Хвост гейта M3 (2026-09-26, ветка `m3-gate-tail`)**: закрыта утечка IPv6 — при отсутствии IPv6
+**M5 сделан 2026-09-26** (на Mac; проверка на телефоне — по сценарию в
+[docs/DEVICE-TESTING.md](docs/DEVICE-TESTING.md), «Этап F»): интерфейс на русском и английском
+(`App/Localizable.xcstrings`, русский — базовый), понятный текст для всех состояний VPN с
+пояснением под статусом, ошибка под кнопкой — подсказка + сырой код в квадратных скобках,
+«Поделиться» на экране «Логи» отдаёт сразу `tunnel.log` + `app.log` (+ `last_error.txt`),
+иконка (`make icon`). Авто-подключение не делали — почему, см. docs/IMPLEMENTATION.md, M5.
+
+**M6 подготовлен 2026-09-26**: `make testflight` (архив Release → загрузка в App Store Connect
+через API-ключ, без fastlane/altool), `Config/ExportOptions.plist`, инструкция для ручных шагов
+и тексты для ревью/родственников — [docs/TESTFLIGHT.md](docs/TESTFLIGHT.md). Сама загрузка ещё
+не выполнялась: нужны запись приложения и API-ключ в App Store Connect (шаг 6.1, делается руками).
+
+**Хвост гейта M3 (2026-09-26)**: закрыта утечка IPv6 — при отсутствии IPv6
 от сервера расширение ставит IPv6-настройки с ULA-адресом и default-маршрутом в туннель, а мост
 отбрасывает такие пакеты (`ipv6=sink(…)` в логе, `ipv6-sunk N` в heartbeat); при смене сети
 (Wi-Fi ↔ LTE) провайдер следит за `OpenVPNReachability` и просит ядро переподключиться (ядро на
@@ -58,7 +71,6 @@ iOS смену интерфейса само не видит); очистка н
 стать фатальной ошибкой; sleep/wake намеренно остаётся пробросом (разбор — в
 [docs/DEVICE-TESTING.md](docs/DEVICE-TESTING.md), «Хвост гейта M3»). Проверки руками —
 IPv6-сайт при поднятом VPN, переключение Wi-Fi ↔ LTE, блокировка экрана — по чек-листу там же.
-Дальше — M5: доводка (ошибки, ru/en, иконка), затем M6 TestFlight.
 
 ## Команды
 
@@ -77,6 +89,10 @@ make ddi        # смонтировать на телефон образ раз
 make install    # подписанная сборка → установка на подключённый iPhone → запуск
 make push-key   # DEBUG: доставить Secrets/my.vpnkey в приложение тем же кодом, что экран импорта
 make release-check # ворота Release: нет DEBUG-моста, нет файлов ключа в бандле
+make strings-check # каталог строк ru/en сходится с кодом (App/Localizable.xcstrings)
+make icon       # перерисовать иконку 1024×1024 скриптом (scripts/make-app-icon.swift)
+make scene      # пересобрать сцену главного экрана App/Scene/scene.html (нужен Node.js)
+make testflight # Release-архив → загрузка в TestFlight (API-ключ в Secrets/asc.env, см. docs/TESTFLIGHT.md)
 make logs       # забрать логи с телефона в build/logs/latest/
 make crashlogs  # то же + отчёты о падениях расширения/приложения
 ```
@@ -119,7 +135,7 @@ python3 scripts/decode-vpnkey.py --schema Secrets/my.vpnkey
 на телефон ставим только через `make install`, не кнопкой Run. Каналы отладки:
 
 - экран «Логи» в приложении: `tunnel.log` (расширение) и `app.log` (приложение)
-  из App Group, кнопка «Поделиться»;
+  из App Group; «Поделиться» отдаёт оба файла сразу (и `last_error.txt`, если есть);
 - `make logs` / `make crashlogs` — те же файлы и отчёты о падениях на Mac, без sudo;
 - Console.app с фильтром по subsystem `com.razhev.ovocclient`;
 - `sudo log collect --device-name "<iPhone>" --last 10m` по кабелю.
@@ -130,6 +146,22 @@ python3 scripts/decode-vpnkey.py --schema Secrets/my.vpnkey
 
 `Secrets/`, `*.vpnkey`, `*.ovpn` — в `.gitignore`. Реальные ключи не коммитятся
 и не попадают в код/тесты (тесты синтезируют ключи сами).
+
+## Дизайн «Печка»
+
+Мультяшная дизайн-система в духе советских мультфильмов 60-х: вместо замков,
+ключей и щитов — изба, русская печь, ушат с тестом и колобок. Источник правды —
+холст Design «Печка — мультяшный OVoC Client» (экраны, цвета, шрифты, голос,
+компоненты, иконки, движение, иконка приложения).
+
+- `App/Pechka.swift` — цвета, шрифты, кнопки, плашки, карточки, край панели;
+  `App/PechkaIcons.swift` — иконки (те же SVG-пути, что на холсте).
+- Сцена главного экрана — `App/Scene/scene.html` в `WKWebView` (`App/SceneView.swift`):
+  SVG + CSS-анимации, собранные `make scene` из `scripts/pechka/scene.mjs` —
+  того же кода, что рисует холст. «ПЫХ!» проигрывается при переходе в «Подключено».
+- Голос: шутка — только в заголовке («Испеклось!»), статус в плашке — прямо
+  («VPN включён»), кнопки — глаголом.
+- Шрифты Marmelad, Rubik, PT Mono — `App/Fonts` (Google Fonts, лицензия OFL, тексты рядом).
 
 ## Лицензионная заметка
 

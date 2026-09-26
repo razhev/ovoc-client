@@ -9,6 +9,11 @@ options:
   deploymentTarget:
     iOS: "16.0"
   createIntermediateGroups: true
+  # Язык разработки (developmentRegion проекта и CFBundleDevelopmentRegion):
+  # русский — базовый, ключи в App/Localizable.xcstrings — русские строки,
+  # английский — перевод в том же каталоге. knownRegions XcodeGen выводит
+  # из каталога сам (ru + en).
+  developmentLanguage: ru
 
 settings:
   base:
@@ -68,7 +73,16 @@ targets:
         # иначе XcodeGen зашивает 1.0 / 1 и настройки выше не действуют.
         CFBundleShortVersionString: $(MARKETING_VERSION)
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
-        UILaunchScreen: {}
+        # Экран запуска — цвета «Печки», без белой вспышки перед сценой.
+        UILaunchScreen:
+          UIColorName: LaunchBackground
+        # Шрифты «Печки» (App/Fonts, Google Fonts, лицензия OFL — рядом).
+        UIAppFonts:
+          - Marmelad-Regular.ttf
+          - Rubik-Regular.ttf
+          - Rubik-Medium.ttf
+          - Rubik-SemiBold.ttf
+          - PTMono-Regular.ttf
         UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
         UIRequiresFullScreen: true
         # Стандартная криптография (TLS/AES) — экспортное исключение;

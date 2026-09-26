@@ -3,7 +3,7 @@
 PROJECT := OVoCClient.xcodeproj
 SCHEME  := OVoCClient
 
-.PHONY: gen build test framework fetch verify devices ddi install push-key connect disconnect dummy release-check logs crashlogs clean
+.PHONY: scene gen build test framework fetch verify devices ddi install push-key connect disconnect dummy release-check strings-check icon testflight logs crashlogs clean
 
 ## Сгенерировать OVoCClient.xcodeproj из project.yml
 gen:
@@ -69,6 +69,27 @@ dummy:
 ## Ворота Release: в сборке нет DEBUG-моста и нет ни одного файла ключа
 release-check: gen
 	./scripts/check-release.sh
+
+## Каталог строк ru/en: каждый русский литерал App/*.swift есть в
+## App/Localizable.xcstrings и переведён; мёртвых ключей нет
+strings-check:
+	@python3 scripts/check-localization.py
+
+## Пересобрать сцену главного экрана App/Scene/scene.html (изба, печь, Вовка, анимации)
+## из scripts/pechka/scene.mjs — того же кода, что рисует холст Design. Нужен Node.js.
+scene:
+	node scripts/pechka/build-scene.mjs
+
+## Перерисовать иконку 1024×1024 (App/Assets.xcassets/AppIcon.appiconset/AppIcon.png)
+## скриптом на CoreGraphics — без внешних зависимостей
+icon:
+	swift scripts/make-app-icon.swift
+
+## Release-архив → загрузка в TestFlight через API-ключ App Store Connect
+## (Secrets/asc.env, ключ в ~/.private_keys/). Перед этим сам гоняет release-check.
+## Номер сборки (CURRENT_PROJECT_VERSION в project.yml) поднимать руками — docs/TESTFLIGHT.md
+testflight: gen
+	./scripts/upload-testflight.sh
 
 ## Забрать логи с телефона в build/logs/latest/ (tunnel.log, app.log, last_error.txt)
 logs:

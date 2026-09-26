@@ -254,19 +254,55 @@ xcodebuild -project OVoCClient.xcodeproj -scheme OVoCClient \
 поднятом VPN → `tunnel is up — stopping` → `import OK`. Чистая установка + вставка ключа
 на экране → IP сервера — см. DEVICE-TESTING.md, этап E.
 
-### M5 — Доводка (1–2 сессии)
+### M5 — Доводка (сделано на Mac 2026-09-26; проверка на телефоне — DEVICE-TESTING.md, этап F)
 
-- Агент: статусы всех состояний `NEVPNStatus`; ошибка под кнопкой — `fetchLastDisconnectError` (iOS 16+) + fallback `last_error.txt`; кнопка «Поделиться логами» (`ShareLink` на файл лога); `Localizable.xcstrings` ru/en; иконка; **опционально** авто-подключение (`isOnDemandEnabled`, по умолчанию **выключено**, с предупреждением в UI о назойливых реконнектах при мёртвом сервере).
-- **Проверка:** телефон на русском → интерфейс русский; выключить сервер → под кнопкой читаемая ошибка, не молчаливое «Отключено»; логи экспортируются.
+Что сделано:
+- **Статусы**: `NEVPNStatus.localizedText` для всех шести значений + `localizedHint` — пояснение
+  под статусом для `invalid` (профиль удалили/не разрешили → импортировать ключ заново),
+  `reasserting` (сеть сменилась, ничего нажимать не нужно), `disconnecting`. Ошибка под кнопкой
+  осталась в принятом виде: подсказка + сырой код `[домен код: текст]`, источники —
+  `fetchLastDisconnectError` и `last_error.txt` расширения.
+- **Логи**: «Поделиться» на экране «Логи» отдаёт все имеющиеся файлы сразу (`tunnel.log`,
+  `app.log`, `last_error.txt`), а не только открытую вкладку — причина сбоя обычно видна лишь по
+  двум логам вместе.
+- **Локализация ru/en**: `App/Localizable.xcstrings` (String Catalog), русский — базовый
+  (`developmentLanguage: ru` в `project.yml`; ключ каталога = русская строка из кода), английский —
+  перевод. Литералы `Text(...)` SwiftUI берёт из каталога сами, строки `TunnelManager` — через
+  `String(localized:)`. Тексты ошибок разбора ключа переводятся в приложении
+  (`TunnelManager.explainParse`), `ConfigKit` остаётся пакетом без ресурсов (его
+  `errorDescription` — для логов и тестов). **Строки для `app.log` не локализуются**
+  (`NEVPNStatus.logName`). Ворота: `make strings-check` (`scripts/check-localization.py`) —
+  каждый русский литерал `App/*.swift` есть в каталоге и переведён, мёртвых ключей нет; в
+  `upload-testflight.sh` вызывается автоматически.
+- **Иконка**: `make icon` → `scripts/make-app-icon.swift` (CoreGraphics/CoreText, без
+  зависимостей) рисует одну картинку 1024×1024 без альфа-канала в
+  `App/Assets.xcassets/AppIcon.appiconset/AppIcon.png`; для iOS 17+ этого достаточно. Акцентный
+  цвет `#3D9EF2` — общий для иконки и `AccentColor.colorset`.
+- **Авто-подключение (`isOnDemandEnabled`) — не делаем**, в `apply` оно явно выключено.
+  Причины: (1) при недоступном сервере iOS переподключается бесконечно и заметно жрёт батарею;
+  (2) смена ключа устроена как «стоп → ждём Отключено → запись профиля» — с on-demand система
+  перезапускала бы туннель сразу после стопа, и `stopAndWait` ломался бы; (3) нужны
+  `onDemandRules` + переключатель + отдельная проверка на телефоне — не укладывается в доводку.
+  Если понадобится: правило `NEOnDemandRuleConnect` с `interfaceTypeMatch = .any`, переключатель
+  выключен по умолчанию, при включении — предупреждение из PLAN.md.
 
-### M6 — TestFlight (1–2 сессии + 1–2 дня ревью Apple)
+**Проверка на Mac (2026-09-26):** `make build` — BUILD SUCCEEDED; `make test` — 41 тест, 0 ошибок;
+`make release-check` — 5×PASS, в бандле `ru.lproj`/`en.lproj/Localizable.strings` и `Assets.car` с
+иконкой; `make strings-check` — PASS, 66 строк. **На телефоне** (телефон на русском → русский
+интерфейс; сервер выключен → под кнопкой читаемая ошибка; экспорт логов) — сценарий в
+DEVICE-TESTING.md, этап F; ещё не выполнялся.
 
-| Шаг | Кто | Что |
-|---|---|---|
-| 6.1 | **Пользователь** | App Store Connect: создать запись приложения (bundle `com.razhev.ovocclient` — после первой загрузки сборки он не меняется); Users and Access → Integrations → **API key** (роль App Manager), `.p8` → `~/.private_keys/`; сообщить агенту Key ID + Issuer ID |
-| 6.2 | Агент | `Config/ExportOptions.plist` (method `app-store-connect`, upload) + `scripts/upload-testflight.sh`: `xcodebuild archive` → `xcodebuild -exportArchive` с `-authenticationKeyPath/-authenticationKeyID/-authenticationKeyIssuerID`. Без fastlane, без altool |
-| 6.3 | **Пользователь** | В App Store Connect: внешняя группа тестеров + публичная ссылка; заполнить заметки Beta App Review (текст даст агент: личный клиент к собственному серверу + рабочий тестовый ключ) |
-| 6.4 | Агент | В репозиторий: текст заметок для ревью, шаблон сообщения родственникам (ru), памятка «перезаливать ≤90 дней» |
+### M6 — TestFlight (инструменты готовы 2026-09-26; загрузка ещё не выполнялась)
+
+| Шаг | Кто | Что | Состояние |
+|---|---|---|---|
+| 6.1 | **Пользователь** | App Store Connect: создать запись приложения (bundle `com.razhev.ovocclient` — после первой загрузки сборки он не меняется); Users and Access → Integrations → **API key** (роль App Manager), `.p8` → `~/.private_keys/`; Key ID + Issuer ID → `Secrets/asc.env` | **ждёт** — по шагам в docs/TESTFLIGHT.md |
+| 6.2 | Агент | `Config/ExportOptions.plist` (method `app-store-connect`, destination upload, автоподпись, `manageAppVersionAndBuildNumber=false`) + `scripts/upload-testflight.sh` = `make testflight`: проверки окружения/реквизитов → ворота `release-check` + `strings-check` → `xcodebuild archive` → `-exportArchive` с `-authenticationKey*`. Без fastlane, без altool. `ITSAppUsesNonExemptEncryption=false` уже в `project.yml`/`Info.plist`, скрипт это сверяет на архиве | сделано; первый запуск — после 6.1 |
+| 6.3 | **Пользователь** | В App Store Connect: внешняя группа тестеров + публичная ссылка; заметки Beta App Review — готовый текст в docs/TESTFLIGHT.md, приложить отдельный тестовый ключ | **ждёт** |
+| 6.4 | Агент | docs/TESTFLIGHT.md: текст заметок для ревью, шаблон сообщения родственникам (ru), памятка «перезаливать ≤90 дней» (скрипт печатает дату и ведёт `build/testflight/uploads.log`), запасной вариант с внутренними тестерами, таблица ошибок | сделано |
+
+Номер сборки поднимается руками: `CURRENT_PROJECT_VERSION` в `project.yml` перед каждой
+загрузкой (скрипт отказывается заливать номер, который уже заливался).
 
 **Проверка:** сборка «Ready to Test»; свой телефон ставит по публичной ссылке; один родственник подключается и видит IP сервера. Fallback при буксующем ревью — внутренние тестеры (без ревью, Apple ID в команду).
 
@@ -302,7 +338,7 @@ xcodebuild -project OVoCClient.xcodeproj -scheme OVoCClient \
 | Пригодность релиза v1.0.42 (символы Cloak, линковка с SDK 26) | Может переключить на запасной источник/сборку из исходников | Шаг 0.2 (символы/заголовки) и M2 (загрузка на устройстве) |
 | Реальный `vpn://`-ключ пользователя | Блокирует M3 (шаг 3.1), не раньше | Пользователь экспортирует из Amnezia к началу M3 |
 | ~~Версия iOS на рабочем iPhone~~ — закрыт 2026-09-19: iPhone 16 Pro, iOS 26.6.2 → штатный путь через `devicectl` | — | — |
-| App Store Connect: запись приложения + API key (Key ID, Issuer ID) | Блокирует только M6 | Пользователь создаёт после одобрения аккаунта (шаг 6.1) |
+| App Store Connect: запись приложения + API key (Key ID, Issuer ID) | Блокирует только первый `make testflight` (инструменты готовы) | Пользователь создаёт по docs/TESTFLIGHT.md, шаг 6.1; реквизиты — в `Secrets/asc.env` (не в git) |
 | ~~Имя «PersonalVPN» — финальное?~~ — закрыт 2026-09-24: приложение — **OVoC Client** (OpenVPN over Cloak Client), проект `OVoCClient`, bundle `com.razhev.ovocclient` | — | — |
 
 ---

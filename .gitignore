@@ -1,5 +1,8 @@
 # ── Секреты (никогда не коммитить) ──
-Secrets/
+# Secrets/* (а не Secrets/): git не умеет «разыгнорировать» файл внутри
+# игнорируемого каталога, а шаблон asc.env.example должен попасть в репозиторий.
+Secrets/*
+!Secrets/asc.env.example
 *.vpnkey
 *.ovpn
 *.mobileprovision

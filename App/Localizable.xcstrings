@@ -1,0 +1,930 @@
+{
+  "sourceLanguage": "ru",
+  "strings": {
+    "App Group НЕДОСТУПНА: в подписи сборки нет application-groups — логи писать некуда.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "App Group UNAVAILABLE: the build's signature lacks application-groups — there is nowhere to write logs."
+          }
+        }
+      }
+    },
+    "App Group: OK · %lld КБ · изменён в %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "App Group: OK · %lld KB · modified at %@"
+          }
+        }
+      }
+    },
+    "App Group: OK · файла лога нет": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "App Group: OK · no log file yet"
+          }
+        }
+      }
+    },
+    "App Group: OK · файла лога нет — расширение ещё не запускалось": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "App Group: OK · no log file yet — the extension has not run"
+          }
+        }
+      }
+    },
+    "VPN включён": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "VPN is on"
+          }
+        }
+      }
+    },
+    "VPN выключен": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "VPN is off"
+          }
+        }
+      }
+    },
+    "VPN сейчас включён — на время смены ключа он будет отключён.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The VPN is on now — it will be disconnected while the key is being changed."
+          }
+        }
+      }
+    },
+    "В ключе нет протокола OpenVPN over Cloak — экспортируйте ключ для контейнера amnezia-openvpn-cloak": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The key has no OpenVPN over Cloak protocol — export a key for the amnezia-openvpn-cloak container"
+          }
+        }
+      }
+    },
+    "В конфигурации не хватает поля «%@»": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The configuration is missing the “%@” field"
+          }
+        }
+      }
+    },
+    "В этом тексте нет ключа Amnezia: ключ начинается с vpn://": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "There is no Amnezia key in this text: a key starts with vpn://"
+          }
+        }
+      }
+    },
+    "Внутри ключа не JSON-конфигурация Amnezia (%@)": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The key does not contain an Amnezia JSON configuration (%@)"
+          }
+        }
+      }
+    },
+    "Вы нажали «Не разрешать» (или VPN запрещён профилем управления). %@ и выберите «Разрешить».": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "You tapped “Don't Allow” (or VPN is prohibited by a management profile). %@ and choose “Allow”."
+          }
+        }
+      }
+    },
+    "Выбрать файл с ключом…": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Choose a File with the Key…"
+          }
+        }
+      }
+    },
+    "Гасим печь…": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Banking the fire…"
+          }
+        }
+      }
+    },
+    "Дальше iOS спросит: «%@ хочет добавить конфигурации VPN». Нажмите «Разрешить» и введите код-пароль — без этого разрешения приложение не может включать VPN. Спрашивают один раз.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Next, iOS will ask: “%@ Would Like to Add VPN Configurations”. Tap “Allow” and enter your passcode — without this permission the app cannot turn the VPN on. It asks only once."
+          }
+        }
+      }
+    },
+    "Добавить ключ": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Add Key"
+          }
+        }
+      }
+    },
+    "Закрыть": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Close"
+          }
+        }
+      }
+    },
+    "Импортировать": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Import"
+          }
+        }
+      }
+    },
+    "Импортирую…": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Importing…"
+          }
+        }
+      }
+    },
+    "Испеклось!": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fresh out of the oven!"
+          }
+        }
+      }
+    },
+    "Источник": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Source"
+          }
+        }
+      }
+    },
+    "Ключ": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Key"
+          }
+        }
+      }
+    },
+    "Ключ выдаёт владелец сервера. В AmneziaVPN: «Поделиться» → протокол OpenVPN over Cloak → формат «Для приложения AmneziaVPN» → «Копировать». Можно вставить сообщение целиком — ключ найдётся сам.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The server owner provides the key. In AmneziaVPN: “Share” → OpenVPN over Cloak protocol → “For AmneziaVPN app” format → “Copy”. You can paste the whole message — the key will be found automatically."
+          }
+        }
+      }
+    },
+    "Ключ импортирован: «%@»": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Key imported: “%@”"
+          }
+        }
+      }
+    },
+    "Ключ повреждён: не удалось раскодировать base64 (возможно, строка скопирована не целиком)": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The key is damaged: base64 could not be decoded (the string may have been copied incompletely)"
+          }
+        }
+      }
+    },
+    "Ключ повреждён: не удалось распаковать данные": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The key is damaged: the data could not be decompressed"
+          }
+        }
+      }
+    },
+    "Ключ скопирован не целиком — конец строки обрезан. Скопируйте ключ заново полностью": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The key was copied incompletely — the end of the string is cut off. Copy the whole key again"
+          }
+        }
+      }
+    },
+    "Лог пуст": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Log is empty"
+          }
+        }
+      }
+    },
+    "Логи": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Logs"
+          }
+        }
+      }
+    },
+    "Нажмите «Подключить» ещё раз": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tap “Connect” again"
+          }
+        }
+      }
+    },
+    "Нажмите «Подключить» — Вовка растопит печь.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tap “Connect” — Vovka will light the stove."
+          }
+        }
+      }
+    },
+    "Не подключилось": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Didn’t connect"
+          }
+        }
+      }
+    },
+    "Не удалось импортировать ключ: %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Could not import the key: %@"
+          }
+        }
+      }
+    },
+    "Не удалось определить IPv4-адрес сервера «%@»": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Could not resolve the IPv4 address of server “%@”"
+          }
+        }
+      }
+    },
+    "Не удалось отключить VPN перед сменой ключа. Отключите его кнопкой и повторите импорт.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Could not turn the VPN off before changing the key. Disconnect it with the button and import again."
+          }
+        }
+      }
+    },
+    "Не удалось прочитать файл как текст. В файле должен лежать ключ vpn://…": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Could not read the file as text. The file must contain a vpn://… key"
+          }
+        }
+      }
+    },
+    "Не удалось создать или запустить профиль VPN.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Could not create or start the VPN profile."
+          }
+        }
+      }
+    },
+    "Неизвестное состояние": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Unknown state"
+          }
+        }
+      }
+    },
+    "Нет ключа": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No key"
+          }
+        }
+      }
+    },
+    "Нет профиля VPN": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No VPN profile"
+          }
+        }
+      }
+    },
+    "Нет сети.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No network."
+          }
+        }
+      }
+    },
+    "Обновить": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Refresh"
+          }
+        }
+      }
+    },
+    "Обычно это занимает несколько секунд.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This usually takes a few seconds."
+          }
+        }
+      }
+    },
+    "Отключаемся…": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Disconnecting…"
+          }
+        }
+      }
+    },
+    "Отключение…": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Disconnecting…"
+          }
+        }
+      }
+    },
+    "Отключено": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Disconnected"
+          }
+        }
+      }
+    },
+    "Отключить": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Disconnect"
+          }
+        }
+      }
+    },
+    "Отменить": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cancel"
+          }
+        }
+      }
+    },
+    "Переподключаемся…": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reconnecting…"
+          }
+        }
+      }
+    },
+    "Переподключение…": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reconnecting…"
+          }
+        }
+      }
+    },
+    "Печь остыла": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The stove is cold"
+          }
+        }
+      }
+    },
+    "Повторите импорт": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Import again"
+          }
+        }
+      }
+    },
+    "Поделиться логами": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Share Logs"
+          }
+        }
+      }
+    },
+    "Подкидываем дров…": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Adding firewood…"
+          }
+        }
+      }
+    },
+    "Подключаемся…": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Connecting…"
+          }
+        }
+      }
+    },
+    "Подключение…": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Connecting…"
+          }
+        }
+      }
+    },
+    "Подключено": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Connected"
+          }
+        }
+      }
+    },
+    "Подключить": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Connect"
+          }
+        }
+      }
+    },
+    "Приложение": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "App"
+          }
+        }
+      }
+    },
+    "Профиль VPN выключен: активен другой VPN. Отключите его и повторите.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The VPN profile is disabled: another VPN is active. Turn it off and try again."
+          }
+        }
+      }
+    },
+    "Профиль VPN недоступен: его удалили в Настройках или не разрешили создать. Импортируйте ключ заново.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The VPN profile is unavailable: it was removed in Settings or was not allowed to be created. Import the key again."
+          }
+        }
+      }
+    },
+    "Профиль VPN некорректен — обычно не совпал bundle id расширения.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The VPN profile is invalid — usually the extension's bundle id does not match."
+          }
+        }
+      }
+    },
+    "Профиль VPN повреждён: удалите его в Настройки → VPN и подключитесь заново.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The VPN profile is corrupted: remove it in Settings → VPN and connect again."
+          }
+        }
+      }
+    },
+    "Профиль VPN устарел — нажмите «Подключить» ещё раз.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The VPN profile is stale — tap “Connect” again."
+          }
+        }
+      }
+    },
+    "Расширение туннеля аварийно завершилось: не загрузился фреймворк, сбой подписи или нехватка памяти. Отчёт о падении: make crashlogs.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The tunnel extension crashed: the framework failed to load, a signing failure, or out of memory. Crash report: make crashlogs."
+          }
+        }
+      }
+    },
+    "Расширение туннеля не написало в лог ни строки — оно не запустилось или у него нет доступа к App Group.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The tunnel extension did not write a single log line — it did not start or has no access to the App Group."
+          }
+        }
+      }
+    },
+    "Рецепт потерялся": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The recipe is lost"
+          }
+        }
+      }
+    },
+    "Сеть изменилась — соединение восстанавливается, ничего нажимать не нужно.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The network changed — the connection is being restored, no action needed."
+          }
+        }
+      }
+    },
+    "Система не дала прочитать или сохранить профиль VPN.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The system did not allow reading or saving the VPN profile."
+          }
+        }
+      }
+    },
+    "Система не нашла расширение туннеля (bundle id / NSExtension) либо приложение только что переустановлено — попробуйте ещё раз.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The system could not find the tunnel extension (bundle id / NSExtension), or the app was just reinstalled — try again."
+          }
+        }
+      }
+    },
+    "Система не смогла запустить туннель.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The system could not start the tunnel."
+          }
+        }
+      }
+    },
+    "Система отказала сразу, без диалога: в подписи сборки нет права на Network Extension. Это проблема сборки — смотрите ворота entitlements в выводе make install.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The system refused immediately, without a dialog: the build's signature lacks the Network Extension entitlement. This is a build problem — see the entitlements gate in the make install output."
+          }
+        }
+      }
+    },
+    "Система разорвала VPN-соединение.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The system dropped the VPN connection."
+          }
+        }
+      }
+    },
+    "Сменить ключ": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Change Key"
+          }
+        }
+      }
+    },
+    "Сначала добавьте ключ: без него подключаться некуда.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Add a key first: without it there is nowhere to connect."
+          }
+        }
+      }
+    },
+    "Тесто порвалось": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The dough tore"
+          }
+        }
+      }
+    },
+    "Трафик идёт через сервер.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Traffic goes through the server."
+          }
+        }
+      }
+    },
+    "Туннель": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tunnel"
+          }
+        }
+      }
+    },
+    "Туннель завершился с ошибкой: %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The tunnel ended with an error: %@"
+          }
+        }
+      }
+    },
+    "Туннель закрывается, это занимает пару секунд.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The tunnel is shutting down, this takes a couple of seconds."
+          }
+        }
+      }
+    },
+    "Тянем-потянем…": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Heave-ho…"
+          }
+        }
+      }
+    },
+    "Ушат пустой": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The tub is empty"
+          }
+        }
+      }
+    },
+    "Файл слишком большой для ключа. Выберите файл, в котором лежит строка vpn://…": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The file is too large to be a key. Choose the file that contains the vpn://… string"
+          }
+        }
+      }
+    },
+    "Чтобы подключаться к серверу, добавьте ключ vpn://… — его выдаёт владелец сервера.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "To connect to the server, add a vpn://… key — the server owner provides it."
+          }
+        }
+      }
+    }
+  },
+  "version": "1.0"
+}

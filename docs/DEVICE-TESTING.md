@@ -332,25 +332,30 @@ TCP-сокета, пойманном через `Dialer.Control`, — за сп�
 - `RingLogger` держит файл открытым весь срок жизни процесса: дескриптор открыт раньше любых
   сокетов и не освобождается, чужой номер ему не достанется. Ротация закрывает и открывает его заново.
 
-**Проверка.** На Mac: `make build` и `make test` зелёные (2026-09-24). На телефоне прогон
-2026-09-24 упёрся в отладочный канал: `make disconnect` перезапускал приложение через
-devicectl (`--terminate-existing`), а такой перезапуск на iPhone 16 Pro / iOS 26.6.2 убивает и
-процесс расширения — в `app.log` причина `NEVPNConnectionErrorDomain 12`, в `tunnel.log` ни
-`stopTunnel`, ни строк после него (проверено и на сборке без исправления, и после удаления второго
-приложения с телефона). Утром того же дня стоп, нажатый пальцем, доходил до расширения штатно.
-Поэтому `make disconnect` теперь доставляет команду файлом `Documents/debug.disconnect`
-(`scripts/debug-command.sh`), DEBUG-сборка приложения подхватывает его раз в секунду и зовёт тот
-же `stop()`, что и кнопка; приложение при этом не перезапускается. Сам прогон с новым каналом ещё
-не сделан (телефон отключили от кабеля): `make install` → `make connect` → подождать →
-`make disconnect` → `make logs`. Ожидаемо в `tunnel.log`: `stopTunnel: reason=userInitiated(1)`,
-`configureTunnel: clearing network settings (while stopping)`, возможно `clearing network settings
-failed: <домен>#<код> — ignored, tunnel is stopping`, затем `event: disconnected`; ни одной строки
-`error(fatal=true)`, файл читается как UTF-8, `last_error.txt` не появляется; в `app.log` —
-`debug command: disconnect` и `disconnect reason: none`. Негативная проверка, что настоящие
-фатальные ошибки по-прежнему доходят до кнопки: профиль с чужим CA (`Secrets/broken-ca.ovpn`,
-собирается из ключа: `<ca>` заменён на самоподписанный) → `make push-key KEY=Secrets/broken-ca.ovpn`
-→ «Подключить»: сервер не проходит проверку сертификата, ядро отдаёт фатальную ошибку в фазе
-`.starting` → `last_error.txt` и текст под кнопкой.
+**Проверка — пройдена 2026-09-26** (iPhone 16 Pro, iOS 26.6.2, сборка OVoC Client 2cd56f1+).
+По дороге выяснилось, что старый `make disconnect` перезапускал приложение через devicectl
+(`--terminate-existing`), а такой перезапуск убивает и процесс расширения — в `app.log`
+`NEVPNConnectionErrorDomain 12`, в `tunnel.log` ни `stopTunnel`, ни строк после него (проверено и
+на сборке без исправления, и после удаления второго приложения). Стоп, нажатый пальцем, доходил
+штатно. Поэтому `make disconnect` теперь доставляет команду файлом `Documents/debug.disconnect`
+(`scripts/debug-command.sh`): DEBUG-сборка подхватывает его раз в секунду и зовёт тот же `stop()`,
+что и кнопка, без перезапуска приложения.
+
+Штатное отключение (`make connect` → `make disconnect` → `make logs`), дословно из `tunnel.log`:
+`stopTunnel: reason=userInitiated(1)` → `configureTunnel: clearing network settings (while stopping)`
+→ `clearing network settings failed: NEAgentErrorDomain#1 — ignored, tunnel is stopping` →
+`event: disconnected`. Ни одной `error(fatal=true)`, файл читается как UTF-8, `last_error.txt` не
+создан; в `app.log` — `debug command: disconnect`, `disconnect reason: none`. Так что системная
+ошибка, из которой адаптер делал «фатальную» #20, — это `NEAgentErrorDomain` код 1 на
+`setTunnelNetworkSettings(nil)` во время остановки.
+
+Негативная проверка (настоящая фатальная ошибка по-прежнему доходит до кнопки): профиль с чужим
+CA (`Secrets/broken-ca.ovpn` — из ключа, `<ca>` заменён на самоподписанный) →
+`make push-key KEY=Secrets/broken-ca.ovpn` → `make connect`: ядро отдаёт `VERIFY FAIL`, адаптер —
+`error(fatal=true): …#48 OpenVPN fatal error occured | mbed TLS: … Certificate verification failed`
+в фазе `.starting`; `last_error.txt` с этим текстом создан, приложение записало
+`disconnect reason: me.ss-abramchuk.openvpn-adapter.error-domain 48` и показывает текст под
+кнопкой. После проверки — `make push-key` с настоящим ключом.
 
 **Что осталось у фреймворка.** Сырой `close` в плагине никуда не делся: запись может
 попасть в любой другой свежий дескриптор. Возможная доработка — патч `fw.hpp`
@@ -368,8 +373,8 @@ failed: <домен>#<код> — ignored, tunnel is stopping`, затем `even
 | «Ключ скопирован не целиком…» / «нет протокола OpenVPN over Cloak» / «нет ключа Amnezia» | обрезан при копировании; ключ другого протокола; в тексте нет `vpn://` | скопировать заново целиком в формате «For the AmneziaVPN app»; на Mac: `python3 scripts/decode-vpnkey.py --schema Secrets/my.vpnkey` |
 | код `12` сразу после «Подключение…» | расширение упало; при боевом туннеле чаще всего память (лимит ~50 МБ) | `make crashlogs` → `JetsamEvent-*`, последние `heartbeat` в `tunnel.log` |
 | обрыв при блокировке экрана или смене сети | sleep/wake и Wi-Fi ↔ LTE пока простым пробросом | `make logs` → строки `sleep` / `wake` / `event: reconnecting`; доработка — по результатам теста |
-| после `make disconnect` старого образца (перезапуск приложения) в `app.log` `NEVPNConnectionErrorDomain 12`, в `tunnel.log` нет `stopTunnel` | принудительный перезапуск приложения через devicectl убивает и расширение | это не ошибка провайдера; `make disconnect` теперь шлёт команду файлом; для проверки стопа — он либо кнопка |
-| при отключении кнопкой в `tunnel.log` `error(fatal=true) … #20 Failed to reset tunnel`, есть `last_error.txt`, в логе двоичный мусор | сборка до 2026-09-24: ложная ошибка `resetTun` адаптера + сырой `close` в Go-плагине Cloak (разбор выше) | обновить сборку (`make install`); в новой ожидается `clearing network settings (while stopping)` без `error(fatal=true)` |
+| в `app.log` `NEVPNConnectionErrorDomain 12` сразу после перезапуска приложения через devicectl, в `tunnel.log` нет `stopTunnel` | принудительный перезапуск приложения (`--terminate-existing`) убивает и расширение | это не ошибка провайдера; стоп проверять через `make disconnect` (команда файлом) либо кнопкой |
+| при отключении кнопкой в `tunnel.log` `error(fatal=true) … #20 Failed to reset tunnel`, есть `last_error.txt`, в логе двоичный мусор | сборка до 2026-09-24: ложная ошибка `resetTun` адаптера + сырой `close` в Go-плагине Cloak (разбор выше) | обновить сборку (`make install`); в новой — `clearing network settings (while stopping)`, `NEAgentErrorDomain#1 — ignored`, без `error(fatal=true)` |
 
 ---
 

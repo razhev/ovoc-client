@@ -6,6 +6,9 @@ import UniformTypeIdentifiers
 ///
 /// Ключ — это приватный ключ и сертификаты: экран его не логирует, не хранит
 /// дольше импорта и очищает поле при успехе и при закрытии.
+///
+/// Локализация: каждый видимый текст — ОДИН строковый литерал (ключ каталога).
+/// Склейка через `+` дала бы `String`, и SwiftUI показал бы его без перевода.
 struct ImportView: View {
     @ObservedObject var tunnel: TunnelManager
     @Environment(\.dismiss) private var dismiss
@@ -47,7 +50,7 @@ struct ImportView: View {
                         .disabled(importing)
                         .overlay(alignment: .topLeading) {
                             if text.isEmpty {
-                                Text("vpn://…")
+                                Text(verbatim: "vpn://…")
                                     .font(.system(.caption2, design: .monospaced))
                                     .foregroundStyle(.tertiary)
                                     .padding(.top, 8)
@@ -58,16 +61,19 @@ struct ImportView: View {
                 } header: {
                     Text("Ключ")
                 } footer: {
-                    Text("Ключ выдаёт владелец сервера. В AmneziaVPN: «Поделиться» → протокол "
-                       + "OpenVPN over Cloak → формат «Для приложения AmneziaVPN» → «Копировать». "
-                       + "Можно вставить сообщение целиком — ключ найдётся сам.")
+                    Text("Ключ выдаёт владелец сервера. В AmneziaVPN: «Поделиться» → протокол OpenVPN over Cloak → формат «Для приложения AmneziaVPN» → «Копировать». Можно вставить сообщение целиком — ключ найдётся сам.")
                 }
 
                 Section {
                     Button(action: importFromField) {
                         HStack {
-                            Text(importing ? "Импортирую…" : "Импортировать")
-                            if importing { Spacer(); ProgressView() }
+                            if importing {
+                                Text("Импортирую…")
+                                Spacer()
+                                ProgressView()
+                            } else {
+                                Text("Импортировать")
+                            }
                         }
                     }
                     .disabled(importing || text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
@@ -84,14 +90,12 @@ struct ImportView: View {
                             Text("VPN сейчас включён — на время смены ключа он будет отключён.")
                         }
                         if !tunnel.hasRealConfig {
-                            Text("Дальше iOS спросит: «\(Bundle.main.displayName) хочет добавить конфигурации VPN». "
-                               + "Нажмите «Разрешить» и введите код-пароль — без этого разрешения "
-                               + "приложение не может включать VPN. Спрашивают один раз.")
+                            Text("Дальше iOS спросит: «\(Bundle.main.displayName) хочет добавить конфигурации VPN». Нажмите «Разрешить» и введите код-пароль — без этого разрешения приложение не может включать VPN. Спрашивают один раз.")
                         }
                     }
                 }
             }
-            .navigationTitle(tunnel.hasRealConfig ? "Сменить ключ" : "Добавить ключ")
+            .navigationTitle(tunnel.hasRealConfig ? Text("Сменить ключ") : Text("Добавить ключ"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -122,11 +126,11 @@ struct ImportView: View {
 
         let size = (try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0
         guard size <= Self.maxFileSize else {
-            error = "Файл слишком большой для ключа. Выберите файл, в котором лежит строка vpn://…"
+            error = String(localized: "Файл слишком большой для ключа. Выберите файл, в котором лежит строка vpn://…")
             return
         }
         guard let data = try? Data(contentsOf: url), let content = String(data: data, encoding: .utf8) else {
-            error = "Не удалось прочитать файл как текст. В файле должен лежать ключ vpn://…"
+            error = String(localized: "Не удалось прочитать файл как текст. В файле должен лежать ключ vpn://…")
             return
         }
         run(content, source: .file)

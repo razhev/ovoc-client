@@ -9,6 +9,11 @@ options:
   deploymentTarget:
     iOS: "16.0"
   createIntermediateGroups: true
+  # Язык разработки (developmentRegion проекта и CFBundleDevelopmentRegion):
+  # русский — базовый, ключи в App/Localizable.xcstrings — русские строки,
+  # английский — перевод в том же каталоге. knownRegions XcodeGen выводит
+  # из каталога сам (ru + en).
+  developmentLanguage: ru
 
 settings:
   base:

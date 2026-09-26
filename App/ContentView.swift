@@ -3,6 +3,10 @@ import NetworkExtension
 
 /// Главный экран: статус + большая кнопка «Подключить». Пока ключ не
 /// импортирован, вместо неё — приглашение добавить ключ (экран ImportView).
+///
+/// Все видимые строки — через `Localizable.xcstrings` (русский — базовый,
+/// английский — второй): литералы в `Text(...)` SwiftUI берёт как ключи
+/// каталога сами, строки из `TunnelManager` приходят уже локализованными.
 struct ContentView: View {
     @StateObject private var tunnel = TunnelManager()
     @State private var busy = false
@@ -44,6 +48,16 @@ struct ContentView: View {
                     Text(tunnel.status.localizedText)
                         .font(.title2)
 
+                    // Промежуточные состояния (переподключение, отключение,
+                    // потерянный профиль) — с пояснением, что происходит.
+                    if let hint = tunnel.status.localizedHint {
+                        Text(hint)
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal, 32)
+                    }
+
                     Button(action: toggle) {
                         Text(buttonTitle)
                             .font(.headline)
@@ -64,6 +78,7 @@ struct ContentView: View {
                 }
 
                 if let error = tunnel.lastError {
+                    // Подсказка + сырой код в квадратных скобках (см. TunnelManager.explain).
                     Text(error)
                         .font(.footnote)
                         .foregroundStyle(.red)
@@ -85,7 +100,7 @@ struct ContentView: View {
                         } label: {
                             Image(systemName: "key")
                         }
-                        .accessibilityLabel("Сменить ключ")
+                        .accessibilityLabel(Text("Сменить ключ"))
                     }
                 }
                 ToolbarItem(placement: .primaryAction) {
@@ -94,7 +109,7 @@ struct ContentView: View {
                     } label: {
                         Image(systemName: "doc.text")
                     }
-                    .accessibilityLabel("Логи")
+                    .accessibilityLabel(Text("Логи"))
                 }
             }
             .sheet(isPresented: $showingImport) {
@@ -136,11 +151,14 @@ struct ContentView: View {
         switch tunnel.status {
         case .connected: return "lock.shield.fill"
         case .connecting, .reasserting: return "arrow.triangle.2.circlepath"
+        case .invalid: return "exclamationmark.shield"
         default: return "lock.shield"
         }
     }
 
-    private var buttonTitle: String {
+    /// `LocalizedStringKey`, а не `String`: иначе тернарный литерал стал бы
+    /// обычной строкой и мимо каталога.
+    private var buttonTitle: LocalizedStringKey {
         switch tunnel.status {
         case .connected, .connecting, .reasserting: return "Отключить"
         default: return "Подключить"

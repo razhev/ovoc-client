@@ -58,6 +58,28 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
     private var fallbackDNS: [String] = []
     private var ovpnText = ""
 
+    /// Сколько раз ядро переподключалось за эту сессию (событие .reconnecting).
+    private var reconnectCount = 0
+    /// Момент ухода в сон — чтобы на wake написать, сколько спали.
+    private var sleptAt: Date?
+
+    /// Смена сети (Wi-Fi ↔ LTE). Ядро OpenVPN3 на iOS не имеет объекта
+    /// lifecycle (он есть только на macOS — MacLifeCycle), то есть само о смене
+    /// интерфейса не узнаёт: замечает только ошибку транспорта либо тишину
+    /// по ping-restart (сервер шлёт `ping 10` / `ping-restart 120`, то есть до
+    /// двух минут). Хуже того, при переходе LTE → Wi-Fi старый TCP-сокет Cloak
+    /// живёт дальше через сотовую сеть, и трафик идёт по ней. Поэтому следим за
+    /// достижимостью сами (класс фреймворка OpenVPNReachability, SCNetworkReachability
+    /// на главном run loop) и при смене сети просим ядро переподключиться —
+    /// как в README адаптера. `reconnect` → new_client() → событие .reconnecting
+    /// → tun_builder_new → наш configureTunnel(nil) → новые настройки → .connected.
+    private var reachability: OpenVPNReachability?
+    private var lastReachability: OpenVPNReachabilityStatus?
+
+    /// Адрес-«раковина» для IPv6 (см. configureTunnel). ULA-префикс fd00::/8,
+    /// 6f76:6f63 — «ovoc»; в реальной сети такого адреса нет.
+    private static let ipv6SinkAddress = "fd00:6f76:6f63::2"
+
     // MARK: - Старт
 
     override func startTunnel(options: [String: NSObject]?, completionHandler: @escaping (Error?) -> Void) {
@@ -147,11 +169,59 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
 
         phase = .starting
         startCompletion = completionHandler
+        reconnectCount = 0
         armStartWatchdog()
         packetBridge.serverAddress = serverIP.split(separator: ".").compactMap { UInt8($0) }
         packetBridge.reset()
         logger.heartbeatExtra = { [weak self] in self?.packetBridge.summary() ?? "" }
+        startReachabilityTracking()
         adapter.connect(using: packetBridge)
+    }
+
+    /// Только на stateQueue. Колбэк приходит с главного run loop — заходим на
+    /// stateQueue через async, как и всё остальное.
+    private func startReachabilityTracking() {
+        let reachability = OpenVPNReachability()
+        self.reachability = reachability
+        lastReachability = reachability.reachabilityStatus
+        logger.log("reachability: \(Self.reachabilityName(reachability.reachabilityStatus)) (tracking)")
+        reachability.startTracking { [weak self] status in
+            self?.stateQueue.async { self?.reachabilityChanged(status) }
+        }
+    }
+
+    /// Только на stateQueue.
+    private func reachabilityChanged(_ status: OpenVPNReachabilityStatus) {
+        let previous = lastReachability
+        lastReachability = status
+        let transition = "\(previous.map(Self.reachabilityName) ?? "?") → \(Self.reachabilityName(status))"
+
+        // Сеть пропала: переподключаться некуда, ядро само уйдёт в цикл
+        // рестартов по ошибке транспорта, а вернувшуюся сеть мы поймаем ниже.
+        guard status != .notReachable else {
+            logger.log("reachability: \(transition)")
+            return
+        }
+        // Ложные срабатывания (тот же статус) и всё, что вне живой сессии, —
+        // только в лог: во время старта ядро ещё рукопожимается, трогать нельзя.
+        guard status != previous, phase == .connected else {
+            logger.log("reachability: \(transition) (ignored: phase=\(phase))")
+            return
+        }
+        // 2 секунды — дать новому интерфейсу получить адрес; reconnect ядра
+        // безопасен, даже если оно уже само переподключается по ошибке сокета:
+        // new_client() просто начнёт заново с той же генерации.
+        logger.log("reachability: \(transition) — reconnecting in 2s")
+        adapter.reconnect(afterTimeInterval: 2)
+    }
+
+    private static func reachabilityName(_ status: OpenVPNReachabilityStatus) -> String {
+        switch status {
+        case .notReachable: return "none"
+        case .reachableViaWiFi: return "wifi"
+        case .reachableViaWWAN: return "cellular"
+        @unknown default: return "status#\(status.rawValue)"
+        }
     }
 
     private func startDummyTunnel(completionHandler: @escaping (Error?) -> Void) {
@@ -210,6 +280,7 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
 
             self.phase = .stopping
             self.stopCompletion = completionHandler
+            self.stopReachabilityTracking()
 
             let watchdog = DispatchSource.makeTimerSource(queue: self.stateQueue)
             watchdog.schedule(deadline: .now() + 5)
@@ -245,15 +316,36 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
         completion()
     }
 
-    // MARK: - Sleep/wake (v1 — простой проброс)
+    /// Только на stateQueue.
+    private func stopReachabilityTracking() {
+        guard let reachability, reachability.isTracking else { return }
+        reachability.stopTracking()
+        self.reachability = nil
+    }
 
+    // MARK: - Sleep/wake — намеренно простой проброс
+
+    /// Почему не pause()/resume() адаптера. pause у ядра — это остановка
+    /// сессии с разборкой tun (interim_finalize → tun_builder_teardown): без
+    /// tunPersist маршруты снимаются, и пока телефон «спит», фоновый трафик
+    /// (push, почта) идёт мимо VPN; resume — полное рукопожатие Cloak заново.
+    /// А iOS дёргает sleep/wake очень часто — в логах бывали пары через 2–3 сек.
+    /// Проброс дешевле и безопаснее: за короткий сон сокет живёт, за долгий
+    /// умирает — тогда ping 10 / ping-restart от сервера дают ошибку транспорта,
+    /// и ядро переподключается само (.reconnecting → .connected). Проверено на
+    /// устройстве: десятки sleep/wake подряд без единого переподключения.
     override func sleep(completionHandler: @escaping () -> Void) {
         logger.log("sleep")
+        stateQueue.async { self.sleptAt = Date() }
         completionHandler()
     }
 
     override func wake() {
-        logger.log("wake")
+        stateQueue.async {
+            let slept = self.sleptAt.map { Int(Date().timeIntervalSince($0)) }
+            self.sleptAt = nil
+            self.logger.log("wake" + (slept.map { " after \($0)s" } ?? ""))
+        }
     }
 
     // MARK: - Вспомогательное
@@ -363,20 +455,24 @@ extension PacketTunnelProvider: OpenVPNAdapterDelegate {
     ) {
         guard let settings = networkSettings else {
             // nil приходит из resetTun адаптера: перед каждым подключением
-            // (tun_builder_new) и при разборке tun (tun_builder_teardown) — в том
-            // числе при остановке по команде пользователя. Во время остановки
-            // setTunnelNetworkSettings(nil) у iOS проваливается (система уже
-            // сама разбирает туннель), а любой отказ здесь адаптер превращает
-            // в фатальную ошибку #20 «Failed to reset tunnel». Для стопа это
-            // не ошибка: настройки снимет система, отказ только логируем.
+            // (tun_builder_new) — в том числе перед КАЖДЫМ переподключением при
+            // смене сети — и при разборке tun (tun_builder_teardown), в том числе
+            // при остановке по команде пользователя. Любой отказ здесь адаптер
+            // превращает в фатальную ошибку #20 «Failed to reset tunnel», а
+            // сам отказ ни о чём не говорит: во время остановки
+            // setTunnelNetworkSettings(nil) у iOS проваливается (система уже сама
+            // разбирает туннель), а при переподключении следом всё равно придут
+            // новые настройки, и их ошибка — настоящая — обработается ниже.
+            // Поэтому очистку никогда не считаем фатальной: отказ только логируем.
             let stopping = phase == .stopping || phase == .stopped
-            logger.log("configureTunnel: clearing network settings" + (stopping ? " (while stopping)" : ""))
+            logger.log("configureTunnel: clearing network settings"
+                       + (stopping ? " (while stopping)" : reconnectCount > 0 ? " (reconnect #\(reconnectCount))" : ""))
             setTunnelNetworkSettings(nil) { [weak self] error in
                 if let error {
-                    self?.logger.log("clearing network settings failed: \(Self.brief(error))"
-                                     + (stopping ? " — ignored, tunnel is stopping" : ""))
+                    self?.logger.log("clearing network settings failed: \(Self.brief(error)) — ignored"
+                                     + (stopping ? ", tunnel is stopping" : ", new settings follow"))
                 }
-                completionHandler(stopping ? nil : error)
+                completionHandler(nil)
             }
             return
         }
@@ -425,6 +521,32 @@ extension PacketTunnelProvider: OpenVPNAdapterDelegate {
         // что геттер вернул тот же объект.
         settings.ipv4Settings = ipv4
 
+        // ── IPv6: в туннель и в раковину (утечка мимо VPN) ──
+        // Адаптер выставляет ipv6Settings только при ifconfig-ipv6 от сервера,
+        // а его tun_builder_set_block_ipv6 — пустышка. Наш сервер даёт лишь IPv4,
+        // и без IPv6-настроек iOS оставляет IPv6-маршруты физической сети:
+        // всё, что резолвится в AAAA (у оператора и домашнего Wi-Fi IPv6 есть),
+        // уходит мимо туннеля с настоящим адресом телефона.
+        //
+        // Приём общепринятый (так делают OpenVPN Connect при block-ipv6 и
+        // WireGuard-клиенты): выдать интерфейсу ULA-адрес, которого нет ни в
+        // одной сети, и default-маршрут IPv6 в туннель. Пакеты IPv6 тогда попадают
+        // в наш packetFlow, и мост их отбрасывает (PacketFlowBridge: серверу они
+        // не нужны, он бы их и так уронил). Почему именно ULA: по RFC 6724
+        // источник fd00::/8 «не того класса» для глобальных адресатов, и iOS
+        // сама предпочитает IPv4 (Happy Eyeballs не ждёт таймаута IPv6).
+        // IPv4 и DNS не задеты: DNS-серверы — IPv4-литералы, идут в туннель как
+        // и раньше; link-local (fe80::/10) остаётся на своих интерфейсах.
+        let ipv6Mode: String
+        if settings.ipv6Settings == nil {
+            let sink = NEIPv6Settings(addresses: [Self.ipv6SinkAddress], networkPrefixLengths: [64])
+            sink.includedRoutes = [NEIPv6Route.default()]
+            settings.ipv6Settings = sink
+            ipv6Mode = "sink(\(Self.ipv6SinkAddress)/64→tunnel)"
+        } else {
+            ipv6Mode = "server"
+        }
+
         // MTU задаём явно: сервер его не присылает, а значение «по умолчанию»
         // у iOS не документировано. Сервер OpenVPN в TCP-режиме рвёт соединение
         // на первом же пакете длиннее своего предела («Bad encapsulated packet
@@ -438,7 +560,7 @@ extension PacketTunnelProvider: OpenVPNAdapterDelegate {
         let excluded = settings.ipv4Settings?.excludedRoutes?.count ?? 0
         logger.log("configureTunnel: remote=\(settings.tunnelRemoteAddress) "
                    + "routes incl=\(included) excl=\(excluded) serverExcluded=\(alreadyExcluded ? "by-profile" : "added") "
-                   + "ipv6=\(settings.ipv6Settings == nil ? "none" : "set") "
+                   + "ipv6=\(ipv6Mode) "
                    + "dns=\(settings.dnsSettings?.servers.joined(separator: ",") ?? "none") "
                    + "mtu=\(settings.mtu?.stringValue ?? "default")")
 
@@ -464,6 +586,9 @@ extension PacketTunnelProvider: OpenVPNAdapterDelegate {
     private func handle(_ event: OpenVPNAdapterEvent) {
         switch event {
         case .connected:
+            // При переподключении (phase уже .connected) сюда приходим повторно:
+            // completion старта давно вызван (finishStart одноразовый), остаётся
+            // снять reasserting — приложение снова покажет «Подключено».
             reasserting = false
             lastAdapterError = nil
             if phase == .starting {
@@ -471,6 +596,8 @@ extension PacketTunnelProvider: OpenVPNAdapterDelegate {
                 if let url = SharedPaths.lastErrorURL { try? FileManager.default.removeItem(at: url) }
                 logger.logMemory("connected")
                 finishStart(nil)
+            } else if phase == .connected {
+                logger.logMemory("reconnected (#\(reconnectCount))")
             }
 
         case .disconnected:
@@ -491,7 +618,12 @@ extension PacketTunnelProvider: OpenVPNAdapterDelegate {
             }
 
         case .reconnecting:
+            // Ядро начало новую сессию (new_client): tun разберётся и соберётся
+            // заново, настройки придут свежие из PUSH_REPLY. Пока идёт
+            // рукопожатие, приложение показывает «Переподключение…».
+            reconnectCount += 1
             reasserting = true
+            logger.log("reconnect #\(reconnectCount): \(packetBridge.summary())")
             packetBridge.reset()
 
         default:

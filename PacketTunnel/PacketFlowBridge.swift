@@ -21,6 +21,10 @@ final class PacketFlowBridge: NSObject, OpenVPNAdapterPacketFlow {
     /// это петля маршрутов: собственное соединение Cloak завернулось в наш же туннель.
     var serverAddress: [UInt8]?
     private var loopedPackets = 0
+    /// IPv6-пакеты, отброшенные мостом: провайдер заводит их в туннель
+    /// маршрутом-«раковиной» (см. configureTunnel), чтобы они не ушли мимо VPN;
+    /// серверу IPv6 не нужен — до адаптера они не доходят.
+    private var sunkIPv6Packets = 0
 
     private let lock = NSLock()
     private var outbound = Counter()
@@ -46,6 +50,7 @@ final class PacketFlowBridge: NSObject, OpenVPNAdapterPacketFlow {
         outbound = Counter()
         inbound = Counter()
         loopedPackets = 0
+        sunkIPv6Packets = 0
         detailedBatchesLeft = 24
         lock.unlock()
     }
@@ -56,7 +61,7 @@ final class PacketFlowBridge: NSObject, OpenVPNAdapterPacketFlow {
         defer { lock.unlock() }
         return "tun→vpn \(outbound.packets) pkt / \(outbound.bytes) B (max \(outbound.maxSize)), "
              + "vpn→tun \(inbound.packets) pkt / \(inbound.bytes) B (max \(inbound.maxSize)), "
-             + "to-server-inside-tunnel \(loopedPackets)"
+             + "to-server-inside-tunnel \(loopedPackets), ipv6-sunk \(sunkIPv6Packets)"
     }
 
     // MARK: - OpenVPNAdapterPacketFlow
@@ -64,9 +69,43 @@ final class PacketFlowBridge: NSObject, OpenVPNAdapterPacketFlow {
     @objc(readPacketsWithCompletionHandler:)
     func readPackets(completionHandler: @escaping ([Data], [NSNumber]) -> Void) {
         flow.readPackets { [weak self] packets, protocols in
-            self?.note(packets, direction: "tun→vpn", isOutbound: true)
-            completionHandler(packets, protocols)
+            guard let self else {
+                completionHandler(packets, protocols)
+                return
+            }
+            let (kept, keptProtocols) = self.dropIPv6(packets, protocols)
+            self.note(kept, direction: "tun→vpn", isOutbound: true)
+            completionHandler(kept, keptProtocols)
         }
+    }
+
+    /// Раковина IPv6: пакеты семейства AF_INET6 до адаптера не доходят.
+    /// Обычная пачка целиком IPv4 — возвращаем как есть, без копирования.
+    private func dropIPv6(_ packets: [Data], _ protocols: [NSNumber]) -> ([Data], [NSNumber]) {
+        let ipv6 = NSNumber(value: AF_INET6)
+        guard protocols.contains(ipv6) else { return (packets, protocols) }
+
+        var kept: [Data] = []
+        var keptProtocols: [NSNumber] = []
+        var dropped = 0
+        for (packet, family) in zip(packets, protocols) {
+            if family == ipv6 {
+                dropped += 1
+            } else {
+                kept.append(packet)
+                keptProtocols.append(family)
+            }
+        }
+
+        lock.lock()
+        let firstSunk = sunkIPv6Packets == 0
+        sunkIPv6Packets += dropped
+        lock.unlock()
+        if firstSunk, dropped > 0 {
+            // Одна строка на подключение: раковина работает, IPv6 не утёк.
+            logger.log("ipv6 sink: first IPv6 packet entered the tunnel and was dropped (n=\(dropped))")
+        }
+        return (kept, keptProtocols)
     }
 
     @objc(writePackets:withProtocols:)

@@ -60,12 +60,13 @@ final class DecoderTests: XCTestCase {
         XCTAssertThrowsError(try VPNKeyDecoder.decode("https://example.com/x")) {
             XCTAssertEqual($0 as? VPNKeyError, .notAVPNKey)
         }
-        // битый base64 (недопустимые символы / длина ≡ 1 mod 4)
+        // битый base64 (недопустимые символы)
         XCTAssertThrowsError(try VPNKeyDecoder.decode("vpn://%%%недопустимо%%%")) {
             XCTAssertEqual($0 as? VPNKeyError, .invalidBase64)
         }
+        // алфавит верный, но от ключа остался один символ — это обрезка, а не «битый base64»
         XCTAssertThrowsError(try VPNKeyDecoder.decode("vpn://a")) {
-            XCTAssertEqual($0 as? VPNKeyError, .invalidBase64)
+            XCTAssertEqual($0 as? VPNKeyError, .truncated)
         }
         // валидный base64, но внутри ни zlib, ни JSON
         let noise = SyntheticKey.base64url(Data([0xde, 0xad, 0xbe, 0xef, 0x11, 0x22, 0x33, 0x44]))

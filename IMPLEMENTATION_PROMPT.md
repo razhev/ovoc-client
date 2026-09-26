@@ -30,7 +30,7 @@
 5. **`ConfigKit`** — локальный SPM-пакет (platforms: iOS 16, macOS 13) со ВСЕЙ логикой разбора ключа; тестируется на Mac через `swift test` без телефона и подписи.
 6. Расширение **ничего не парсит**: приложение при импорте собирает готовый текст `.ovpn` (с уже дописанным `<cloak>`) и передаёт через `providerConfiguration` (+ `serverIP`, `dns1`, `dns2`). App Group — для логов и хранения конфига.
 7. Deployment target **iOS 16.0**; `SWIFT_VERSION: "5.0"` (не Swift 6 language mode — избегаем strict-concurrency трения с ObjC-делегатами).
-8. Bundle ID: `com.razhev.personalvpn` (app), `com.razhev.personalvpn.tunnel` (extension), App Group `group.com.razhev.personalvpn`. Рабочее имя PersonalVPN.
+8. Bundle ID: `com.razhev.ovocclient` (app), `com.razhev.ovocclient.tunnel` (extension), App Group `group.com.razhev.ovocclient`. Имя приложения — OVoC Client (OpenVPN over Cloak Client), проект и таргет — `OVoCClient`. До 2026-09-24 — рабочее имя PersonalVPN и bundle `com.razhev.personalvpn`.
 9. Раздача: **TestFlight, внешняя группа с публичной ссылкой** (fallback — внутренние тестеры). Загрузка: `xcodebuild -exportArchive` + App Store Connect API key. Без fastlane, без altool (мёртв в Xcode 26).
 10. Структура каталогов и список файлов — в PLAN.md, раздел «Структура проекта». Следуй ей.
 

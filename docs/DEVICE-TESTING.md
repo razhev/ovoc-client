@@ -1,6 +1,6 @@
 # Тестирование на iPhone: от одобренного аккаунта до работающего туннеля
 
-Практическая инструкция к этапам M1–M3 из [IMPLEMENTATION.md](IMPLEMENTATION.md). Всё делается
+Практическая инструкция к этапам M1–M4 из [IMPLEMENTATION.md](IMPLEMENTATION.md). Всё делается
 из терминала (`make …`); в Xcode заходим только добавить Apple ID и один раз «познакомить» Mac
 с телефоном.
 
@@ -14,13 +14,16 @@
 make devices    # какие iPhone видит Mac и готовы ли они к установке
 make ddi        # смонтировать на телефон образ разработчика (нужен доступ к gs.apple.com БЕЗ VPN)
 make install    # make ddi + подписанная сборка → проверка entitlements → установка → запуск
-make push-key   # M3: доставить Secrets/my.vpnkey в установленное приложение (ключ не попадает в сборку)
+make push-key   # DEBUG: доставить Secrets/my.vpnkey в приложение тем же кодом, что экран импорта
+                #   негативные случаи: FORCE=1 make push-key KEY=файл-с-мусором
 make logs       # забрать tunnel.log / app.log / last_error.txt в build/logs/latest/
 make crashlogs  # то же + отчёты о падениях расширения и приложения (.ips)
 make build      # сборка БЕЗ подписи — быстрая проверка, что всё компилируется
 make framework  # собрать OpenVPNAdapter.framework из исходников с исправлением (основной способ)
 make connect    # DEBUG: перезапустить приложение на телефоне и сразу подключить VPN
-make disconnect # DEBUG: то же, но отключить
+make disconnect # DEBUG: отключить VPN командой-файлом, без перезапуска приложения (перезапуск убил бы расширение)
+make dummy      # DEBUG: профиль-пустышка M1 (диагностика без сервера; ЗАТИРАЕТ боевой профиль)
+make release-check # ворота Release: DEBUG-моста нет, файлов ключа в бандле нет
 ```
 
 Если к Mac подключено несколько устройств: `make install DEVICE=<udid|имя>`.
@@ -60,7 +63,7 @@ make disconnect # DEBUG: то же, но отключить
 
 **iOS 16 на телефоне.** `devicectl` работает только с iOS 17+. Для iOS 16: `brew install
 ios-deploy`, сборка та же (блок `xcodebuild` из `scripts/install-device.sh`), установка —
-`ios-deploy --id <UDID> --bundle build/DerivedData/Build/Products/Debug-iphoneos/PersonalVPN.app`,
+`ios-deploy --id <UDID> --bundle build/DerivedData/Build/Products/Debug-iphoneos/OVoCClient.app`,
 приложение открыть пальцем. `make logs` не сработает — логи только через экран «Логи» → «Поделиться».
 
 ---
@@ -89,15 +92,15 @@ M2: `OpenVPNAdapter.framework` реально загружается в проц
    Ожидаемый вывод:
    ```
    PASS сборка: BUILD SUCCEEDED
-   PASS подпись PersonalVPN.app: packet-tunnel-provider + group.com.razhev.personalvpn
-   PASS подпись PacketTunnel.appex: packet-tunnel-provider + group.com.razhev.personalvpn
+   PASS подпись OVoCClient.app: packet-tunnel-provider + group.com.razhev.ovocclient
+   PASS подпись PacketTunnel.appex: packet-tunnel-provider + group.com.razhev.ovocclient
    Подписано командой: <Team ID>
-   Готово: PersonalVPN установлен и запущен на «…».
+   Готово: OVoC Client установлен и запущен на «…».
    ```
-4. На телефоне: **«Подключить»** → системный диалог «PersonalVPN хочет добавить конфигурации
+4. На телефоне: **«Подключить»** → системный диалог «OVoC Client хочет добавить конфигурации
    VPN» → **Разрешить** → код-пароль / Face ID.
 5. **Гейт — всё из списка должно быть правдой:**
-   - [ ] статус в приложении «Подключено»; Настройки → VPN → «PersonalVPN (тест)» — Подключено;
+   - [ ] статус в приложении «Подключено»; Настройки → VPN → «OVoC Client (тест)» — Подключено;
          значок VPN виден в Пункте управления (на iPhone с Face ID в статус-баре его нет);
    - [ ] Safari открывает сайты — пустышка забирает только `10.8.0.0/24`;
    - [ ] экран «Логи» → «Туннель»: шапка `App Group: OK`, строки по порядку
@@ -119,8 +122,8 @@ M2: `OpenVPNAdapter.framework` реально загружается в проц
 |---|---|---|
 | Экран «Логи» в приложении | всегда; единственный канал у родственников | переключатель Туннель / Приложение, кнопка «Поделиться» |
 | `make logs` | телефон подключён к Mac | файлы из App Group → `build/logs/latest/` |
-| `make crashlogs` | расширение упало (код 12) | `.ips` для `PacketTunnel`, `PersonalVPN`, `JetsamEvent` (убийство по памяти) |
-| Console.app | нужен живой поток, или App Group не работает | выбрать iPhone слева, фильтр `subsystem:com.razhev.personalvpn`; категории `tunnel` и `app` |
+| `make crashlogs` | расширение упало (код 12) | `.ips` для `PacketTunnel`, `OVoCClient`, `JetsamEvent` (убийство по памяти) |
+| Console.app | нужен живой поток, или App Group не работает | выбрать iPhone слева, фильтр `subsystem:com.razhev.ovocclient`; категории `tunnel` и `app` |
 | `sudo log collect --device-name "<iPhone>" --last 10m` | нужен архив системных логов | требует sudo — запускает человек |
 
 Что пишется куда: `tunnel.log` — расширение (кольцевой, 256 КБ, heartbeat памяти раз в 30 сек);
@@ -145,7 +148,7 @@ M2: `OpenVPNAdapter.framework` реально загружается в проц
 | «agree to the latest Program License Agreement» | не приняты соглашения | этап A, шаг 1 |
 | «Your team has no devices…» | сборка `generic/platform=iOS` до регистрации устройства | собирать только через `make install` |
 | «Personal development teams … do not support Network Extensions» | выбран Team ID бесплатной Personal Team | вписать Team ID платной команды |
-| «app identifier … is not available» / то же про App Group | идентификатор занят кем-то глобально | сменить префикс в `project.yml`, обоих `.entitlements`, `SharedPaths.appGroupID`, `TunnelManager.tunnelBundleID` |
+| «app identifier … is not available» / то же про App Group | идентификатор занят кем-то глобально | сменить `com.razhev.ovocclient` согласованно везде — полный список даёт `git grep -n ovocclient -- ':!*.md'`: `project.yml` (оба таргета), оба `.entitlements`, `SharedPaths.appGroupID`, `TunnelManager.tunnelBundleID`, `APP_BUNDLE_ID` / `APP_GROUP_ID` в `scripts/`, subsystem в `RingLogger`, домен ошибок в `PacketTunnelProvider`; затем документация. Для iOS это новое приложение — см. «Переход с PersonalVPN» |
 | «provisioning profile doesn't include the … networkextension entitlement» / App Groups | capability ещё не включена на App ID | повторить `make install`; иначе портал → Identifiers → у **обоих** App ID включить Network Extensions и App Groups, привязать группу |
 | сборка висит на CodeSign / `errSecInternalComponent` | ждёт диалог Связки ключей либо запущено не из GUI-сессии | пароль Mac → «Всегда разрешать»; запускать из Terminal.app |
 | `FAIL подпись …` (ворота скрипта) | сборка прошла, но в подписи нет права на VPN или App Group | то же, что строкой выше про capability |
@@ -246,8 +249,9 @@ hostname); директивы `.ovpn` — имя и число аргумент�
 - **`auth-user-pass` не поддерживается** — такой профиль отклоняется сразу с понятным текстом,
   а не выглядит как 30-секундный таймаут.
 - **Ключ не попадает в сборку.** `make push-key` кладёт его в контейнер уже установленного
-  приложения; код импорта из `Documents` существует только под `#if DEBUG`. В Release/TestFlight
-  ключ попасть не может в принципе. Это тот же путь, что и импорт в M4, только без экрана.
+  приложения; код импорта из `Documents` существует только под `#if DEBUG` и с M4 вызывает тот
+  же `TunnelManager.importKey`, что и экран. В Release/TestFlight ключ попасть не может —
+  `make release-check` это проверяет.
 
 ### Итог первой попытки M3 (2026-09-20): дефект готового фреймворка — найден и исправлен
 
@@ -287,6 +291,78 @@ AES-256-CBC как обход невозможен: адаптер не даёт
 возвращает `false` (метку пишет старый API по отдельному указателю), а `decrypt()` вызывает
 `mbedtls_cipher_auth_decrypt` и действительно проверяет метку входящих пакетов.
 
+### Ложная фатальная ошибка #20 при отключении и двоичный мусор в `tunnel.log` (разобрано 2026-09-24)
+
+**Симптом (сборки до 2026-09-24).** После `stopTunnel: reason=userInitiated(1)` в `tunnel.log`
+шли строки `configureTunnel: clearing network settings` и
+`error(fatal=true): me.ss-abramchuk.openvpn-adapter.error-domain#20 Failed to reset tunnel…`,
+появлялся `last_error.txt`, а иногда между строками лога оказывалось ~140 байт двоичного мусора.
+Соединение при этом отключалось штатно (`event: disconnected`).
+
+**Откуда #20.** При разборке tun ядро OpenVPN3 зовёт `tun_builder_teardown` → у адаптера
+`resetTun` (`OpenVPNAdapterImpl.mm`): он закрывает свой socketpair и вызывает делегата
+`configureTunnelWithNetworkSettings:nil`; если completion пришёл с ошибкой, адаптер сообщает
+**фатальную** `OpenVPNAdapterErrorTUNSetupFailed` (#20), пряча системную ошибку в
+`NSUnderlyingErrorKey`. Провайдер отвечал `setTunnelNetworkSettings(nil)`, а во время
+остановки iOS этот вызов отвергает — систему уже сама разбирает туннель. То есть ошибка
+рождалась на ровном месте, и та же `resetTun` штатно вызывается перед каждым подключением
+(`tun_builder_new`) — отсюда «clearing network settings» и до `assignIP`.
+
+**Откуда мусор.** Это не текст ошибки (текст вложенной ошибки в лог никогда не попадал), а
+ровно одна TLS-запись Cloak: заголовок `17 03 03 00 88` + 136 байт данных = 141 байт.
+Go-плагин Cloak (`cmd/ck-ovpn-plugin/ck-ovpn-plugin.go` в форке amnezia-vpn/Cloak,
+ветка master-amnezia) в `Cloak_close_connection` делает `syscall.Close(fd)` на номере
+TCP-сокета, пойманном через `Dialer.Control`, — за спиной рантайма Go. Горутины сессии Cloak
+при этом продолжают работать и пишут следующую запись в тот же номер дескриптора, который
+к этому моменту получил кто-то другой в процессе. Логгер открывал файл на каждую строку, и
+запись ложилась в `tunnel.log`. Плагин поставляется бинарём (`Lib/ios/arm64/ck-ovpn-plugin.a`),
+в исходниках OpenVPN3 и адаптера это не лечится. Куда попадёт такая запись в другой раз,
+предсказать нельзя — любой короткоживущий дескриптор процесса; порядок в ядре (`cliproto.hpp`:
+сначала `tun->stop()`, потом `transport->stop()`) объясняет, почему мусор шёл уже после
+наших строк об ошибке.
+
+**Что сделано.**
+
+- `configureTunnel(nil)` во время остановки (`phase == .stopping/.stopped`) отказ
+  `setTunnelNetworkSettings(nil)` только логирует (`clearing network settings failed: <домен>#<код>
+  — ignored, tunnel is stopping`) и отвечает адаптеру `nil` — ошибка #20 не рождается.
+- `handleError`: фатальная ошибка обрывает сессию и пишет `last_error.txt` только в фазах
+  `.starting` / `.connected`; в остальных — строка `error(fatal=true, ignored: stopping)` и всё.
+- В лог от вложенной ошибки — только `underlying: <домен>#<код>`, без описания.
+- `RingLogger` держит файл открытым весь срок жизни процесса: дескриптор открыт раньше любых
+  сокетов и не освобождается, чужой номер ему не достанется. Ротация закрывает и открывает его заново.
+
+**Проверка — пройдена 2026-09-26** (iPhone 16 Pro, iOS 26.6.2, сборка OVoC Client 2cd56f1+).
+По дороге выяснилось, что старый `make disconnect` перезапускал приложение через devicectl
+(`--terminate-existing`), а такой перезапуск убивает и процесс расширения — в `app.log`
+`NEVPNConnectionErrorDomain 12`, в `tunnel.log` ни `stopTunnel`, ни строк после него (проверено и
+на сборке без исправления, и после удаления второго приложения). Стоп, нажатый пальцем, доходил
+штатно. Поэтому `make disconnect` теперь доставляет команду файлом `Documents/debug.disconnect`
+(`scripts/debug-command.sh`): DEBUG-сборка подхватывает его раз в секунду и зовёт тот же `stop()`,
+что и кнопка, без перезапуска приложения.
+
+Штатное отключение (`make connect` → `make disconnect` → `make logs`), дословно из `tunnel.log`:
+`stopTunnel: reason=userInitiated(1)` → `configureTunnel: clearing network settings (while stopping)`
+→ `clearing network settings failed: NEAgentErrorDomain#1 — ignored, tunnel is stopping` →
+`event: disconnected`. Ни одной `error(fatal=true)`, файл читается как UTF-8, `last_error.txt` не
+создан; в `app.log` — `debug command: disconnect`, `disconnect reason: none`. Так что системная
+ошибка, из которой адаптер делал «фатальную» #20, — это `NEAgentErrorDomain` код 1 на
+`setTunnelNetworkSettings(nil)` во время остановки.
+
+Негативная проверка (настоящая фатальная ошибка по-прежнему доходит до кнопки): профиль с чужим
+CA (`Secrets/broken-ca.ovpn` — из ключа, `<ca>` заменён на самоподписанный) →
+`make push-key KEY=Secrets/broken-ca.ovpn` → `make connect`: ядро отдаёт `VERIFY FAIL`, адаптер —
+`error(fatal=true): …#48 OpenVPN fatal error occured | mbed TLS: … Certificate verification failed`
+в фазе `.starting`; `last_error.txt` с этим текстом создан, приложение записало
+`disconnect reason: me.ss-abramchuk.openvpn-adapter.error-domain 48` и показывает текст под
+кнопкой. После проверки — `make push-key` с настоящим ключом.
+
+**Что осталось у фреймворка.** Сырой `close` в плагине никуда не делся: запись может
+попасть в любой другой свежий дескриптор. Возможная доработка — патч `fw.hpp`
+(`CloakTransport::close` не звать `Cloak_close_connection`), тогда сокет за спиной Go не
+закрывается вовсе; цена — локальный pipe плагина живёт до конца процесса. Не делали:
+расширение и так живёт одно подключение.
+
 ### Если боевое подключение не удалось
 
 | Симптом | Причина | Что делать |
@@ -294,6 +370,59 @@ AES-256-CBC как обход невозможен: адаптер не даёт
 | «Не удалось подключиться за 30 секунд» | сервер недоступен, неверные параметры Cloak, либо тем же ключом уже подключён другой клиент | `make logs` → строки `ovpn:` и `error(fatal=…)`; проверить, что сервер жив и ключ не занят |
 | под кнопкой текст из `start REFUSED` / `configureTunnel REFUSED` | сработала защита fail-closed: нет IPv4 сервера, IPv4-настроек или DNS | текст называет причину; обычно лечится повторным `make push-key` со свежим ключом |
 | «Подключено», но сайты не открываются | петля маршрутов или DNS | в `tunnel.log` строка `configureTunnel:` — `excl` должно быть ≥ 1, `dns` не пуст; на iOS 26 известен баг amnezia-client#2072 → `scripts/build-framework-source.sh`, затем `make verify` и заново этап C |
-| «Не удалось импортировать ключ: …» | ключ скопирован не целиком или это не формат «For the AmneziaVPN app» | `python3 scripts/decode-vpnkey.py --schema Secrets/my.vpnkey` |
+| «Ключ скопирован не целиком…» / «нет протокола OpenVPN over Cloak» / «нет ключа Amnezia» | обрезан при копировании; ключ другого протокола; в тексте нет `vpn://` | скопировать заново целиком в формате «For the AmneziaVPN app»; на Mac: `python3 scripts/decode-vpnkey.py --schema Secrets/my.vpnkey` |
 | код `12` сразу после «Подключение…» | расширение упало; при боевом туннеле чаще всего память (лимит ~50 МБ) | `make crashlogs` → `JetsamEvent-*`, последние `heartbeat` в `tunnel.log` |
 | обрыв при блокировке экрана или смене сети | sleep/wake и Wi-Fi ↔ LTE пока простым пробросом | `make logs` → строки `sleep` / `wake` / `event: reconnecting`; доработка — по результатам теста |
+| в `app.log` `NEVPNConnectionErrorDomain 12` сразу после перезапуска приложения через devicectl, в `tunnel.log` нет `stopTunnel` | принудительный перезапуск приложения (`--terminate-existing`) убивает и расширение | это не ошибка провайдера; стоп проверять через `make disconnect` (команда файлом) либо кнопкой |
+| при отключении кнопкой в `tunnel.log` `error(fatal=true) … #20 Failed to reset tunnel`, есть `last_error.txt`, в логе двоичный мусор | сборка до 2026-09-24: ложная ошибка `resetTun` адаптера + сырой `close` в Go-плагине Cloak (разбор выше) | обновить сборку (`make install`); в новой — `clearing network settings (while stopping)`, `NEAgentErrorDomain#1 — ignored`, без `error(fatal=true)` |
+
+---
+
+## Этап E — импорт ключа в приложении (M4)
+
+Ключ добавляется на экране «Добавить ключ»: вставкой из буфера (`PasteButton` — без системного
+вопроса «Разрешить вставку?») или файлом из «Файлов». Можно вставить сообщение целиком — ключ
+внутри найдётся сам. Первый импорт вызывает системный диалог «OVoC Client хочет добавить
+конфигурации VPN» → **Разрешить** → код-пароль; «Не разрешать» даёт читаемую ошибку, прежний
+профиль (если был) не портится. Смена ключа — кнопка-ключ в тулбаре; поднятый VPN при этом
+сначала отключается.
+
+**Гейт M4 (чистая установка):**
+1. На Mac положить ключ в буфер, не показывая: `pbcopy < Secrets/my.vpnkey` (общий буфер
+   обмена Mac ↔ iPhone: Handoff включён на обоих).
+2. На телефоне удалить OVoC Client (до переименования — PersonalVPN; профиль VPN удалится вместе
+   с ним) → `make install`.
+3. В приложении: «Добавить ключ» → «Вставить» → «Импортировать» → «Разрешить» → код-пароль →
+   «Ключ импортирован: …» → «Подключить» → сайт-определитель показывает IP сервера.
+4. `make logs`: в `app.log` — `import[paste]: start` … `import OK: profile=N bytes`, ни ключа,
+   ни профиля; в `tunnel.log` — `event: connected`, `heartbeat` со счётчиками пакетов, нет
+   `Transport error`.
+
+**Без рук (DEBUG-мост, тот же код):** `FORCE=1 make push-key KEY=мусор.txt` → в `app.log`
+`import FAILED: parse: notAVPNKey` (обрезанный ключ — `truncated`, ключ AWG — `noCloakContainer`),
+приложение не падает; `make push-key` с настоящим ключом при поднятом VPN → `tunnel is up —
+stopping before profile change` → `import OK`.
+
+---
+
+## Переход с PersonalVPN на OVoC Client (2026-09-24)
+
+С переименованием сменился bundle ID: `com.razhev.personalvpn` → `com.razhev.ovocclient`
+(расширение `com.razhev.ovocclient.tunnel`, App Group `group.com.razhev.ovocclient`). Для iOS это
+другое приложение: поверх старого оно не встанет, а появится рядом. Один раз:
+
+1. На телефоне удалить старое **PersonalVPN**: удерживать иконку → «Удалить приложение» →
+   «Удалить». Вместе с ним удалятся его VPN-профиль и логи в старой App Group; то, что уже скачано
+   в `build/logs/`, остаётся.
+2. `make install`. Первая подпись с новым bundle ID сама заведёт на портале два App ID и App Group
+   (как в M1). Ожидаемо: `PASS подпись OVoCClient.app: … + group.com.razhev.ovocclient`. Старые
+   App ID и группа остаются на портале и ничему не мешают.
+3. Ключ — как в гейте M4 (пункты 1 и 3 этапа E). Профиль в Настройки → VPN появляется только после
+   «Разрешить» и называется «OVoC Client».
+4. `make logs` читает уже новую App Group; в Console.app — фильтр `subsystem:com.razhev.ovocclient`.
+
+**Пройдено 2026-09-24** (iPhone 16 Pro, iOS 26.6.2): `make install` выпустил профиль «iOS Team
+Provisioning Profile: com.razhev.ovocclient», оба `PASS подпись` с `group.com.razhev.ovocclient`;
+первый запуск — `load: profiles=0 appGroup=ok`; импорт вставкой — `import OK: profile=8882 bytes`;
+`event: connected` через Cloak, `heartbeat: memory=8 MB` с пакетами в обе стороны, без
+`Transport error`.

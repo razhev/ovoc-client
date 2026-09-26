@@ -16,10 +16,10 @@ import OpenVPNAdapter
 /// поток адаптера в это время ждёт наш completion, sync дал бы взаимоблокировку.
 final class PacketTunnelProvider: NEPacketTunnelProvider {
 
-    private static let errorDomain = "com.razhev.personalvpn.tunnel"
+    private static let errorDomain = "com.razhev.ovocclient.tunnel"
 
     private let logger = RingLogger.shared
-    private let stateQueue = DispatchQueue(label: "com.razhev.personalvpn.tunnel.state")
+    private let stateQueue = DispatchQueue(label: "com.razhev.ovocclient.tunnel.state")
 
     private lazy var adapter: OpenVPNAdapter = {
         let adapter = OpenVPNAdapter()
@@ -317,11 +317,23 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
         try? Data(text.utf8).write(to: url, options: .atomic)
     }
 
+    /// Домен, код, описание и сообщение ядра OpenVPN. От вложенной ошибки
+    /// (NSUnderlyingErrorKey — то, что вернула система в setTunnelNetworkSettings)
+    /// берём только домен и код: её текст нам ни о чём не говорит, а в файл
+    /// должны попадать только наши строки.
     private func describe(_ error: Error) -> String {
         let nsError = error as NSError
         let message = nsError.userInfo[OpenVPNAdapterErrorMessageKey] as? String
+        let underlying = nsError.userInfo[NSUnderlyingErrorKey] as? NSError
         return "\(nsError.domain)#\(nsError.code) \(nsError.localizedDescription)"
             + (message.map { " | \($0)" } ?? "")
+            + (underlying.map { " | underlying: \(Self.brief($0))" } ?? "")
+    }
+
+    /// Только домен и код.
+    private static func brief(_ error: Error) -> String {
+        let nsError = error as NSError
+        return "\(nsError.domain)#\(nsError.code)"
     }
 }
 
@@ -350,8 +362,22 @@ extension PacketTunnelProvider: OpenVPNAdapterDelegate {
         completionHandler: @escaping (Error?) -> Void
     ) {
         guard let settings = networkSettings else {
-            logger.log("configureTunnel: clearing network settings")
-            setTunnelNetworkSettings(nil) { completionHandler($0) }
+            // nil приходит из resetTun адаптера: перед каждым подключением
+            // (tun_builder_new) и при разборке tun (tun_builder_teardown) — в том
+            // числе при остановке по команде пользователя. Во время остановки
+            // setTunnelNetworkSettings(nil) у iOS проваливается (система уже
+            // сама разбирает туннель), а любой отказ здесь адаптер превращает
+            // в фатальную ошибку #20 «Failed to reset tunnel». Для стопа это
+            // не ошибка: настройки снимет система, отказ только логируем.
+            let stopping = phase == .stopping || phase == .stopped
+            logger.log("configureTunnel: clearing network settings" + (stopping ? " (while stopping)" : ""))
+            setTunnelNetworkSettings(nil) { [weak self] error in
+                if let error {
+                    self?.logger.log("clearing network settings failed: \(Self.brief(error))"
+                                     + (stopping ? " — ignored, tunnel is stopping" : ""))
+                }
+                completionHandler(stopping ? nil : error)
+            }
             return
         }
 
@@ -425,8 +451,13 @@ extension PacketTunnelProvider: OpenVPNAdapterDelegate {
     }
 
     func openVPNAdapter(_ openVPNAdapter: OpenVPNAdapter, handleEvent event: OpenVPNAdapterEvent, message: String?) {
-        logger.log("event: \(eventName(event))" + (message.map { " — \($0)" } ?? ""))
-        stateQueue.async { self.handle(event) }
+        // Пишем в лог на stateQueue, как и ошибки: порядок строк «error → event»
+        // в файле тогда совпадает с порядком обработки.
+        let line = "event: \(eventName(event))" + (message.map { " — \($0)" } ?? "")
+        stateQueue.async {
+            self.logger.log(line)
+            self.handle(event)
+        }
     }
 
     /// Только на stateQueue.
@@ -471,27 +502,31 @@ extension PacketTunnelProvider: OpenVPNAdapterDelegate {
     func openVPNAdapter(_ openVPNAdapter: OpenVPNAdapter, handleError error: Error) {
         let nsError = error as NSError
         let fatal = (nsError.userInfo[OpenVPNAdapterErrorFatalKey] as? Bool) ?? false
-        logger.log("error(fatal=\(fatal)): \(describe(error))")
         // Что успело пройти через туннель к моменту ошибки — главный след
         // для обрывов вида PT_SIZE_ERROR.
-        logger.log("packets at error: \(packetBridge.summary())")
+        let packets = packetBridge.summary()
 
         stateQueue.async {
             self.lastAdapterError = error
-            guard fatal else { return }
+            // Фатальная ошибка обрывает сессию, только пока сессия есть. Во время
+            // остановки по команде пользователя (и после неё) адаптер всё равно
+            // отдаст .disconnected, а last_error.txt показал бы под кнопкой
+            // «ошибку» там, где человек сам нажал «Отключить».
+            let terminatesSession = self.phase == .starting || self.phase == .connected
+            let tag = fatal && !terminatesSession ? "fatal=true, ignored: \(self.phase)" : "fatal=\(fatal)"
+            self.logger.log("error(\(tag)): \(self.describe(error))")
+            self.logger.log("packets at error: \(packets)")
+            guard fatal, terminatesSession else { return }
 
             // Если туннель отказались поднимать мы сами, наш текст понятнее.
             let reported: Error = self.refusalReason.map { Self.makeError(4, $0) } ?? error
             self.writeLastError(self.refusalReason ?? self.describe(error))
 
-            switch self.phase {
-            case .starting:
+            if self.phase == .starting {
                 self.finishStart(reported)
-            case .connected:
+            } else {
                 self.phase = .stopped
                 self.cancelTunnelWithError(reported)
-            case .idle, .stopping, .stopped:
-                break
             }
         }
     }

@@ -14,8 +14,12 @@ final class TunnelManager: ObservableObject {
     @Published private(set) var lastError: String?
     /// Нейтральное сообщение под кнопкой (например, «ключ импортирован»).
     @Published private(set) var notice: String?
-    /// true, когда в профиле лежит боевой конфиг (а не пустышка M1).
+    /// true, когда в профиле лежит боевой конфиг. Пока его нет, приложение
+    /// предлагает импорт ключа, а не подключение.
     @Published private(set) var hasRealConfig = false
+    /// Профили прочитаны: до этого момента неизвестно, есть ли ключ, и экран
+    /// не должен мигать приглашением к импорту.
+    @Published private(set) var isLoaded = false
 
     private var manager: NETunnelProviderManager?
     private var statusObserver: NSObjectProtocol?
@@ -30,7 +34,7 @@ final class TunnelManager: ObservableObject {
     /// написать в tunnel.log хоть строку.
     private var startRequestedAt: Date?
 
-    private static let tunnelBundleID = "com.razhev.personalvpn.tunnel"
+    private static let tunnelBundleID = "com.razhev.ovocclient.tunnel"
 
     init() {
         // object: nil — уведомления приходят обо всех VPN системы; обработчик
@@ -46,6 +50,7 @@ final class TunnelManager: ObservableObject {
 
     /// Подтягивает существующий профиль (если есть) при запуске приложения.
     func load() async {
+        defer { isLoaded = true }
         do {
             let managers = try await NETunnelProviderManager.loadAllFromPreferences()
             manager = managers.first
@@ -60,38 +65,163 @@ final class TunnelManager: ObservableObject {
         }
         #if DEBUG
         await importDebugKeyIfPresent()
+        startDebugCommandWatcher()
         #endif
     }
 
     #if DEBUG
-    /// DEBUG-мост M3 (экрана импорта ещё нет — он появится в M4). `make push-key`
-    /// кладёт ключ в Documents приложения через devicectl; здесь он проходит тот же
-    /// путь, что пройдёт при импорте в M4: ConfigKit → профиль туннеля. Ключ не
-    /// входит ни в один вход сборки, а этого кода нет в Release — в TestFlight
-    /// ключ попасть не может. Файл удаляется сразу после чтения.
+    private var debugCommandTimer: DispatchSourceTimer?
+
+    /// DEBUG-мост для `make disconnect`: команда приходит файлом Documents/debug.disconnect
+    /// (scripts/debug-command.sh), а не перезапуском приложения — принудительный перезапуск
+    /// через devicectl (--terminate-existing) убивает и процесс расширения (в логе приложения
+    /// NEVPNConnectionErrorDomain 12, stopTunnel в расширении не вызывается), и остановку
+    /// по кнопке так не проверить. Выполняется тем же `stop()`, что и кнопка.
+    private func startDebugCommandWatcher() {
+        guard debugCommandTimer == nil,
+              let documents = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first
+        else { return }
+        let marker = documents.appendingPathComponent("debug.disconnect")
+        let timer = DispatchSource.makeTimerSource(queue: .main)
+        timer.schedule(deadline: .now() + 1, repeating: 1)
+        timer.setEventHandler { [weak self] in
+            guard let self, FileManager.default.fileExists(atPath: marker.path) else { return }
+            try? FileManager.default.removeItem(at: marker)
+            self.logger.log("debug command: disconnect")
+            self.stop()
+        }
+        timer.resume()
+        debugCommandTimer = timer
+    }
+    #endif
+
+    // MARK: - Импорт ключа
+
+    /// Откуда пришёл ключ — только для лога.
+    enum KeySource: String {
+        case paste, file
+        #if DEBUG
+        case debugBridge
+        #endif
+    }
+
+    /// Ошибка импорта с готовым русским текстом для экрана.
+    struct ImportFailure: LocalizedError {
+        let errorDescription: String?
+    }
+
+    /// ЕДИНСТВЕННЫЙ путь импорта ключа: им пользуются и экран импорта (вставка,
+    /// файл), и DEBUG-мост `make push-key` — один путь, одна проверка.
+    ///
+    /// Порядок выбран так, чтобы неудача ничего не портила: сначала ключ целиком
+    /// разбирается (до этого момента профиль не трогаем), затем поднятый VPN
+    /// отключается, и только потом профиль перезаписывается. При первом импорте
+    /// на шаге записи появляется системный диалог «…хочет добавить конфигурации VPN».
+    ///
+    /// В лог идут только размеры и вид ошибки: ни ключ, ни профиль, ни адреса.
+    /// - Returns: название сервера из ключа (для сообщения на экране).
+    @discardableResult
+    func importKey(_ text: String, source: KeySource) async throws -> String {
+        logger.log("import[\(source.rawValue)]: start, text=\(text.utf8.count) bytes")
+
+        // Разбор — не на главном потоке: если hostName в ключе — домен, внутри
+        // синхронный DNS-запрос.
+        let config: ImportedConfig
+        do {
+            config = try await Task.detached(priority: .userInitiated) {
+                try ImportedConfig.make(fromPastedText: text)
+            }.value
+        } catch {
+            logger.log("import FAILED: parse: \(Self.logCode(error))")
+            let text = (error as? LocalizedError)?.errorDescription ?? Self.raw(error)
+            throw ImportFailure(errorDescription: text)
+        }
+
+        // Менять профиль под работающим туннелем нельзя: расширение продолжит
+        // жить со старым конфигом, а статус на экране будет врать.
+        if isTunnelActive {
+            logger.log("import: tunnel is up — stopping before profile change")
+            guard await stopAndWait() else {
+                logger.log("import FAILED: tunnel did not stop in time")
+                throw ImportFailure(errorDescription:
+                    "Не удалось отключить VPN перед сменой ключа. Отключите его кнопкой и повторите импорт.")
+            }
+        }
+
+        do {
+            try await timed { try await self.apply(config: config) }
+        } catch {
+            logger.log("import FAILED: save profile: \(Self.raw(Self.unwrap(error).error))")
+            throw ImportFailure(errorDescription: explain(error, retry: "Повторите импорт"))
+        }
+
+        logger.log("import OK: profile=\(config.ovpnProfile.utf8.count) bytes")
+        lastError = nil
+        notice = "Ключ импортирован: «\(config.description)»"
+        return config.description
+    }
+
+    private var isTunnelActive: Bool {
+        switch manager?.connection.status {
+        case .connected, .connecting, .reasserting, .disconnecting: return true
+        default: return false
+        }
+    }
+
+    /// Останавливает туннель и ждёт статуса «Отключено» (обычно 1–2 секунды;
+    /// расширение страхует остановку своим таймером на 5 секунд).
+    private func stopAndWait(timeout: TimeInterval = 10) async -> Bool {
+        guard let connection = manager?.connection else { return true }
+        userRequestedStop = true
+        connection.stopVPNTunnel()
+        let deadline = Date().addingTimeInterval(timeout)
+        while Date() < deadline {
+            if connection.status == .disconnected || connection.status == .invalid { return true }
+            try? await Task.sleep(nanoseconds: 200_000_000)
+        }
+        return false
+    }
+
+    /// Вид ошибки разбора для лога — без значений из ключа (у notAnIPv4 внутри
+    /// имя сервера, поэтому `String(describing:)` здесь не годится).
+    private static func logCode(_ error: Error) -> String {
+        guard let keyError = error as? VPNKeyError else { return raw(error) }
+        switch keyError {
+        case .notAVPNKey: return "notAVPNKey"
+        case .invalidBase64: return "invalidBase64"
+        case .truncated: return "truncated"
+        case .decompressionFailed: return "decompressionFailed"
+        case .malformedJSON: return "malformedJSON"
+        case .noCloakContainer: return "noCloakContainer"
+        case .missingField(let field): return "missingField(\(field))"
+        case .notAnIPv4: return "notAnIPv4"
+        }
+    }
+
+    #if DEBUG
+    /// DEBUG-мост: `make push-key` кладёт ключ в Documents приложения через
+    /// devicectl, здесь он проходит ТОТ ЖЕ `importKey`, что и ключ с экрана импорта.
+    /// Нужен, чтобы проверять импорт на телефоне с Mac, без рук. Ключ не входит
+    /// ни в один вход сборки, а этого кода нет в Release — в TestFlight ключ
+    /// попасть не может. Файл удаляется сразу после чтения.
     private func importDebugKeyIfPresent() async {
         guard let url = Self.findDebugKey() else { return }
         defer { try? FileManager.default.removeItem(at: url) }
         do {
             let key = try String(contentsOf: url, encoding: .utf8)
-            let config: ImportedConfig
             if url.pathExtension == "ovpn" {
                 // Диагностика: готовый .ovpn без Cloak (например, к временному
                 // тестовому серверу). Мимо ConfigKit — там обязателен контейнер Cloak.
-                config = try Self.rawProfileConfig(key)
+                let config = try Self.rawProfileConfig(key)
+                try await apply(config: config)
+                logger.log("debug .ovpn imported: profile=\(config.ovpnProfile.utf8.count) bytes")
+                lastError = nil
+                notice = "Ключ импортирован: «\(config.description)»"
             } else {
-                config = try await Task.detached(priority: .userInitiated) {
-                    try ImportedConfig.make(fromKey: key)
-                }.value
+                try await importKey(key, source: .debugBridge)
             }
-            try await apply(config: config)
-            // В лог — только размеры: ни ключ, ни адреса туда не попадают.
-            logger.log("debug key imported: profile=\(config.ovpnProfile.utf8.count) bytes")
-            lastError = nil
-            notice = "Ключ импортирован: «\(config.description)»"
         } catch {
             let text = (error as? LocalizedError)?.errorDescription ?? Self.raw(error)
-            logger.log("debug key import FAILED: \(text)")
             lastError = "Не удалось импортировать ключ: \(text)"
         }
     }
@@ -140,10 +270,19 @@ final class TunnelManager: ObservableObject {
         ]
 
         manager.protocolConfiguration = proto
-        manager.localizedDescription = "PersonalVPN"
+        manager.localizedDescription = Bundle.main.displayName
         manager.isEnabled = true
 
-        try await manager.saveToPreferences()
+        do {
+            try await manager.saveToPreferences()
+        } catch {
+            // Сохранить не дали (например, «Не разрешать» в системном диалоге).
+            // Объект в памяти уже изменён — перечитываем, чтобы прежний профиль
+            // остался таким, каким лежит в настройках системы.
+            try? await self.manager?.loadFromPreferences()
+            refreshDerivedState()
+            throw error
+        }
         // Известная особенность NE: без повторного load свежесохранённый
         // профиль может не стартовать ("Missing protocol or protocol has
         // invalid type").
@@ -153,8 +292,12 @@ final class TunnelManager: ObservableObject {
         refreshDerivedState()
     }
 
-    /// Профиль-пустышка для M1: расширение поднимет фиктивный туннель
-    /// (в providerConfiguration нет ovpnConfig — это и есть признак пустышки).
+    #if DEBUG
+    /// Диагностика (`make dummy`): профиль-пустышка M1 — расширение поднимет
+    /// фиктивный туннель с узким маршрутом (в providerConfiguration нет ovpnConfig —
+    /// это и есть признак пустышки). Проверяет подпись, entitlements, App Group и
+    /// загрузку фреймворка без участия сервера. ЗАТИРАЕТ боевой профиль — после
+    /// неё ключ импортируется заново. Из интерфейса недоступна.
     func applyDummyProfile() async throws {
         let manager = self.manager ?? NETunnelProviderManager()
 
@@ -164,7 +307,7 @@ final class TunnelManager: ObservableObject {
         proto.providerConfiguration = ["dummy": true]
 
         manager.protocolConfiguration = proto
-        manager.localizedDescription = "PersonalVPN (тест)"
+        manager.localizedDescription = "\(Bundle.main.displayName) (тест)"
         manager.isEnabled = true
 
         try await manager.saveToPreferences()
@@ -174,23 +317,35 @@ final class TunnelManager: ObservableObject {
         refreshDerivedState()
     }
 
+    /// `make dummy`: записать пустышку и сразу поднять её.
+    func connectDummy() async {
+        do {
+            try await applyDummyProfile()
+            await connect(allowDummy: true)
+        } catch {
+            logger.log("dummy profile FAILED: \(Self.raw(error))")
+            lastError = explain(error, retry: "Повторите make dummy")
+        }
+    }
+    #endif
+
     // MARK: - Управление туннелем
 
     /// Единая точка входа кнопки «Подключить». Любая ошибка попадает под кнопку
-    /// и в app.log: M1 существует, чтобы увидеть ошибки подписи и entitlements,
-    /// «мёртвой» кнопки без сообщения быть не должно.
-    func connect() async {
+    /// и в app.log: «мёртвой» кнопки без сообщения быть не должно.
+    ///
+    /// Без боевого профиля не подключаемся: профиль появляется только при импорте
+    /// ключа (там же — системный диалог «…хочет добавить конфигурации VPN»).
+    func connect(allowDummy: Bool = false) async {
         lastError = nil
         notice = nil
         userRequestedStop = false
+        guard let manager, hasRealConfig || allowDummy else {
+            logger.log("connect refused: no real profile")
+            lastError = "Сначала добавьте ключ: без него подключаться некуда."
+            return
+        }
         do {
-            if manager == nil {
-                // Профиля ещё нет (M1) — создаём пустышку; здесь появляется
-                // системный диалог «…хочет добавить конфигурации VPN».
-                try await timed { try await self.applyDummyProfile() }
-            }
-            guard let manager else { return }
-
             // iOS держит включённым только один VPN-профиль. Если подключались
             // другим клиентом (AmneziaVPN), наш профиль выключен и старт упадёт
             // с configurationDisabled — включаем его обратно.
@@ -212,7 +367,7 @@ final class TunnelManager: ObservableObject {
             logger.log("connect FAILED: \(Self.raw(Self.unwrap(error).error))")
             lastError = explain(error)
             // Устаревший профиль лечится перечитыванием — следующее нажатие сработает.
-            try? await manager?.loadFromPreferences()
+            try? await manager.loadFromPreferences()
         }
     }
 
@@ -230,8 +385,12 @@ final class TunnelManager: ObservableObject {
         status = newStatus
         logger.log("status: \(newStatus.localizedText)")
 
-        if newStatus == .disconnected, !userRequestedStop, startRequestedAt != nil {
-            Task { await explainDisconnect() }
+        // Причину от системы пишем в лог всегда — и при остановке по кнопке:
+        // так видно, дошёл ли stopTunnel до расширения или систему что-то убило.
+        // Под кнопку — только когда отключились не по нашей команде.
+        if newStatus == .disconnected {
+            let show = !userRequestedStop && startRequestedAt != nil
+            Task { await explainDisconnect(showToUser: show) }
         }
     }
 
@@ -243,15 +402,16 @@ final class TunnelManager: ObservableObject {
 
     /// Почему туннель отключился сам. Источники: причина от системы
     /// (fetchLastDisconnectError) и last_error.txt, который пишет расширение.
-    private func explainDisconnect() async {
+    private func explainDisconnect(showToUser: Bool) async {
         guard let connection = manager?.connection else { return }
         let systemError: NSError? = await withCheckedContinuation { continuation in
             connection.fetchLastDisconnectError { continuation.resume(returning: $0 as NSError?) }
         }
+        logger.log("disconnect reason: \(systemError.map(Self.raw) ?? "none")")
+        guard showToUser else { return }
 
         var parts: [String] = []
         if let systemError {
-            logger.log("disconnect reason: \(Self.raw(systemError))")
             parts.append(Self.describeDisconnect(systemError) + "\n[\(Self.raw(systemError))]")
         }
         if let url = SharedPaths.lastErrorURL,
@@ -301,7 +461,7 @@ final class TunnelManager: ObservableObject {
 
     /// Человеческое объяснение + сырой код. Строки системных ошибок NE не
     /// документированы, подсказка эвристическая — поэтому код показываем всегда.
-    private func explain(_ error: Error) -> String {
+    private func explain(_ error: Error, retry: String = "Нажмите «Подключить» ещё раз") -> String {
         let (underlying, elapsed) = Self.unwrap(error)
         let nsError = underlying as NSError
         let text = nsError.localizedDescription.lowercased()
@@ -314,7 +474,7 @@ final class TunnelManager: ObservableObject {
                      + "в выводе make install."
             } else {
                 hint = "Вы нажали «Не разрешать» (или VPN запрещён профилем управления). "
-                     + "Нажмите «Подключить» ещё раз и выберите «Разрешить»."
+                     + "\(retry) и выберите «Разрешить»."
             }
         } else if nsError.domain == NEVPNErrorDomain, let code = NEVPNError.Code(rawValue: nsError.code) {
             switch code {

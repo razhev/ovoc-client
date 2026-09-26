@@ -6,7 +6,7 @@ import Foundation
 /// Расширение живёт отдельным процессом и иначе не может передать
 /// приложению ни логи, ни текст последней ошибки.
 enum SharedPaths {
-    static let appGroupID = "group.com.razhev.personalvpn"
+    static let appGroupID = "group.com.razhev.ovocclient"
 
     /// nil возможен только при неправильных entitlements —
     /// это ошибка конфигурации сборки, а не рантайм-ситуация.
@@ -22,7 +22,4 @@ enum SharedPaths {
 
     /// Последняя фатальная ошибка туннеля — приложение показывает её под кнопкой.
     static var lastErrorURL: URL? { containerURL?.appendingPathComponent("last_error.txt") }
-
-    /// Импортированный конфиг (ImportedConfig в JSON).
-    static var configURL: URL? { containerURL?.appendingPathComponent("config.json") }
 }

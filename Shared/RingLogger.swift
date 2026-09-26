@@ -24,7 +24,7 @@ final class RingLogger {
     private let fileURL: URL?
     private let maxBytes: Int
     private let osLog: Logger
-    private let queue = DispatchQueue(label: "com.razhev.personalvpn.ringlogger")
+    private let queue = DispatchQueue(label: "com.razhev.ovocclient.ringlogger")
     private var heartbeatTimer: DispatchSourceTimer?
 
     /// Добавка к строке heartbeat (расширение подставляет счётчики пакетов):
@@ -34,7 +34,7 @@ final class RingLogger {
     init(fileURL: URL?, maxBytes: Int, category: String) {
         self.fileURL = fileURL
         self.maxBytes = maxBytes
-        self.osLog = Logger(subsystem: "com.razhev.personalvpn", category: category)
+        self.osLog = Logger(subsystem: "com.razhev.ovocclient", category: category)
     }
 
     func log(_ message: String) {
@@ -68,26 +68,58 @@ final class RingLogger {
 
     // MARK: - Файл
 
+    /// Файл держим открытым весь срок жизни процесса, а не открываем на каждую
+    /// строку. Причина — не скорость, а чужие дескрипторы: Go-плагин Cloak в
+    /// фреймворке при отключении закрывает свой TCP-сокет «сырым» close(2) за
+    /// спиной рантайма Go, а его сессия продолжает писать в тот же номер
+    /// дескриптора. Короткоживущий дескриптор лога получал этот номер, и в
+    /// tunnel.log попадала TLS-запись Cloak (двоичный мусор). Постоянный
+    /// дескриптор открыт раньше любых сокетов и не освобождается — чужой
+    /// номер ему не достанется. Только на queue.
+    private var handle: FileHandle?
+
     private func append(_ line: String) {
         guard let url = fileURL, let data = line.data(using: .utf8) else { return }
+        if handle == nil {
+            handle = Self.openForAppend(url)
+        }
+        guard let handle else { return }
+        do {
+            try handle.seekToEnd()
+            try handle.write(contentsOf: data)
+        } catch {
+            // Дескриптор закрыли под нами (та же болезнь фреймворка, см. выше):
+            // открываем файл заново и оставляем след, чтобы это было видно в логе.
+            try? handle.close()
+            self.handle = Self.openForAppend(url)
+            guard let reopened = self.handle else { return }
+            let marker = "\(Self.timestamp()) LOGGER: file handle was closed underneath us — reopened\n"
+            _ = try? reopened.seekToEnd()
+            try? reopened.write(contentsOf: Data(marker.utf8))
+            try? reopened.write(contentsOf: data)
+        }
+        rotateIfNeeded(url: url)
+    }
+
+    private static func openForAppend(_ url: URL) -> FileHandle? {
         let fm = FileManager.default
         if !fm.fileExists(atPath: url.path) {
             fm.createFile(atPath: url.path, contents: nil)
         }
-        guard let handle = try? FileHandle(forWritingTo: url) else { return }
-        defer { try? handle.close() }
-        _ = try? handle.seekToEnd()
-        try? handle.write(contentsOf: data)
-        rotateIfNeeded(url: url)
+        return try? FileHandle(forWritingTo: url)
     }
 
     /// Ротация усечением: когда файл превышает лимит, оставляем вторую половину.
-    /// Примитивно, зато без второго файла и лишней памяти.
+    /// Примитивно, зато без второго файла и лишней памяти. Атомарная запись
+    /// подменяет файл новым, поэтому открытый дескриптор после неё закрываем —
+    /// следующая строка откроет уже новый файл.
     private func rotateIfNeeded(url: URL) {
         guard let size = try? FileManager.default.attributesOfItem(atPath: url.path)[.size] as? Int,
               size > maxBytes,
               let data = try? Data(contentsOf: url) else { return }
         let tail = data.suffix(maxBytes / 2)
+        try? handle?.close()
+        handle = nil
         try? tail.write(to: url, options: .atomic)
     }
 

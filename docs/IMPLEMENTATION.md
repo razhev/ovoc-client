@@ -1,4 +1,4 @@
-# План имплементации: PersonalVPN (iOS-клиент OpenVPN over Cloak)
+# План имплементации: OVoC Client (iOS-клиент OpenVPN over Cloak)
 
 > Детализация утверждённого PLAN.md. После утверждения сохраняется как `docs/IMPLEMENTATION.md` и пушится. Все зафиксированные решения из IMPLEMENTATION_PROMPT.md соблюдены без изменений.
 
@@ -25,7 +25,7 @@
 | **M1** | Подписи, установка на iPhone, пустышка-туннель | **Да** | Настройки → VPN: «Подключено» (значок VPN — в Пункте управления); логи расширения видны в LogView |
 | **M2** | Фреймворк загружается в процессе расширения на устройстве | Да | «OpenVPNAdapter loaded» в логе; пустышка по-прежнему работает |
 | **M3** | Настоящее соединение на зашитом конфиге (главный риск) | Да + реальный ключ | Сайт-определитель показывает IP сервера; 10 мин стабильно; чистый reconnect |
-| **M4** | Импорт `vpn://` в приложении + вшитый ключ | Да | Чистая установка + вставка ключа воспроизводит M3 |
+| **M4** | Импорт `vpn://` в приложении (без вшитого ключа) | Да | Чистая установка + вставка ключа воспроизводит M3 |
 | **M5** | Доводка: ошибки под кнопкой, шаринг логов, ru/en, иконка | Да | Телефон на русском → интерфейс русский; мёртвый сервер → читаемая ошибка |
 | **M6** | TestFlight: архив, загрузка, внешняя группа, публичная ссылка | Да + App Store Connect | Родственник ставит по ссылке и видит IP сервера |
 
@@ -35,32 +35,35 @@
 
 ### Шаг 0.1 — Каркас проекта: `project.yml`, скелеты таргетов, Makefile
 
+> Имена ниже — текущие. До переименования 2026-09-24 проект, таргет и приложение назывались
+> PersonalVPN, bundle ID — `com.razhev.personalvpn`.
+
 **Файлы:**
 
 - **`project.yml`** — единый источник правды для XcodeGen:
   - `options`: `deploymentTarget: iOS "16.0"`
   - общие settings: `SWIFT_VERSION: "5.0"`, `SUPPORTED_PLATFORMS: iphoneos`, `TARGETED_DEVICE_FAMILY: 1`, `DEVELOPMENT_TEAM: ""` (плейсхолдер до M0), `CODE_SIGN_STYLE: Automatic`, `ITSAppUsesNonExemptEncryption: false` в Info.plist приложения
-  - target **PersonalVPN** (iOS app, bundle `com.razhev.personalvpn`): sources `App/` + `Shared/`, зависимость от таргета PacketTunnel (embed appex), пакет ConfigKit, entitlements-файл `App/PersonalVPN.entitlements`
-  - target **PacketTunnel** (app-extension, bundle `com.razhev.personalvpn.tunnel`): sources `PacketTunnel/` + `Shared/`, `NSExtensionPointIdentifier: com.apple.networkextension.packet-tunnel`, entitlements `PacketTunnel/PacketTunnel.entitlements`
+  - target **OVoCClient** (iOS app, bundle `com.razhev.ovocclient`, видимое имя «OVoC Client»): sources `App/` + `Shared/`, зависимость от таргета PacketTunnel (embed appex), пакет ConfigKit, entitlements-файл `App/OVoCClient.entitlements`
+  - target **PacketTunnel** (app-extension, bundle `com.razhev.ovocclient.tunnel`): sources `PacketTunnel/` + `Shared/`, `NSExtensionPointIdentifier: com.apple.networkextension.packet-tunnel`, entitlements `PacketTunnel/PacketTunnel.entitlements`
   - фреймворк в project.yml **не** подключаем на этом шаге (он появится в 0.5/M2) — иначе сборка упадёт до его скачивания
 
   *Пояснение для новичка: entitlements — это подписанные «разрешения» приложения (право на VPN, право на общую папку). App Group — общая папка двух процессов (приложение ↔ расширение): через неё ходят логи и конфиг.*
 
 - **Entitlements** (оба таргета, одинаковые по смыслу):
   - `com.apple.developer.networking.networkextension` = `[packet-tunnel-provider]`
-  - `com.apple.security.application-groups` = `[group.com.razhev.personalvpn]`
+  - `com.apple.security.application-groups` = `[group.com.razhev.ovocclient]`
 
 - **`Shared/SharedPaths.swift`** — `enum SharedPaths`: `appGroupID`, `containerURL`, `logFileURL` (`tunnel.log`), `lastErrorURL` (`last_error.txt`), `configURL` (`config.json`).
 - **`Shared/TunnelIPC.swift`** — `enum TunnelConfigKeys`: строковые ключи `ovpnConfig`, `serverIP`, `dns1`, `dns2` для `providerConfiguration`.
-- **`App/PersonalVPNApp.swift`**, **`App/ContentView.swift`** — минимальный SwiftUI: кнопка «Подключить» (пока без действия), текст статуса. `Assets.xcassets` с плейсхолдером.
+- **`App/OVoCClientApp.swift`**, **`App/ContentView.swift`** — минимальный SwiftUI: кнопка «Подключить» (пока без действия), текст статуса. `Assets.xcassets` с плейсхолдером.
 - **`PacketTunnel/PacketTunnelProvider.swift`** — скелет: `startTunnel` поднимает **пустышку** (`NEPacketTunnelNetworkSettings(tunnelRemoteAddress: "10.8.0.1")`, адрес `10.8.0.2/24`, `includedRoutes = [NEIPv4Route(dest: "10.8.0.0", mask: "255.255.255.0")]` — **узкий маршрут, НИКОГДА не default route**), пишет строку в лог App Group. Это ровно то, что нужно для M1 — пишем сразу.
-- **`Shared/RingLogger.swift`** (с M1 — в `Shared/`: расширение пишет `tunnel.log`, приложение — `app.log`) — `final class RingLogger`: `init(fileURL:maxBytes:category:)` (лимит ~256 КБ, ротация усечением половины), `func log(_:)` (файл + `os.Logger` subsystem `com.razhev.personalvpn`, уровень `.notice`), `func startMemoryHeartbeat()` — раз в 30 сек строка с footprint из `task_vm_info` (следим за лимитом 50 МБ).
+- **`Shared/RingLogger.swift`** (с M1 — в `Shared/`: расширение пишет `tunnel.log`, приложение — `app.log`) — `final class RingLogger`: `init(fileURL:maxBytes:category:)` (лимит ~256 КБ, ротация усечением половины), `func log(_:)` (файл + `os.Logger` subsystem `com.razhev.ovocclient`, уровень `.notice`), `func startMemoryHeartbeat()` — раз в 30 сек строка с footprint из `task_vm_info` (следим за лимитом 50 МБ).
 - **`Makefile`** — цели: `gen` (xcodegen), `build` (см. проверку ниже), `test` (`cd ConfigKit && swift test`), `fetch` / `verify` (скрипты фреймворка), позже `install` / `archive` / `upload` / `logs`.
 
 **Команды/проверка:**
 ```
 xcodegen generate
-xcodebuild -project PersonalVPN.xcodeproj -scheme PersonalVPN \
+xcodebuild -project OVoCClient.xcodeproj -scheme OVoCClient \
   -destination 'generic/platform=iOS' build \
   CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO
 ```
@@ -114,7 +117,7 @@ xcodebuild -project PersonalVPN.xcodeproj -scheme PersonalVPN \
   - подстановка `$PRIMARY_DNS`/`$SECONDARY_DNS` (дефолты 1.1.1.1 / 1.0.0.1); оба случая: плейсхолдеры есть / их нет;
   - проверка/вставка строки `route <serverIP> 255.255.255.255 net_gateway` (защита от петли №1 — OpenVPNAdapter конвертирует её в excludedRoute);
   - дописывание `\n<cloak>\n<base64(cloakJSON)>\n</cloak>\n` (base64 стандартный).
-- **`Sources/ConfigKit/ImportedConfig.swift`** — `public struct ImportedConfig: Codable {ovpnProfile, serverIP, dns1, dns2, description}` + фабрика `make(from key: String, resolve: (String) throws -> String) throws -> ImportedConfig` — резолвер хоста инжектируется (в приложении — getaddrinfo, в тестах — стаб), если `hostName` — домен, IP фиксируется при импорте.
+- **`Sources/ConfigKit/ImportedConfig.swift`** — `public struct ImportedConfig {ovpnProfile, serverIP, dns1, dns2, description}` (в App Group не сохраняется — см. M4) + фабрика `make(from key: String, resolve: (String) throws -> String) throws -> ImportedConfig` — резолвер хоста инжектируется (в приложении — getaddrinfo, в тестах — стаб), если `hostName` — домен, IP фиксируется при импорте.
 
 **Тестовая стратегия — конкретные кейсы (`Tests/ConfigKitTests/`)**, синтетический ключ собирается прямо в тесте (JSON → qCompress → base64url → `vpn://`), реальный ключ в тесты **не попадает никогда**:
 
@@ -212,12 +215,44 @@ xcodebuild -project PersonalVPN.xcodeproj -scheme PersonalVPN \
 
 **Если «подключено, но трафика нет» на iOS 26** — известный баг amnezia-client#2072: файловое логирование у нас всегда включено (совпадает с обходом); если не помогло — `build-framework-source.sh` (HEAD `master-amnezia` с мартовскими фиксами), повторить ворота verify и M2.
 
-### M4 — Импорт ключа в приложении + вшитый ключ (2–3 сессии)
+### M4 — Импорт ключа в приложении (сделан 2026-09-24)
 
-- Агент: **`App/ImportView.swift`** — вставка `vpn://` из буфера, вызов ConfigKit, показ типизированных ошибок русским текстом; сохранение `ImportedConfig` в App Group + обновление профиля туннеля через `TunnelManager.apply`.
-- Агент: авто-импорт `App/Resources/default.vpnkey` при первом запуске, если файл есть в бандле (файл в .gitignore; семейная сборка кладёт его локально перед `make archive`).
-- Агент: удалить DEBUG-мост из 3.3.
-- **Проверка:** `swift test` зелёный; на телефоне — удалить приложение, поставить заново, вставить настоящий ключ, «Подключить» → IP сервера (импортёр воспроизводит M3 без ручной подготовки).
+Решения, принятые перед реализацией (отличаются от первоначального плана):
+- **Вшитого ключа нет.** Клиент раздаётся пустым, ключ каждый добавляет сам: ключи раздаются
+  по одному на человека, а в будущем клиент может пригодиться любому владельцу сервера
+  OpenVPN over Cloak. Ресурс `App/Resources/default.vpnkey` не поддерживается; `make
+  release-check` наоборот проверяет, что в бандле нет ни файла ключа, ни строки `vpn://…`.
+- **DEBUG-мост оставлен** (`make push-key`, `make connect/disconnect`, `make dummy`): он позволяет
+  проверять импорт на телефоне без рук и идёт через тот же `TunnelManager.importKey`, что и
+  экран. В Release его нет — `make release-check` собирает обе конфигурации и проверяет метки.
+- **config.json не пишется**: профиль с приватным ключом живёт только в `providerConfiguration`;
+  `ImportedConfig.save/load` и `SharedPaths.configURL` удалены.
+- **Профиль-пустышка M1 из интерфейса убрана**: без ключа кнопка «Подключить» не показывается.
+  Пустышка осталась диагностикой `make dummy` (затирает боевой профиль).
+
+Что сделано:
+- **ConfigKit**: `VPNKeyText` + `VPNKeyDecoder.decode(pastedText:)` — ключ внутри сообщения,
+  переносы строк, невидимые символы, латинский хвост после ключа (перебор кандидатов);
+  `qUncompress` — потоковый inflate, отличает обрезанный ключ (`VPNKeyError.truncated`,
+  «скопирован не целиком») от испорченного и ограничивает заявленный размер. 16 новых тестов
+  (`PastedTextTests`), всего 41.
+- **`App/ImportView.swift`**: `PasteButton` (без системного запроса «Разрешить вставку»), поле,
+  файл из «Файлов» (`fileImporter`, до 1 МБ); текст готовит к диалогу «…хочет добавить
+  конфигурации VPN»; поле очищается после импорта и при закрытии.
+- **`TunnelManager.importKey`** — единственный путь импорта: разбор в `Task.detached` (DNS,
+  если hostName — домен) → поднятый VPN отключается и ждём «Отключено» → `apply`; при отказе
+  сохранить профиль (в т.ч. «Не разрешать») прежний профиль перечитывается из настроек и не
+  портится. В `app.log` — только размеры и вид ошибки.
+- **`ContentView`**: нет боевого профиля → «Ключ не добавлен» + кнопка «Добавить ключ»;
+  кнопка-ключ в тулбаре для смены.
+
+**Проверка (2026-09-24):** `make test` 41 зелёный; `make build`, `make verify` 3×PASS,
+`make release-check` 5×PASS (с подложенным `default.vpnkey` — FAIL, как и должно). На телефоне
+через мост тем же кодом: мусор → `notAVPNKey`, обрезанный → `truncated`, ключ AWG →
+`noCloakContainer`, приложение не падает, старый профиль цел; настоящий ключ → `import OK` →
+`connected`, heartbeat со счётчиками пакетов, без `Transport error`; повторный импорт при
+поднятом VPN → `tunnel is up — stopping` → `import OK`. Чистая установка + вставка ключа
+на экране → IP сервера — см. DEVICE-TESTING.md, этап E.
 
 ### M5 — Доводка (1–2 сессии)
 
@@ -228,7 +263,7 @@ xcodebuild -project PersonalVPN.xcodeproj -scheme PersonalVPN \
 
 | Шаг | Кто | Что |
 |---|---|---|
-| 6.1 | **Пользователь** | App Store Connect: создать запись приложения (bundle `com.razhev.personalvpn`); Users and Access → Integrations → **API key** (роль App Manager), `.p8` → `~/.private_keys/`; сообщить агенту Key ID + Issuer ID |
+| 6.1 | **Пользователь** | App Store Connect: создать запись приложения (bundle `com.razhev.ovocclient` — после первой загрузки сборки он не меняется); Users and Access → Integrations → **API key** (роль App Manager), `.p8` → `~/.private_keys/`; сообщить агенту Key ID + Issuer ID |
 | 6.2 | Агент | `Config/ExportOptions.plist` (method `app-store-connect`, upload) + `scripts/upload-testflight.sh`: `xcodebuild archive` → `xcodebuild -exportArchive` с `-authenticationKeyPath/-authenticationKeyID/-authenticationKeyIssuerID`. Без fastlane, без altool |
 | 6.3 | **Пользователь** | В App Store Connect: внешняя группа тестеров + публичная ссылка; заполнить заметки Beta App Review (текст даст агент: личный клиент к собственному серверу + рабочий тестовый ключ) |
 | 6.4 | Агент | В репозиторий: текст заметок для ревью, шаблон сообщения родственникам (ru), памятка «перезаливать ≤90 дней» |
@@ -268,7 +303,7 @@ xcodebuild -project PersonalVPN.xcodeproj -scheme PersonalVPN \
 | Реальный `vpn://`-ключ пользователя | Блокирует M3 (шаг 3.1), не раньше | Пользователь экспортирует из Amnezia к началу M3 |
 | ~~Версия iOS на рабочем iPhone~~ — закрыт 2026-09-19: iPhone 16 Pro, iOS 26.6.2 → штатный путь через `devicectl` | — | — |
 | App Store Connect: запись приложения + API key (Key ID, Issuer ID) | Блокирует только M6 | Пользователь создаёт после одобрения аккаунта (шаг 6.1) |
-| Имя «PersonalVPN» — финальное? | Не блокирует; переименование дёшево до M6 (display name — вообще в любой момент) | До создания записи в App Store Connect |
+| ~~Имя «PersonalVPN» — финальное?~~ — закрыт 2026-09-24: приложение — **OVoC Client** (OpenVPN over Cloak Client), проект `OVoCClient`, bundle `com.razhev.ovocclient` | — | — |
 
 ---
 

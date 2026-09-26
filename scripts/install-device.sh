@@ -19,12 +19,12 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
-PROJECT="PersonalVPN.xcodeproj"
-SCHEME="PersonalVPN"
-APP_BUNDLE_ID="com.razhev.personalvpn"
-APP_GROUP_ID="group.com.razhev.personalvpn"
+PROJECT="OVoCClient.xcodeproj"
+SCHEME="OVoCClient"
+APP_BUNDLE_ID="com.razhev.ovocclient"
+APP_GROUP_ID="group.com.razhev.ovocclient"
 DERIVED="$ROOT/build/DerivedData"
-APP="$DERIVED/Build/Products/Debug-iphoneos/PersonalVPN.app"
+APP="$DERIVED/Build/Products/Debug-iphoneos/OVoCClient.app"
 LOG_DIR="$ROOT/build/logs"
 BUILD_LOG="$LOG_DIR/xcodebuild-install.log"
 
@@ -158,10 +158,10 @@ fi
 # ── 5. Запуск (без отладчика) ──
 if ! xcrun devicectl device process launch --device "$UDID" --terminate-existing "$APP_BUNDLE_ID"; then
     echo "FAIL: приложение установлено, но не запустилось — скорее всего телефон заблокирован."
-    echo "      Разблокируйте и откройте PersonalVPN пальцем."
+    echo "      Разблокируйте и откройте OVoC Client пальцем."
     exit 7
 fi
 
 echo ""
-echo "Готово: PersonalVPN установлен и запущен на «${DEVICE_NAME}»."
+echo "Готово: OVoC Client установлен и запущен на «${DEVICE_NAME}»."
 echo "Дальше: «Подключить» → системный диалог про конфигурации VPN → «Разрешить». Логи: make logs"

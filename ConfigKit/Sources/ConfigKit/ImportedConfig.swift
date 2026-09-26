@@ -1,8 +1,8 @@
 import Foundation
 
 /// Итог импорта: всё, что нужно расширению, в готовом виде.
-/// Приложение сохраняет это в App Group (config.json) и кладёт
-/// в providerConfiguration профиля туннеля.
+/// Приложение кладёт это в providerConfiguration профиля туннеля — и больше
+/// никуда: профиль содержит приватный ключ, вторая копия на диске не нужна.
 public struct ImportedConfig: Codable, Equatable {
     /// Полный текст .ovpn: DNS подставлен, route для IP сервера гарантирован,
     /// блок <cloak> дописан.
@@ -29,7 +29,23 @@ public struct ImportedConfig: Codable, Equatable {
         fromKey key: String,
         resolve: (String) throws -> String = ImportedConfig.systemResolveIPv4
     ) throws -> ImportedConfig {
-        let config = try VPNKeyDecoder.decode(key)
+        try make(from: VPNKeyDecoder.decode(key), resolve: resolve)
+    }
+
+    /// То же для текста, вставленного человеком: ключ внутри сообщения, с
+    /// переносами строк и т.п. — см. `VPNKeyDecoder.decode(pastedText:)`.
+    /// Этим входом пользуется экран импорта.
+    public static func make(
+        fromPastedText text: String,
+        resolve: (String) throws -> String = ImportedConfig.systemResolveIPv4
+    ) throws -> ImportedConfig {
+        try make(from: VPNKeyDecoder.decode(pastedText: text), resolve: resolve)
+    }
+
+    private static func make(
+        from config: AmneziaConfig,
+        resolve: (String) throws -> String
+    ) throws -> ImportedConfig {
         let container = try config.cloakContainer()
 
         guard let openvpn = container.openvpn else {
@@ -75,17 +91,6 @@ public struct ImportedConfig: Codable, Equatable {
             dns2: dns2,
             description: config.description ?? config.hostName
         )
-    }
-
-    // MARK: - Сохранение (App Group)
-
-    public func save(to url: URL) throws {
-        let data = try JSONEncoder().encode(self)
-        try data.write(to: url, options: .atomic)
-    }
-
-    public static func load(from url: URL) throws -> ImportedConfig {
-        try JSONDecoder().decode(ImportedConfig.self, from: Data(contentsOf: url))
     }
 
     // MARK: - DNS

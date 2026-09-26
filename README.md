@@ -1,7 +1,10 @@
-# personal-ios-client
+# OVoC Client
 
-Минимальный нативный iOS-клиент для личного сервера **AmneziaVPN** (протокол **OpenVPN over Cloak**).
+**OVoC Client** (OpenVPN over Cloak Client) — минимальный нативный iOS-клиент для личного сервера
+**AmneziaVPN** (протокол **OpenVPN over Cloak**).
 Для установки себе и нескольким родственникам через **TestFlight**. Не для публикации в App Store (пока).
+
+Репозиторий — `personal-ios-client`; до 2026-09-24 приложение называлось PersonalVPN.
 
 ## Что где
 
@@ -28,16 +31,34 @@
 фреймворка Amnezia (разбор — в [docs/DEVICE-TESTING.md](docs/DEVICE-TESTING.md)); фреймворк
 теперь собирается из исходников: `make framework`.
 
-Ещё не проверено (хвост гейта M3): утечка IPv6, переключение Wi-Fi ↔ LTE, отключение и
-повторное подключение на исправленной сборке. Дальше — M4: экран импорта ключа вместо
-отладочного `make push-key`.
+**M4 сделан 2026-09-24**: ключ добавляется в самом приложении — экран «Добавить ключ»
+(вставка из буфера или файл из «Файлов»; можно вставить сообщение с ключом целиком). Без ключа
+приложение предлагает импорт, а не подключение; ключ меняется кнопкой-ключом в тулбаре (поднятый
+VPN при этом сначала отключается). Клиент раздаётся **пустым**: вшитого ключа нет, каждый добавляет
+свой. Отладочный `make push-key` оставлен — он идёт через тот же код импорта, что и экран, и
+вырезан из Release (`make release-check` это проверяет).
+
+**Переименование 2026-09-24**: PersonalVPN → **OVoC Client**. Проект, таргет и схема — `OVoCClient`;
+bundle ID — `com.razhev.ovocclient` (расширение `com.razhev.ovocclient.tunnel`, App Group
+`group.com.razhev.ovocclient`). Для iOS это новое приложение: старое PersonalVPN удаляется с
+телефона руками, ключ импортируется заново ([docs/DEVICE-TESTING.md](docs/DEVICE-TESTING.md),
+«Переход с PersonalVPN»). Проверено на телефоне в тот же день: `make install` сам завёл новые
+App ID и App Group, импорт ключа вставкой → «Подключено», в логах `connected`, heartbeat с
+трафиком в обе стороны, ни одного `Transport error`.
+
+Отключение кнопкой разобрано 2026-09-24: ложная фатальная ошибка #20 адаптера при `stopTunnel`
+и двоичный мусор в `tunnel.log` (сырой `close` в Go-плагине Cloak) — причины и что сделано в
+провайдере описаны в [docs/DEVICE-TESTING.md](docs/DEVICE-TESTING.md).
+
+Ещё не проверено (хвост гейта M3): утечка IPv6, переключение Wi-Fi ↔ LTE. Дальше — M5: доводка
+(ошибки, ru/en, иконка), затем M6 TestFlight.
 
 ## Команды
 
 Требуются: Xcode 26+, [XcodeGen](https://github.com/yonaskolb/XcodeGen) (`brew install xcodegen`).
 
 ```bash
-make gen        # сгенерировать PersonalVPN.xcodeproj из project.yml
+make gen        # сгенерировать OVoCClient.xcodeproj из project.yml
 make build      # собрать оба таргета БЕЗ подписи — быстрая проверка компиляции
 make test       # юнит-тесты ConfigKit — на Mac, телефон не нужен
 make framework  # собрать OpenVPNAdapter.framework из исходников Amnezia + наш патч (основной способ)
@@ -47,12 +68,13 @@ make verify     # ворота: arm64? символы Cloak? setPTCloak в за�
 make devices    # какие iPhone видит Mac и готовы ли они к установке
 make ddi        # смонтировать на телефон образ разработчика (VPN на Mac выключить)
 make install    # подписанная сборка → установка на подключённый iPhone → запуск
-make push-key   # M3: доставить Secrets/my.vpnkey в установленное приложение
+make push-key   # DEBUG: доставить Secrets/my.vpnkey в приложение тем же кодом, что экран импорта
+make release-check # ворота Release: нет DEBUG-моста, нет файлов ключа в бандле
 make logs       # забрать логи с телефона в build/logs/latest/
 make crashlogs  # то же + отчёты о падениях расширения/приложения
 ```
 
-`PersonalVPN.xcodeproj` пересоздаётся каждым `make gen` — все настройки подписи живут в
+`OVoCClient.xcodeproj` пересоздаётся каждым `make gen` — все настройки подписи живут в
 `project.yml`, в интерфейсе Xcode ничего не настраиваем.
 
 Разобрать ключ Amnezia в читаемый JSON (вывод сохранять только в `Secrets/`):
@@ -80,8 +102,8 @@ python3 scripts/decode-vpnkey.py --schema Secrets/my.vpnkey
   (zlib-распаковка, двойной разбор `last_config`, типы Cloak-полей, сборка
   профиля). Тестируется на Mac: `make test`.
 - Расширение ничего не парсит: приложение при импорте собирает готовый текст
-  `.ovpn` и передаёт его через `providerConfiguration`. App Group — для логов
-  и конфига.
+  `.ovpn` и передаёт его через `providerConfiguration` — это единственное место,
+  где лежит профиль с приватным ключом. App Group — только для логов.
 
 ## Отладка на устройстве (M1+)
 
@@ -92,7 +114,7 @@ python3 scripts/decode-vpnkey.py --schema Secrets/my.vpnkey
 - экран «Логи» в приложении: `tunnel.log` (расширение) и `app.log` (приложение)
   из App Group, кнопка «Поделиться»;
 - `make logs` / `make crashlogs` — те же файлы и отчёты о падениях на Mac, без sudo;
-- Console.app с фильтром по subsystem `com.razhev.personalvpn`;
+- Console.app с фильтром по subsystem `com.razhev.ovocclient`;
 - `sudo log collect --device-name "<iPhone>" --last 10m` по кабелю.
 
 Подробности и разбор типовых ошибок — [docs/DEVICE-TESTING.md](docs/DEVICE-TESTING.md).

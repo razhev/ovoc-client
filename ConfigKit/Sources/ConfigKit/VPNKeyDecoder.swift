@@ -5,6 +5,8 @@ import Foundation
 public enum VPNKeyError: Error, LocalizedError, Equatable {
     case notAVPNKey
     case invalidBase64
+    /// Ключ начинается правильно, но обрывается: скопирован не целиком.
+    case truncated
     case decompressionFailed
     case malformedJSON(String)
     case noCloakContainer
@@ -14,9 +16,11 @@ public enum VPNKeyError: Error, LocalizedError, Equatable {
     public var errorDescription: String? {
         switch self {
         case .notAVPNKey:
-            return "Это не ключ Amnezia: строка должна начинаться с vpn://"
+            return "В этом тексте нет ключа Amnezia: ключ начинается с vpn://"
         case .invalidBase64:
             return "Ключ повреждён: не удалось раскодировать base64 (возможно, строка скопирована не целиком)"
+        case .truncated:
+            return "Ключ скопирован не целиком — конец строки обрезан. Скопируйте ключ заново полностью"
         case .decompressionFailed:
             return "Ключ повреждён: не удалось распаковать данные"
         case .malformedJSON(let detail):
@@ -32,6 +36,22 @@ public enum VPNKeyError: Error, LocalizedError, Equatable {
 }
 
 public enum VPNKeyDecoder {
+    /// Вставленный текст → конфигурация. Принимает ключ «как его прислали»: внутри
+    /// сообщения, с переносами строк и невидимыми символами (см. `VPNKeyText`).
+    /// Перебирает кандидатов от длинного к короткому; ошибку сообщает по самому
+    /// длинному — он ближе всего к тому, что человек считал ключом.
+    public static func decode(pastedText text: String) throws -> AmneziaConfig {
+        var firstError: Error?
+        for candidate in VPNKeyText.candidates(in: text) {
+            do {
+                return try decode(candidate)
+            } catch {
+                firstError = firstError ?? error
+            }
+        }
+        throw firstError ?? VPNKeyError.notAVPNKey
+    }
+
     /// vpn:// → base64url без паддинга → qUncompress(zlib) → JSON.
     /// Запасной путь: если распаковка не удалась — те же байты как plain JSON
     /// (старые/сторонние экспорты бывают без сжатия).
@@ -40,20 +60,38 @@ public enum VPNKeyDecoder {
         guard trimmed.lowercased().hasPrefix("vpn://") else { throw VPNKeyError.notAVPNKey }
 
         let encoded = String(trimmed.dropFirst("vpn://".count))
-        guard let raw = base64URLDecode(encoded) else { throw VPNKeyError.invalidBase64 }
+        guard let raw = decodeBody(encoded) else { throw VPNKeyError.invalidBase64 }
 
-        if let unpacked = try? qUncompress(raw) {
+        let zlibError: ZlibError?
+        do {
+            let unpacked = try qUncompress(raw)
             do {
                 return try JSONDecoder().decode(AmneziaConfig.self, from: unpacked)
             } catch {
                 throw VPNKeyError.malformedJSON(shortDescription(of: error))
             }
+        } catch let error as ZlibError {
+            zlibError = error
         }
         // Распаковка не удалась — пробуем как несжатый JSON.
-        guard let config = try? JSONDecoder().decode(AmneziaConfig.self, from: raw) else {
-            throw VPNKeyError.decompressionFailed
+        if let config = try? JSONDecoder().decode(AmneziaConfig.self, from: raw) {
+            return config
         }
-        return config
+        // Обрезанный ключ: оборванный zlib-поток либо несжатый JSON без конца.
+        if zlibError?.isTruncation == true || raw.first == UInt8(ascii: "{") {
+            throw VPNKeyError.truncated
+        }
+        throw VPNKeyError.decompressionFailed
+    }
+
+    /// Длина base64 ≡ 1 (mod 4) невозможна: строка обрезана посреди четвёрки или
+    /// к ней прилип лишний символ. Если алфавит при этом верный, последний символ
+    /// всё равно не несёт ни одного целого байта — отбрасываем его и разбираем
+    /// дальше: обрезанный ключ получит честное «скопирован не целиком».
+    private static func decodeBody(_ encoded: String) -> Data? {
+        if let data = base64URLDecode(encoded) { return data }
+        guard encoded.allSatisfy(VPNKeyText.isBase64URL) else { return nil }
+        return base64URLDecode(String(encoded.dropLast()))
     }
 
     /// base64url (алфавит -_ вместо +/) без паддинга; обычный base64 тоже принимаем.
@@ -72,9 +110,15 @@ public enum VPNKeyDecoder {
     }
 
     private static func shortDescription(of error: Error) -> String {
-        if case DecodingError.keyNotFound(let key, _) = error {
+        // Только имена полей: значения из ключа в текст ошибки не попадают.
+        switch error {
+        case DecodingError.keyNotFound(let key, _):
             return "нет поля \(key.stringValue)"
+        case DecodingError.typeMismatch(_, let context), DecodingError.valueNotFound(_, let context):
+            let path = context.codingPath.map(\.stringValue).joined(separator: ".")
+            return "неожиданный тип поля \(path)"
+        default:
+            return "данные не разбираются как JSON"
         }
-        return String(describing: type(of: error))
     }
 }

@@ -14,7 +14,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
-APP_GROUP_ID="group.com.razhev.personalvpn"
+APP_GROUP_ID="group.com.razhev.ovocclient"
 WITH_CRASHES=0
 [[ "${1:-}" == "--crashes" ]] && WITH_CRASHES=1
 
@@ -69,14 +69,14 @@ def walk(node):
             walk(value)
     elif isinstance(node, str) and node.endswith(".ips"):
         base = node.rsplit("/", 1)[-1]
-        if base.startswith(("PacketTunnel", "PersonalVPN", "JetsamEvent")):
+        if base.startswith(("PacketTunnel", "OVoCClient", "JetsamEvent")):
             found.add(node)
 walk(data)
 print("\n".join(sorted(found)[-15:]))
 PY
 )"
     if [[ -z "$NAMES" ]]; then
-        echo "Отчётов о падениях PacketTunnel / PersonalVPN / Jetsam на устройстве нет."
+        echo "Отчётов о падениях PacketTunnel / OVoCClient / Jetsam на устройстве нет."
     else
         while IFS= read -r NAME; do
             [[ -z "$NAME" ]] && continue

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Перезапускает PersonalVPN на подключённом iPhone с аргументами запуска.
+# Перезапускает OVoC Client на подключённом iPhone с аргументами запуска.
 # DEBUG-сборка понимает -autoconnect и -autodisconnect: это позволяет гонять
 # попытки подключения с Mac (make connect / make disconnect) и одновременно
 # снимать диагностику, не нажимая ничего на телефоне.
@@ -11,7 +11,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
-APP_BUNDLE_ID="com.razhev.personalvpn"
+APP_BUNDLE_ID="com.razhev.ovocclient"
 
 DEVICE_LINE="$(python3 scripts/find-device.py)" || exit $?
 UDID="$(cut -f1 <<<"$DEVICE_LINE")"
@@ -25,4 +25,4 @@ if ! xcrun devicectl device process launch --device "$UDID" --terminate-existing
     grep -v -E "^[0-9]{2}:[0-9]{2}:[0-9]{2}" "$LAUNCH_LOG" | head -6 | sed 's/^/    /'
     exit 7
 fi
-echo "OK: PersonalVPN перезапущен${*:+ с аргументами: $*}"
+echo "OK: OVoC Client перезапущен${*:+ с аргументами: $*}"

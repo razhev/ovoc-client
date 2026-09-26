@@ -84,6 +84,7 @@ make push-key   # DEBUG: доставить Secrets/my.vpnkey в приложе�
 make release-check # ворота Release: нет DEBUG-моста, нет файлов ключа в бандле
 make strings-check # каталог строк ru/en сходится с кодом (App/Localizable.xcstrings)
 make icon       # перерисовать иконку 1024×1024 скриптом (scripts/make-app-icon.swift)
+make scene      # пересобрать сцену главного экрана App/Scene/scene.html (нужен Node.js)
 make testflight # Release-архив → загрузка в TestFlight (API-ключ в Secrets/asc.env, см. docs/TESTFLIGHT.md)
 make logs       # забрать логи с телефона в build/logs/latest/
 make crashlogs  # то же + отчёты о падениях расширения/приложения
@@ -138,6 +139,22 @@ python3 scripts/decode-vpnkey.py --schema Secrets/my.vpnkey
 
 `Secrets/`, `*.vpnkey`, `*.ovpn` — в `.gitignore`. Реальные ключи не коммитятся
 и не попадают в код/тесты (тесты синтезируют ключи сами).
+
+## Дизайн «Печка»
+
+Мультяшная дизайн-система в духе советских мультфильмов 60-х: вместо замков,
+ключей и щитов — изба, русская печь, ушат с тестом и колобок. Источник правды —
+холст Design «Печка — мультяшный OVoC Client» (экраны, цвета, шрифты, голос,
+компоненты, иконки, движение, иконка приложения).
+
+- `App/Pechka.swift` — цвета, шрифты, кнопки, плашки, карточки, край панели;
+  `App/PechkaIcons.swift` — иконки (те же SVG-пути, что на холсте).
+- Сцена главного экрана — `App/Scene/scene.html` в `WKWebView` (`App/SceneView.swift`):
+  SVG + CSS-анимации, собранные `make scene` из `scripts/pechka/scene.mjs` —
+  того же кода, что рисует холст. «ПЫХ!» проигрывается при переходе в «Подключено».
+- Голос: шутка — только в заголовке («Испеклось!»), статус в плашке — прямо
+  («VPN включён»), кнопки — глаголом.
+- Шрифты Marmelad, Rubik, PT Mono — `App/Fonts` (Google Fonts, лицензия OFL, тексты рядом).
 
 ## Лицензионная заметка
 

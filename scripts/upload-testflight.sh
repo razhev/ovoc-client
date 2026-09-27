@@ -115,6 +115,16 @@ echo "  в архиве: ${ARCHIVED_VERSION} (${ARCHIVED_BUILD}), ITSAppUsesNonE
 if find "$ARCHIVE/Products" \( -name "*.vpnkey" -o -name "*.ovpn" \) | grep -q .; then
     fail "в архиве лежит файл ключа" 5
 fi
+# Ссылки «О приложении»: для внутреннего тестирования можно без них, для внешних
+# тестеров — нужны (исходники по GPL, политика конфиденциальности).
+for key in OVoCSourceCodeURL OVoCPrivacyPolicyURL; do
+    value="$(/usr/libexec/PlistBuddy -c "Print :${key}" "$APP_PLIST" 2>/dev/null || true)"
+    if [[ -z "$value" ]]; then
+        echo "  ⚠ ${key} пустой — для внутреннего тестирования можно; перед внешней группой задайте его в project.yml (docs/TESTFLIGHT.md, «Первая загрузка»)."
+    else
+        echo "  ${key}: ${value}"
+    fi
+done
 
 # ── 5. Экспорт + загрузка ──
 echo "Загрузка в App Store Connect… (полный лог: ${EXPORT_LOG#"$ROOT"/})"

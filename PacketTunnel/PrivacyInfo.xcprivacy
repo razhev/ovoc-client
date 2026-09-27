@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Privacy manifest расширения PacketTunnel. Трекинга нет, данные не собираются.
+  Required reason API в бинаре расширения не найдено (сканирование Release,
+  2026-09-27): RingLogger читает только размер файла. stat/fstat и
+  mach_absolute_time вызывает OpenVPNAdapter.framework — они объявлены в его
+  манифесте и в манифесте приложения.
+-->
+<plist version="1.0">
+<dict>
+	<key>NSPrivacyTracking</key>
+	<false/>
+	<key>NSPrivacyTrackingDomains</key>
+	<array/>
+	<key>NSPrivacyCollectedDataTypes</key>
+	<array/>
+	<key>NSPrivacyAccessedAPITypes</key>
+	<array/>
+</dict>
+</plist>

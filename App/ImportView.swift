@@ -30,6 +30,9 @@ struct ImportView: View {
                         .frame(maxWidth: .infinity)
                         .padding(.top, 4)
 
+                    // Правило App Store 5.4: до первого использования VPN — какие данные и зачем.
+                    DataNoticeCard()
+
                     Text("Ключ")
                         .font(.pkText(15, .semibold, relativeTo: .subheadline))
                         .foregroundStyle(Pk.zola)
@@ -114,6 +117,17 @@ struct ImportView: View {
                     if !tunnel.hasRealConfig {
                         footnote(Text("Дальше iOS спросит: «\(Bundle.main.displayName) хочет добавить конфигурации VPN». Нажмите «Разрешить» и введите код-пароль — без этого разрешения приложение не может включать VPN. Спрашивают один раз."))
                     }
+
+                    NavigationLink {
+                        AboutView()
+                    } label: {
+                        Label { Text("О приложении и лицензиях") } icon: { PkIconView(icon: .pechka, size: 18) }
+                            .font(.pkText(14, .medium, relativeTo: .footnote))
+                            .foregroundStyle(Pk.izrazets)
+                    }
+                    .padding(.horizontal, 4)
+                    .padding(.top, 4)
+                    .disabled(importing)
                 }
                 .padding(.horizontal, 20)
                 .padding(.bottom, 24)

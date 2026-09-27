@@ -6,6 +6,10 @@ set -euo pipefail
 #   1. в коде нет DEBUG-моста (`make push-key`, `make connect/disconnect/dummy`);
 #   2. в бандле нет ни одного файла ключа и ни одной строки vpn://… — клиент
 #      раздаётся пустым, ключ каждый добавляет сам на экране импорта.
+#   3. privacy manifest (PrivacyInfo.xcprivacy) есть у приложения, расширения и
+#      фреймворка и читается как plist — без них App Store Connect отвергает загрузку
+#      (ITMS-91053);
+#   4. в бандле лежат тексты лицензий для экрана «О приложении» (GPL/AGPL-компоненты).
 # Контроль самой проверки: те же метки ОБЯЗАНЫ находиться в Debug-сборке, иначе
 # «в Release не найдено» ничего бы не доказывало. Поэтому собираются обе
 # конфигурации — из одних и тех же исходников, в отдельный каталог.
@@ -94,6 +98,39 @@ if [[ -z "$KEY_STRINGS" ]]; then
 else
     echo "FAIL строка vpn://<ключ> найдена в файлах:"
     echo "$KEY_STRINGS" | sed 's/^/    /'
+    FAILED=1
+fi
+
+# Privacy manifest у каждого исполняемого бандла.
+MANIFEST_PROBLEMS=""
+for bundle in "" "PlugIns/PacketTunnel.appex/" "Frameworks/OpenVPNAdapter.framework/"; do
+    manifest="${APP}/${bundle}PrivacyInfo.xcprivacy"
+    if [[ ! -f "$manifest" ]]; then
+        MANIFEST_PROBLEMS="${MANIFEST_PROBLEMS}    нет ${bundle}PrivacyInfo.xcprivacy"$'\n'
+    elif ! plutil -lint -s "$manifest"; then
+        MANIFEST_PROBLEMS="${MANIFEST_PROBLEMS}    не plist: ${bundle}PrivacyInfo.xcprivacy"$'\n'
+    fi
+done
+if [[ -z "$MANIFEST_PROBLEMS" ]]; then
+    echo "PASS privacy manifest: приложение, расширение и фреймворк"
+else
+    echo "FAIL privacy manifest:"
+    printf '%s' "$MANIFEST_PROBLEMS"
+    echo "    фреймворк — make framework-manifest; расширение сразу после добавления файла —"
+    echo "    пересобрать начисто: rm -rf ${DERIVED} && make release-check"
+    FAILED=1
+fi
+
+# Тексты лицензий для экрана «О приложении» (App/Licenses + OFL шрифтов).
+LICENSES="OVoCClient-GPL-3.0 OpenVPNAdapter-AGPL-3.0 OpenVPNAdapter-NOTICE OpenVPN3-LICENSE Go-LICENSE Cloak-Go-modules OFL-marmelad OFL-rubik OFL-ptmono"
+MISSING_LICENSES=""
+for name in $LICENSES; do
+    [[ -s "${APP}/${name}.txt" ]] || MISSING_LICENSES="${MISSING_LICENSES} ${name}.txt"
+done
+if [[ -z "$MISSING_LICENSES" ]]; then
+    echo "PASS лицензии: $(echo $LICENSES | wc -w | tr -d ' ') текстов в бандле"
+else
+    echo "FAIL в бандле нет текстов лицензий:${MISSING_LICENSES}"
     FAILED=1
 fi
 

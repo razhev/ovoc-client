@@ -85,9 +85,19 @@ targets:
           - PTMono-Regular.ttf
         UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
         UIRequiresFullScreen: true
-        # Стандартная криптография (TLS/AES) — экспортное исключение;
-        # без этого флага каждая загрузка в TestFlight задаёт вопрос про шифрование.
+        # Экспорт шифрования. У нас свои реализации стандартных алгоритмов (OpenVPN3/mbed TLS,
+        # Go-крипто Cloak), а не только системные. По таблице Apple («Export compliance
+        # documentation for encryption») для стандартных алгоритмов нужна только французская
+        # декларация — и только при раздаче в App Store во Франции. TestFlight — не App Store,
+        # значит документы не нужны, и Apple велит отметить это здесь (NO = «освобождено от
+        # документов»); без флага каждая загрузка задаёт вопрос про шифрование. Проверено 2026-09-27.
         ITSAppUsesNonExemptEncryption: false
+        # Ссылки для экрана «О приложении» и карточки о данных на экране импорта.
+        # Пустая строка — ссылка не показывается (вместо исходников — «по запросу у
+        # разработчика»). Заполнить, когда исходники и политика опубликованы:
+        # docs/TESTFLIGHT.md, «Первая загрузка», шаги 7–8.
+        OVoCSourceCodeURL: ""
+        OVoCPrivacyPolicyURL: ""
     scheme:
       testTargets: []
 

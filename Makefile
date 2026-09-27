@@ -3,7 +3,7 @@
 PROJECT := OVoCClient.xcodeproj
 SCHEME  := OVoCClient
 
-.PHONY: scene gen build test framework fetch verify devices ddi install push-key connect disconnect dummy release-check strings-check icon testflight logs crashlogs clean
+.PHONY: scene gen build test framework framework-manifest fetch verify devices ddi install push-key connect disconnect dummy release-check strings-check icon testflight logs crashlogs clean
 
 ## Сгенерировать OVoCClient.xcodeproj из project.yml
 gen:
@@ -23,6 +23,10 @@ test:
 ## (patches/openvpn3-aead-auth-tag.patch). ОСНОВНОЙ способ получить фреймворк.
 framework:
 	./scripts/build-framework-source.sh
+
+## Положить privacy manifest в уже собранный фреймворк (make framework делает это сам)
+framework-manifest:
+	./scripts/framework-privacy-manifest.sh
 
 ## Скачать ГОТОВЫЙ фреймворк v1.0.42. НЕ для работы: в нём дефект метки GCM, VPN с ним
 ## не передаёт ни одного пакета (см. docs/DEVICE-TESTING.md). Оставлено для сравнения.

@@ -80,5 +80,6 @@ fi
 rm -rf "$DEST/OpenVPNAdapter.framework"
 mkdir -p "$DEST"
 cp -R "$FW_PATH" "$DEST/"
+"$ROOT/scripts/framework-privacy-manifest.sh"   # своего манифеста у фреймворка нет
 echo "OK: ${DEST#"$ROOT"/}/OpenVPNAdapter.framework (из исходников, с исправлением метки GCM)"
 echo "Дальше обязательно: make verify"

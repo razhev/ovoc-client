@@ -12,6 +12,8 @@
 - **[docs/IMPLEMENTATION.md](docs/IMPLEMENTATION.md)** — детальный план имплементации по шагам (Фаза 0 → M6), тест-стратегия, план коммитов, открытые вопросы.
 - **[docs/DEVICE-TESTING.md](docs/DEVICE-TESTING.md)** — инструкция по тестированию на iPhone: подготовка аккаунта и телефона, чек-лист первого запуска, каналы отладки, таблица «симптом → что делать».
 - **[docs/TESTFLIGHT.md](docs/TESTFLIGHT.md)** — раздача через TestFlight по шагам: запись приложения и API-ключ в App Store Connect, `make testflight`, внешняя группа с публичной ссылкой, текст для Beta App Review, сообщение родственникам, памятка «90 дней».
+- **[THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md)** — лицензия приложения (GPL-3.0) и сторонних компонентов; тексты — в `App/Licenses`, в приложении — экран «О приложении».
+- **[PRIVACY.md](PRIVACY.md)** — политика конфиденциальности (ru + en) — её URL нужен для внешнего тестирования в TestFlight.
 - **[docs/FRAMEWORK-API.md](docs/FRAMEWORK-API.md)** — зафиксированный API `OpenVPNAdapter.framework`, выписанный из реальных заголовков. По нему пишется код провайдера.
 - **[IMPLEMENTATION_PROMPT.md](IMPLEMENTATION_PROMPT.md)** — самодостаточный промпт для агента (выжимка исследования).
 
@@ -63,6 +65,17 @@ App ID и App Group, импорт ключа вставкой → «Подклю
 и тексты для ревью/родственников — [docs/TESTFLIGHT.md](docs/TESTFLIGHT.md). Сама загрузка ещё
 не выполнялась: нужны запись приложения и API-ключ в App Store Connect (шаг 6.1, делается руками).
 
+**Подготовка к первой загрузке 2026-09-27**:
+- privacy manifest у приложения, расширения и фреймворка — без него App Store Connect отвергает загрузку;
+- экран «О приложении» (нажать на название на главном экране): версия, уведомление GPL,
+  исходники, компоненты и полные тексты лицензий;
+- карточка «Что с данными» на экране импорта ключа (правило App Store 5.4);
+- политика [PRIVACY.md](PRIVACY.md) и лицензия [LICENSE](LICENSE);
+- `make release-check` проверяет manifest и лицензии.
+
+Флаг `ITSAppUsesNonExemptEncryption=false` перепроверен по таблице Apple — он верен. Что сделать
+руками, по шагам, — [docs/TESTFLIGHT.md](docs/TESTFLIGHT.md), «Первая загрузка».
+
 **Хвост гейта M3 (2026-09-26)**: закрыта утечка IPv6 — при отсутствии IPv6
 от сервера расширение ставит IPv6-настройки с ULA-адресом и default-маршрутом в туннель, а мост
 отбрасывает такие пакеты (`ipv6=sink(…)` в логе, `ipv6-sunk N` в heartbeat); при смене сети
@@ -81,6 +94,7 @@ make gen        # сгенерировать OVoCClient.xcodeproj из project.y
 make build      # собрать оба таргета БЕЗ подписи — быстрая проверка компиляции
 make test       # юнит-тесты ConfigKit — на Mac, телефон не нужен
 make framework  # собрать OpenVPNAdapter.framework из исходников Amnezia + наш патч (основной способ)
+make framework-manifest # положить privacy manifest в уже собранный фреймворк (make framework делает сам)
 make fetch      # готовый бинарь v1.0.42 — НЕРАБОЧИЙ (дефект метки GCM), только для сравнения
 make verify     # ворота: arm64? символы Cloak? setPTCloak в заголовках?
 
@@ -88,7 +102,7 @@ make devices    # какие iPhone видит Mac и готовы ли они �
 make ddi        # смонтировать на телефон образ разработчика (VPN на Mac выключить)
 make install    # подписанная сборка → установка на подключённый iPhone → запуск
 make push-key   # DEBUG: доставить Secrets/my.vpnkey в приложение тем же кодом, что экран импорта
-make release-check # ворота Release: нет DEBUG-моста, нет файлов ключа в бандле
+make release-check # ворота Release: нет DEBUG-моста и файлов ключа; privacy manifest и лицензии на месте
 make strings-check # каталог строк ru/en сходится с кодом (App/Localizable.xcstrings)
 make icon       # перерисовать иконку 1024×1024 скриптом (scripts/make-app-icon.swift)
 make scene      # пересобрать сцену главного экрана App/Scene/scene.html (нужен Node.js)
@@ -163,7 +177,12 @@ python3 scripts/decode-vpnkey.py --schema Secrets/my.vpnkey
   («VPN включён»), кнопки — глаголом.
 - Шрифты Marmelad, Rubik, PT Mono — `App/Fonts` (Google Fonts, лицензия OFL, тексты рядом).
 
-## Лицензионная заметка
+## Лицензия
 
-Проект линкует `OpenVPNAdapter` / `OpenVPN3` (AGPL-3.0). Для личной раздачи
-через TestFlight обязательств не возникает; исходники предоставляются по запросу.
+OVoC Client распространяется по **GPL-3.0** ([LICENSE](LICENSE)). Внутри — AGPL-3.0-код
+OpenVPNAdapter/OpenVPN3 и GPL-3.0-код Cloak, поэтому любая раздача сборки другим людям — в том
+числе внешним тестерам TestFlight — обязывает дать им доступ к исходникам этой сборки. Компоненты,
+версии и откуда взяты тексты лицензий — [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md); где
+публиковать исходники — [docs/TESTFLIGHT.md](docs/TESTFLIGHT.md), «Исходники и ссылки».
+
+OpenVPN® is a registered trademark of OpenVPN Inc. OVoC Client не связан с Amnezia и OpenVPN Inc.

@@ -17,13 +17,102 @@
 
 ---
 
+## Первая загрузка — что сделать руками, по порядку
+
+В репозитории к первой загрузке всё готово (2026-09-27):
+- privacy manifest у приложения, расширения и фреймворка;
+- тексты лицензий и экран «О приложении» — он открывается нажатием на название на главном экране;
+- карточка «Что с данными» на экране импорта ключа (этого требует правило App Store 5.4);
+- политика конфиденциальности [PRIVACY.md](../PRIVACY.md);
+- новые проверки в `make release-check`.
+
+Флаг `ITSAppUsesNonExemptEncryption=false` оставлен сознательно: по таблице Apple для
+стандартных алгоритмов документы нужны только при раздаче в App Store во Франции (подробно —
+комментарий в `project.yml`).
+
+Дальше — только руками. **Часть 1** — сборка у вас на телефоне через TestFlight (внутреннее
+тестирование, без ревью Apple). **Часть 2** — раздача другим людям.
+
+### Часть 1. Первая сборка у себя (≈ 1 час, из них 5–30 минут — ожидание Apple)
+
+1. **Обновить фреймворк на Mac** — один раз, если он собран до 2026-09-27:
+   `make framework-manifest` → строка `OK: privacy manifest → …`. Затем `make release-check`:
+   все строки `PASS`, в том числе «privacy manifest» и «лицензии».
+2. **Соглашения Apple.** Открыть <https://appstoreconnect.apple.com> под Apple ID аккаунта
+   разработчика.
+   - Если наверху баннер о новом соглашении (Apple Developer Program License Agreement) — открыть
+     и принять. Пока оно не принято, загрузка отказывает.
+   - Договор Paid Apps, налоговые формы и банковский счёт для бесплатного приложения **не нужны**.
+3. **Запись приложения** — шаг 6.1а ниже: Apps → «+» → New App, Bundle ID
+   `com.razhev.ovocclient`, SKU `ovocclient`.
+4. **API-ключ** — шаг 6.1б ниже:
+   - Users and Access → Integrations → Team Keys → «+», роль App Manager;
+   - скачать `.p8` — его можно скачать **только один раз**;
+   - положить файл в `~/.private_keys/`;
+   - Key ID и Issuer ID вписать в `Secrets/asc.env` (или сказать агенту).
+5. **Загрузить сборку**: `make testflight` в Terminal.app — или попросить агента.
+   - Связка ключей может спросить пароль Mac → «Всегда разрешать».
+   - В конце должно быть `Готово: 0.1.0 (1) загружена`.
+   - Два предупреждения `⚠ OVoCSourceCodeURL пустой` и `⚠ OVoCPrivacyPolicyURL пустой` для
+     этой части нормальны.
+6. **Поставить себе.**
+   - Через 5–30 минут: App Store Connect → OVoC Client → вкладка **TestFlight**. Сборка выйдет
+     из «Processing».
+   - **Internal Testing** → «+» → группа, например `Я` → добавить себя → в группе **Builds** →
+     «+» → сборка.
+   - На iPhone: поставить **TestFlight** из App Store → войти тем же Apple ID → OVoC Client →
+     **Install**. Сборка из TestFlight заменит установленную по кабелю (bundle ID тот же). Если
+     профиль VPN пропал — импортировать ключ заново.
+   - **Проверка:**
+     - нажать на название «OVoC Client» вверху главного экрана → «О приложении»: версия, «Что с
+       данными», лицензия, список компонентов (каждый открывает полный текст);
+     - кнопка-ключ → вверху карточка «Что с данными», внизу «О приложении и лицензиях»;
+     - «Подключить» → сайт-определитель показывает IP сервера.
+
+### Часть 2. Раздача другим людям — внешняя группа (≈ 1–2 дня из-за ревью)
+
+7. **Решить, где будут исходники.** Лицензия GPL: каждый, кто получил сборку, должен иметь доступ
+   к её исходному коду. Варианты и команды — раздел «Исходники и ссылки» ниже:
+   - **А.** Новый публичный репозиторий со свежей историей — рекомендуется: в ней нет ваших email
+     и отладочной переписки.
+   - **Б.** Сделать публичным текущий `personal-ios-client` — в истории видны email из коммитов.
+   - **В.** Только для своих — приватный доступ по запросу. Ссылки не публикуются, в приложении
+     остаётся «Исходный код можно получить у разработчика».
+8. **Опубликовать политику конфиденциальности** — текст готов в [PRIVACY.md](../PRIVACY.md).
+   - При вариантах А/Б — ссылка на файл в публичном репозитории.
+   - При варианте В — «секретный» Gist (раздел «Исходники и ссылки»).
+   - Ссылки вписать в `project.yml` (`OVoCSourceCodeURL`, `OVoCPrivacyPolicyURL`) или передать
+     агенту. Поднять номер сборки и снова `make testflight` — предупреждений о пустых ссылках
+     больше не будет.
+9. **Тестовый ключ для ревьюера.**
+   - В AmneziaVPN: сервер → «Поделиться» → протокол OpenVPN over Cloak → **новый пользователь**
+     (например, `appreview`) → формат «Для приложения AmneziaVPN».
+   - Сохранить как `test-key.txt` **вне репозитория**.
+   - Личный ключ ревьюерам не давать. После ревью этого пользователя удалить в Amnezia.
+10. **Проверка в сети только с IPv6** — раздел «Проверка в IPv6-only сети» ниже, с ключом из
+    шага 9. Apple проверяет приложения именно в такой сети. Если не подключается — на ревью не
+    отправлять, прислать агенту `make logs`.
+11. **Внешняя группа и ревью** — шаг 6.3:
+    - Test Information: описание, email для отзывов, **Privacy Policy URL** из шага 8, контакт
+      для ревью;
+    - группа → публичная ссылка → сборка;
+    - заметки для ревью (готовый текст ниже) + вложение `test-key.txt` → **Submit for Review**.
+12. **Ответ Apple** — обычно 1–2 дня.
+    - **«Ready to Test»** — ссылку можно раздавать, шаблон сообщения — шаг 6.4.
+    - **Отказ по «Guideline 5.4 – VPN Apps»** — ответить в Resolution Center (текст ниже) или
+      перейти на внутренних тестеров (до 100 человек, без ревью).
+
+---
+
 ## Предпосылки
 
 - Платный аккаунт Apple Developer одобрен, Team ID вписан в `project.yml` (`DEVELOPMENT_TEAM`).
 - `make install` хотя бы раз проходил: он зарегистрировал на портале App ID
   `com.razhev.ovocclient` и `com.razhev.ovocclient.tunnel` с нужными capability. Без этого
   запись приложения в App Store Connect создать нельзя (bundle ID выбирается из списка портала).
-- `Frameworks/OpenVPNAdapter.framework` собран (`make framework`), `make verify` — 3×PASS.
+- `Frameworks/OpenVPNAdapter.framework` собран (`make framework`), `make verify` — 3×PASS. В
+  фреймворке лежит privacy manifest (`make framework` кладёт его сам; для собранного раньше —
+  `make framework-manifest`).
 - `make release-check` — зелёный. Его `make testflight` прогоняет сам, но лучше знать заранее.
 
 ---
@@ -98,7 +187,8 @@ make testflight
    существует.
 3. Сверяет Team ID в `project.yml` и `Config/ExportOptions.plist`; печатает версию и номер
    сборки; отказывается заливать номер, который уже заливался (`build/testflight/uploads.log`).
-4. **Ворота**: `make release-check` (в бандле нет DEBUG-моста и ни одного файла ключа) и
+4. **Ворота**: `make release-check` (в бандле нет DEBUG-моста и ни одного файла ключа; privacy
+   manifest у приложения, расширения и фреймворка; тексты лицензий на месте) и
    `scripts/check-localization.py` (каталог строк сходится с кодом). Пропустить, если только что
    гоняли: `RELEASE_CHECK=0 make testflight`.
 5. `xcodebuild archive` — Release, `generic/platform=iOS`, автоподпись через API-ключ
@@ -108,7 +198,9 @@ make testflight
    спросить пароль Mac — ответить «Всегда разрешать», иначе сборка висит.
 6. Ворота на архиве: `CFBundleShortVersionString`/`CFBundleVersion` печатаются,
    `ITSAppUsesNonExemptEncryption=false` обязателен (иначе TestFlight задержит сборку вопросом
-   про шифрование), файлов ключа в архиве нет.
+   про шифрование), файлов ключа в архиве нет. Ссылки `OVoCSourceCodeURL` и
+   `OVoCPrivacyPolicyURL` печатаются; пустые — только предупреждение `⚠` (для внутреннего
+   тестирования можно, перед внешней группой — «Первая загрузка», шаги 7–8).
 7. `xcodebuild -exportArchive` с `Config/ExportOptions.plist` (`method: app-store-connect`,
    `destination: upload`) — переподписывает и **загружает** сборку. Лог:
    `build/logs/xcodebuild-export.log`.
@@ -141,6 +233,114 @@ make testflight
 
 ---
 
+## Исходники и ссылки (перед внешней группой)
+
+**Зачем.** OVoC Client распространяется по GPL-3.0 (почему именно так —
+[THIRD_PARTY_LICENSES.md](../THIRD_PARTY_LICENSES.md)). Внешний тестер получает сборку, значит,
+должен иметь доступ к её исходникам. Кроме того, TestFlight просит URL политики
+конфиденциальности. Публикуете вы сами (или агент по вашему прямому слову): это публичное действие
+под вашим именем.
+
+### Вариант А — новый публичный репозиторий со свежей историей (рекомендуется)
+
+В нём один коммит с текущим кодом: без личных email из истории и без отладочной переписки. Имя
+репозитория — любое, ниже `ovoc-client`.
+
+```bash
+# 0. посмотреть, что уйдёт в публикацию (секреты и ключи в git не попадают — .gitignore)
+git ls-files | less
+
+# 1. снимок текущего коммита во временную папку
+SNAP="$(mktemp -d)"
+git archive --format=tar HEAD | tar -x -C "$SNAP"
+
+# 2. новая история от имени, за которым GitHub прячет почту (noreply-адрес)
+cd "$SNAP"
+git init -q -b main
+EMAIL="$(gh api user --jq '"\(.id)+\(.login)@users.noreply.github.com"')"
+git add -A
+git -c user.name="razhev" -c user.email="$EMAIL" commit -q -m "OVoC Client 0.1.0 (1)"
+
+# 3. публичный репозиторий
+gh repo create razhev/ovoc-client --public --source . --push \
+  --description "iOS client for self-hosted OpenVPN over Cloak servers (GPL-3.0)"
+```
+
+Ссылки: исходники — `https://github.com/razhev/ovoc-client`, политика —
+`https://github.com/razhev/ovoc-client/blob/main/PRIVACY.md`. Для каждой следующей раздаваемой
+версии в этот репозиторий добавляется новый коммит с тем же содержимым — попросите агента, он
+сделает снимок тем же способом.
+
+### Вариант Б — открыть текущий репозиторий
+
+```bash
+gh repo edit razhev/personal-ios-client --visibility public --accept-visibility-change-consequences
+```
+
+Ссылки: `https://github.com/razhev/personal-ios-client` и
+`https://github.com/razhev/personal-ios-client/blob/main/PRIVACY.md`. В истории будут видны email
+из коммитов (gmail и yandex) и вся отладка. Реальных ключей и IP сервера в истории нет
+(проверено 2026-09-26).
+
+### Вариант В — только для своих
+
+Ссылка на исходники не публикуется. Кто попросит — даёте доступ к приватному репозиторию (GitHub →
+репозиторий → Settings → Collaborators) или архив исходников. Политика конфиденциальности всё
+равно нужна по URL:
+
+1. <https://gist.github.com> → имя файла `PRIVACY.md` → вставить текст из
+   [PRIVACY.md](../PRIVACY.md) → **Create secret gist**.
+2. Скопировать адрес страницы. «Секретный» gist не находится поиском, но открывается по ссылке
+   без входа.
+
+`OVoCSourceCodeURL` остаётся пустым, в `OVoCPrivacyPolicyURL` — адрес gist.
+
+### Вписать ссылки в сборку
+
+`project.yml`, таргет `OVoCClient` → `info` → `properties`:
+
+```yaml
+        OVoCSourceCodeURL: "https://github.com/razhev/ovoc-client"
+        OVoCPrivacyPolicyURL: "https://github.com/razhev/ovoc-client/blob/main/PRIVACY.md"
+```
+
+Дальше поднять `CURRENT_PROJECT_VERSION` (см. «Номер сборки» выше), закоммитить,
+`make testflight`. В приложении ссылки появятся на экране «О приложении» и в карточке «Что с
+данными».
+
+---
+
+## Проверка в IPv6-only сети (NAT64)
+
+**Зачем.** Apple проверяет приложения в сети, где есть только IPv6 (правило 2.5.5). А наш путь до
+сервера рассчитан на IPv4:
+- адрес сервера в ключе — IPv4;
+- исключение маршрута — `/32`;
+- для IPv6 расширение ставит «раковину» с маршрутом по умолчанию в туннель.
+
+Как Cloak поведёт себя в такой сети, заранее неизвестно — лучше увидеть самим, чем получить отказ
+ревью.
+
+**Нужно:** Mac с проводным интернетом (Ethernet или USB-C-адаптер) — Mac раздаёт его по Wi-Fi.
+Если провода нет, проверку пропустить и помнить о возможном отказе по 2.5.5.
+
+1. Выключить VPN на Mac: с kill switch раздача не заработает.
+2. Системные настройки → Основные → Общий доступ → «Общий интернет» → (i):
+   - «Общее подключение» — Ethernet (или адаптер);
+   - «Для устройств, использующих» — Wi-Fi.
+3. **Зажать Option** — в том же окне должен появиться флажок «Создать сеть NAT64». Включить его,
+   затем включить «Общий интернет».
+4. iPhone: Настройки → Wi-Fi → сеть Mac. В Safari открыть любой сайт — должен открыться (через
+   NAT64).
+5. В OVoC Client из TestFlight: кнопка-ключ → тестовый ключ из шага 9 «Первой загрузки» →
+   «Подключить». Ожидаем «VPN включён» и IP сервера на сайте-определителе.
+6. Не подключилось — снять `make logs` (телефон по кабелю) и прислать агенту. Вероятные причины
+   чинятся в коде: Cloak подключается к IPv4-адресу там, где IPv4 нет, или соединение уходит в
+   петлю через синтетический IPv6-адрес сервера.
+7. Вернуть телефон в обычную сеть, импортировать свой ключ обратно, выключить «Общий интернет».
+
+---
+
 ## Шаг 6.3 — Внешняя группа тестеров и публичная ссылка (человек)
 
 Делается после того, как первая сборка прошла Processing (App Store Connect → приложение →
@@ -153,9 +353,8 @@ TestFlight → слева **Test Information**:
 - **Beta App Description** (что тестируем): «Личный VPN-клиент к собственному серверу OpenVPN
   over Cloak. Ключ выдаёт владелец сервера.»
 - **Feedback Email**: ваш адрес.
-- **Privacy Policy URL**: если поле обязательно — ссылка на любую страницу с текстом «Приложение
-  не собирает и не передаёт никаких данных, кроме трафика к вашему собственному VPN-серверу»
-  (подойдёт GitHub Gist или страница репозитория, если он публичный).
+- **Privacy Policy URL**: ссылка из шага 8 «Первой загрузки» (текст — [PRIVACY.md](../PRIVACY.md);
+  публичный репозиторий или «секретный» Gist).
 - **Beta App Review Information**: контакт (имя, телефон, e-mail); **Sign-in required** — нет
   (аккаунтов в приложении нет).
 
@@ -189,20 +388,38 @@ then disconnect.
 **Notes (Beta App Review Information → Notes):**
 
 ```
-OVoC Client is a personal VPN client for a self-hosted OpenVPN over Cloak server
-(AmneziaVPN server-side). It is distributed via TestFlight to the developer's family
-only, is not intended for the App Store, and has no accounts, sign-in, purchases or
-analytics. The app ships empty: the user pastes a "vpn://..." key issued by the server
-owner on the "Add key" screen, then taps "Connect". The first connection triggers the
-standard iOS "Would Like to Add VPN Configurations" prompt — please tap Allow.
+OVoC Client is a VPN client for self-hosted OpenVPN over Cloak servers (AmneziaVPN
+server-side). It offers no VPN service of its own: no servers, accounts, sign-in,
+purchases, ads or analytics, and it collects no user data (see the "Your Data" card
+on the key import screen and the privacy policy). It is distributed via TestFlight
+to a small group of testers.
 
-A working test key is attached (test-key.txt). Steps: open the app → "Add key" →
-paste the key → "Import" → Allow → "Connect". The status should change to "Connected"
-and the VPN icon should appear in the status bar. Logs are available on the "Logs"
-screen. The key belongs to a dedicated test client and will be revoked after review.
+The app ships empty: the user pastes a "vpn://..." key issued by the server owner on
+the "Add Key" screen, then taps "Connect". The first import triggers the standard iOS
+"Would Like to Add VPN Configurations" prompt — please tap Allow.
 
-The app uses only standard TLS/AES cryptography (ITSAppUsesNonExemptEncryption = NO).
+A working test key is attached (test-key.txt). Steps: open the app → "Add Key" →
+"Paste" → "Import" → Allow → "Connect". The status should change to "VPN is on" and
+the VPN icon should appear in the status bar. Logs are on the "Logs" screen; licenses
+and the data notice are under "About" (tap the app name at the top of the main
+screen). The key belongs to a dedicated test client and will be revoked after review.
 ```
+
+Слова «not intended for the App Store» из текста убраны сознательно. Правило 2.2: сборки для
+TestFlight должны быть рассчитаны на публичное распространение, и такая фраза даёт повод отказать.
+
+**Ответ в Resolution Center при отказе по «Guideline 5.4 – VPN Apps»** (аккаунт у нас Individual,
+а правило 5.4 допускает VPN-приложения только от организаций — повод к отказу возможен):
+
+```
+Thank you for the review. OVoC Client does not offer a VPN service: it has no servers,
+accounts or purchases, and it collects no user data. It is a client for a server that
+the user runs themselves — the same model as the WireGuard or OpenVPN Connect clients —
+distributed via TestFlight to a small group of testers. Could you please reconsider
+this build for TestFlight testing?
+```
+
+Если отказ повторили — не спорить, перейти на внутренних тестеров (ниже).
 
 Файл `test-key.txt` — строка `vpn://…` тестового клиента (в репозиторий не класть; `*.vpnkey`
 и `Secrets/` в `.gitignore`).
@@ -275,7 +492,10 @@ The app uses only standard TLS/AES cryptography (ITSAppUsesNonExemptEncryption =
 | `FAIL: нет файла ключа ~/.private_keys/AuthKey_….p8` | `.p8` не скачан / лежит не там / Key ID с опечаткой | шаг 6.1б, п. 4–5; проверить `ls ~/.private_keys` |
 | `FAIL: Team ID расходится` | правили `DEVELOPMENT_TEAM` в `project.yml`, а `Config/ExportOptions.plist` — нет | вписать тот же Team ID в plist |
 | `FAIL: сборка … уже загружалась` | номер сборки не поднят | «Номер сборки» выше |
-| `FAIL: make release-check не прошёл` | в Release попал DEBUG-мост или файл ключа | `make release-check` — смотреть строки `FAIL` |
+| `FAIL: make release-check не прошёл` | в Release попал DEBUG-мост или файл ключа; нет privacy manifest или текстов лицензий | `make release-check` — смотреть строки `FAIL` |
+| `FAIL privacy manifest` в release-check | фреймворк собран до 2026-09-27; или расширение собрано инкрементально сразу после добавления манифеста | `make framework-manifest`; начисто: `rm -rf build/DerivedData-check && make release-check` |
+| письмо или ошибка `ITMS-91053: Missing API declaration` | в коде появился новый required reason API, не объявленный в манифесте | добавить категорию и причину в `App/PrivacyInfo.xcprivacy` (`PacketTunnel/…`, `Config/OpenVPNAdapter-PrivacyInfo.xcprivacy`) — как в комментариях этих файлов |
+| `⚠ OVoCSourceCodeURL пустой` / `⚠ OVoCPrivacyPolicyURL пустой` | ссылки ещё не заданы | для внутреннего тестирования — ничего; перед внешней группой — «Первая загрузка», шаги 7–8 |
 | archive: «No profiles for 'com.razhev.ovocclient' were found» / «doesn't include the … entitlement» | автоподпись не смогла завести distribution-профиль | проверить, что у API-ключа роль App Manager; на портале у обоих App ID включены Network Extensions и App Groups; повторить |
 | archive: «Cloud signing permission error» / «You don't have permission to create a certificate» | роли ключа не хватает для выпуска distribution-сертификата | создать новый ключ с ролью **Admin**, вписать в `Secrets/asc.env` |
 | archive висит на CodeSign | ждёт диалог Связки ключей | пароль Mac → «Всегда разрешать»; запускать из Terminal.app, не из песочницы |
@@ -285,6 +505,7 @@ The app uses only standard TLS/AES cryptography (ITSAppUsesNonExemptEncryption =
 | export: «The bundle … cannot be uploaded: no app record» | шаг 6.1а не сделан или bundle ID в записи другой | App Store Connect → Apps: запись с `com.razhev.ovocclient` |
 | export: `ITMS-90424` / «Invalid Swift Support» и прочие ITMS-9xxx | несовпадение версий приложения и расширения, битый фреймворк | `make verify`; версии в `project.yml` общие для обоих таргетов — проверить, что `PacketTunnel/Info.plist` не правили руками |
 | сборка в TestFlight «Processing» дольше часа | обычная задержка Apple | подождать; письмо придёт |
-| ревью отклонено «Guideline 5.4 – VPN Apps» | ревьюер решил, что это App Store-публикация | ответить в Resolution Center: TestFlight only, personal server, см. заметки; либо внутренние тестеры |
+| ревью отклонено «Guideline 5.4 – VPN Apps» | аккаунт Individual, а правило 5.4 допускает VPN-приложения только от организаций | ответить в Resolution Center — готовый текст в шаге 6.3; при повторном отказе — внутренние тестеры |
+| ревью отклонено по 2.1 / 2.5.5 («не удалось подключиться», IPv6) | ревьюер в сети только с IPv6, а путь до сервера рассчитан на IPv4 | раздел «Проверка в IPv6-only сети»; `make logs` агенту — чинится в коде |
 | родственник: «Beta has expired» | прошло 90 дней | поднять номер сборки → `make testflight` |
 | родственник: ссылка «This beta isn't accepting any new testers» | исчерпан лимит публичной ссылки | увеличить лимит в группе |

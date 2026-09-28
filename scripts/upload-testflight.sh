@@ -140,7 +140,9 @@ fi
 # тестеров — нужны (исходники по GPL, политика конфиденциальности).
 for key in OVoCSourceCodeURL OVoCPrivacyPolicyURL; do
     value="$(/usr/libexec/PlistBuddy -c "Print :${key}" "$APP_PLIST" 2>/dev/null || true)"
-    if [[ -z "$value" ]]; then
+    if [[ -z "$value" && "$key" == "OVoCSourceCodeURL" ]]; then
+        echo "  ℹ ${key} пустой — в приложении «исходный код по запросу у разработчика» (вариант В, docs/TESTFLIGHT.md, «Исходники и ссылки»)."
+    elif [[ -z "$value" ]]; then
         echo "  ⚠ ${key} пустой — для внутреннего тестирования можно; перед внешней группой задайте его в project.yml (docs/TESTFLIGHT.md, «Первая загрузка»)."
     else
         echo "  ${key}: ${value}"

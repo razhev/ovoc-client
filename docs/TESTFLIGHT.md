@@ -67,7 +67,14 @@ Apple: годна для внутреннего тестирования, дей
      из «Processing».
    - **Internal Testing** → «+» → группа, например `Я` → добавить себя → в группе **Builds** →
      «+» → сборка.
-   - На iPhone: поставить **TestFlight** из App Store → войти тем же Apple ID → OVoC Client →
+   - Тестер получает письмо от TestFlight. Само приложение в TestFlight на телефоне не
+     появляется — только после «View in TestFlight» → **Accept** в этом письме (или **Redeem**
+     с кодом из письма, если на iPhone другой Apple ID).
+   - **Если письма нет, а у тестера статус «No Builds Available»**, ждать бесполезно. Письмо
+     уходит, только если в группе уже была готовая сборка, когда туда добавили тестера. Так было
+     при первой загрузке 2026-09-28. Исправить: TestFlight → слева Testers → **All** → галочка у
+     тестера → **Reinvite**.
+   - На iPhone: поставить **TestFlight** из App Store → письмо → **Accept** → OVoC Client →
      **Install**. Сборка из TestFlight заменит установленную по кабелю (bundle ID тот же). Если
      профиль VPN пропал — импортировать ключ заново.
    - **Проверка:**
@@ -461,15 +468,26 @@ this build for TestFlight testing?
 
 ### Запасной вариант: внутренние тестеры (если ревью буксует)
 
-Внутренним тестерам ревью не нужно вообще, сборка доступна сразу после Processing. Цена —
-каждого тестера надо добавить в команду по Apple ID:
+Внутренним тестерам ревью не нужно вообще: сборка доступна сразу после Processing. Цена — каждого
+тестера надо сделать пользователем вашего App Store Connect (у аккаунта Individual — до 50
+пользователей, у них доступ только к App Store Connect, не к сертификатам):
 
-1. App Store Connect → **Users and Access** → **«+»** → имя, фамилия, e-mail Apple ID
-   родственника, роль **Customer Support** (минимальная) → **Invite**. Родственник принимает
-   приглашение по письму.
-2. TestFlight → **Internal Testing** → **«+»** → группа, например `Семья (внутр.)` → добавить
-   пользователей → включить **Enable automatic distribution** (новые сборки уходят сами).
-3. Родственник получает письмо со ссылкой; дальше — как по публичной ссылке.
+1. App Store Connect → **Users and Access** (<https://appstoreconnect.apple.com/access/users>) →
+   **«+»**:
+   - имя, фамилия, e-mail человека;
+   - роль **Marketing**. Внутренними тестерами Apple разрешает быть только ролям Account Holder,
+     Admin, App Manager, Developer и Marketing; Marketing — самая узкая из них. Customer Support
+     **не подходит**;
+   - **Apps**: только OVoC Client;
+   - **Invite**.
+2. Человек получает письмо от App Store Connect, принимает приглашение и входит своим Apple ID
+   (если на этот адрес Apple ID нет — заводит его).
+3. **После** принятия: TestFlight → **Internal Testing Group** (или своя группа, например
+   `Семья (внутр.)` с **Enable automatic distribution**) → **Testers** → **«+»** → отметить
+   человека → **Add**. Сборка в группе уже есть, так что письмо от TestFlight уходит сразу; если
+   статус «No Builds Available» — Testers → All → **Reinvite**.
+4. Человек открывает письмо на iPhone (iOS 16+) → **View in TestFlight** → **Accept** →
+   **Install**. Ключ — его личный, отдельным сообщением (шаг 6.4).
 
 Лимит — 100 внутренних тестеров. Оба варианта можно держать одновременно.
 

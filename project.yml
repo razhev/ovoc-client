@@ -27,7 +27,7 @@ settings:
     # Team ID платной команды (developer.apple.com → Membership). Не секрет:
     # он и так зашит в каждую подписанную сборку.
     DEVELOPMENT_TEAM: "222A4867MA"
-    CURRENT_PROJECT_VERSION: "1"
+    CURRENT_PROJECT_VERSION: "2"
     MARKETING_VERSION: "0.1.0"
 
 packages:
@@ -97,7 +97,7 @@ targets:
         # разработчика»). Заполнить, когда исходники и политика опубликованы:
         # docs/TESTFLIGHT.md, «Первая загрузка», шаги 7–8.
         OVoCSourceCodeURL: ""
-        OVoCPrivacyPolicyURL: ""
+        OVoCPrivacyPolicyURL: "https://gist.github.com/razhev/f7d26b50c314d2fb5f441bd496113c8b"
     scheme:
       testTargets: []
 

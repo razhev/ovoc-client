@@ -43,10 +43,12 @@
    - Если наверху баннер о новом соглашении (Apple Developer Program License Agreement) — открыть
      и принять. Пока оно не принято, загрузка отказывает.
    - Договор Paid Apps, налоговые формы и банковский счёт для бесплатного приложения **не нужны**.
-3. **Запись приложения** — шаг 6.1а ниже: Apps → «+» → New App, Bundle ID
-   `com.razhev.ovocclient`, SKU `ovocclient`.
-4. **API-ключ** — шаг 6.1б ниже:
-   - Users and Access → Integrations → Team Keys → «+», роль App Manager;
+3. **Запись приложения** — шаг 6.1а ниже: Apps → «+» → New App, SKU `ovocclient`. В списке
+   **Bundle ID** нужная строка называется `XC com razhev ovocclient - com.razhev.ovocclient`.
+   Регистрировать Bundle ID руками не нужно: его уже завёл `make install`.
+4. **API-ключ** — шаг 6.1б ниже. Это **не** внутри страницы приложения, а в общем разделе
+   «Users and Access» — прямая ссылка: <https://appstoreconnect.apple.com/access/integrations/api>.
+   - вкладка Integrations → Team Keys → «Generate API Key» (или «+»), роль App Manager;
    - скачать `.p8` — его можно скачать **только один раз**;
    - положить файл в `~/.private_keys/`;
    - Key ID и Issuer ID вписать в `Secrets/asc.env` (или сказать агенту).
@@ -128,21 +130,39 @@
      приложений Apple — если занято, добавить что-нибудь: `OVoC Client (razhev)`; на телефоне
      всё равно показывается `CFBundleDisplayName` из `project.yml`).
    - **Primary Language**: Russian.
-   - **Bundle ID**: выбрать из списка `com.razhev.ovocclient` (если в списке нет — см.
-     предпосылки: `make install` не запускался или упал до регистрации App ID).
+   - **Bundle ID**: выбрать из списка строку `XC com razhev ovocclient - com.razhev.ovocclient`.
+     - Приставку `XC` и имя с пробелами дал Xcode, когда `make install` сам регистрировал этот
+       идентификатор. Важна правая часть — `com.razhev.ovocclient`.
+     - Регистрировать Bundle ID руками на портале не нужно. Портал ответит, что такой
+       идентификатор недоступен, — именно потому, что он уже зарегистрирован у вас.
+     - Не выбирать `XC Wildcard - *` и строку расширения `…ovocclient.tunnel`. Не вписывать
+       другой идентификатор (например, `com.razhev`): загрузка не найдёт запись приложения.
+     - Если нужной строки в списке нет — см. предпосылки: `make install` не запускался или упал
+       до регистрации App ID.
    - **SKU**: любая строка без пробелов, например `ovocclient`.
    - **User Access**: Full Access.
 3. **Create**. Bundle ID после первой загрузки сборки уже не меняется.
 
+**Если запись создана не с тем Bundle ID.** Пока не загружена ни одна сборка, его можно
+поменять: приложение → вкладка **Distribution** → слева **General → App Information** → блок
+**General Information** → список **Bundle ID** → `XC com razhev ovocclient -
+com.razhev.ovocclient` → **Save**. Лишний идентификатор, заведённый руками, можно удалить на
+<https://developer.apple.com/account/resources/identifiers/list> — или оставить, он ничему не
+мешает.
+
 Больше на этом экране ничего заполнять не нужно: скриншоты, описание для App Store, цена —
-это для публикации, а не для TestFlight.
+это для публикации, а не для TestFlight. Страница «iOS App Version 1.0» с кнопкой **Add for
+Review** — тоже про App Store: её не трогать. Всё, что нужно для TestFlight, — на вкладке
+**TestFlight**.
 
 ### б) API-ключ App Store Connect
 
 Ключ нужен, чтобы `xcodebuild` заливал сборку без пароля Apple ID и двухфакторного кода.
 
-1. App Store Connect → **Users and Access** → вкладка **Integrations** → **App Store Connect API**
-   → **Team Keys**.
+1. Открыть <https://appstoreconnect.apple.com/access/integrations/api>. Это общий раздел
+   App Store Connect, а не страница приложения: со страницы приложения туда ведёт логотип
+   «App Store Connect» в самом верху (на главную) → **Users and Access** → вкладка
+   **Integrations** → слева **App Store Connect API** → **Team Keys**.
 2. Если видна кнопка **Request Access** — нажать и подтвердить (это делает Account Holder,
    один раз; для личного аккаунта Account Holder — вы).
 3. **Generate API Key** (или «+»):
@@ -502,7 +522,7 @@ this build for TestFlight testing?
 | export: `ITMS-90189` / «Redundant Binary Upload» | такая пара версия+сборка уже есть в App Store Connect | поднять `CURRENT_PROJECT_VERSION` |
 | export: `ITMS-90062` / «CFBundleShortVersionString … must be greater» | версия ниже, чем уже загруженная | поднять `MARKETING_VERSION` |
 | export: «Missing Compliance» / вопрос про шифрование в App Store Connect | в Info.plist нет `ITSAppUsesNonExemptEncryption` | скрипт это проверяет; в `project.yml` флаг есть — пересобрать `make gen` |
-| export: «The bundle … cannot be uploaded: no app record» | шаг 6.1а не сделан или bundle ID в записи другой | App Store Connect → Apps: запись с `com.razhev.ovocclient` |
+| export: «The bundle … cannot be uploaded: no app record» / «No suitable application records were found» | шаг 6.1а не сделан или bundle ID в записи другой | поменять Bundle ID записи на `com.razhev.ovocclient` — шаг 6.1а, «Если запись создана не с тем Bundle ID» |
 | export: `ITMS-90424` / «Invalid Swift Support» и прочие ITMS-9xxx | несовпадение версий приложения и расширения, битый фреймворк | `make verify`; версии в `project.yml` общие для обоих таргетов — проверить, что `PacketTunnel/Info.plist` не правили руками |
 | сборка в TestFlight «Processing» дольше часа | обычная задержка Apple | подождать; письмо придёт |
 | ревью отклонено «Guideline 5.4 – VPN Apps» | аккаунт Individual, а правило 5.4 допускает VPN-приложения только от организаций | ответить в Resolution Center — готовый текст в шаге 6.3; при повторном отказе — внутренние тестеры |

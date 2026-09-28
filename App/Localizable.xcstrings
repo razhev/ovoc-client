@@ -45,6 +45,28 @@
         }
       }
     },
+    "OVoC Client — свободная программа: её можно распространять и изменять на условиях GNU General Public License версии 3. Программа поставляется без каких-либо гарантий. Тексты лицензий — ниже.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "OVoC Client is free software: you can redistribute and modify it under the terms of the GNU General Public License, version 3. It comes with absolutely no warranty. The license texts are below."
+          }
+        }
+      }
+    },
+    "OpenVPN для iOS, форк Amnezia": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "OpenVPN for iOS, Amnezia fork"
+          }
+        }
+      }
+    },
     "VPN включён": {
       "extractionState": "manual",
       "localizations": {
@@ -107,6 +129,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "There is no Amnezia key in this text: a key starts with vpn://"
+          }
+        }
+      }
+    },
+    "Версия %@ (сборка %@)": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Version %@ (build %@)"
           }
         }
       }
@@ -232,6 +265,39 @@
         }
       }
     },
+    "Исходный код": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Source Code"
+          }
+        }
+      }
+    },
+    "Исходный код можно получить у разработчика — например, через «Отправить отзыв» в TestFlight.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The source code is available from the developer — for example, via “Send Beta Feedback” in TestFlight."
+          }
+        }
+      }
+    },
+    "Клиент OpenVPN over Cloak для вашего собственного сервера. Своих серверов и VPN-сервиса у приложения нет: подключение идёт только к серверу из ключа, который выдал владелец сервера.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "An OpenVPN over Cloak client for your own server. The app has no servers or VPN service of its own: it connects only to the server from the key issued by the server owner."
+          }
+        }
+      }
+    },
     "Ключ": {
       "extractionState": "manual",
       "localizations": {
@@ -294,6 +360,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "The key was copied incompletely — the end of the string is cut off. Copy the whole key again"
+          }
+        }
+      }
+    },
+    "Компоненты и лицензии": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Components and Licenses"
+          }
+        }
+      }
+    },
+    "Лицензия": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "License"
           }
         }
       }
@@ -386,6 +474,17 @@
         }
       }
     },
+    "Не удалось открыть текст лицензии.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Couldn't open the license text."
+          }
+        }
+      }
+    },
     "Не удалось прочитать файл как текст. В файле должен лежать ключ vpn://…": {
       "extractionState": "manual",
       "localizations": {
@@ -452,6 +551,28 @@
         }
       }
     },
+    "О приложении": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "About"
+          }
+        }
+      }
+    },
+    "О приложении и лицензиях": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "About and Licenses"
+          }
+        }
+      }
+    },
     "Обновить": {
       "extractionState": "manual",
       "localizations": {
@@ -514,6 +635,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Disconnect"
+          }
+        }
+      }
+    },
+    "Открывает «О приложении»": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Opens About"
           }
         }
       }
@@ -639,6 +771,17 @@
         }
       }
     },
+    "Политика конфиденциальности": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Privacy Policy"
+          }
+        }
+      }
+    },
     "Приложение": {
       "extractionState": "manual",
       "localizations": {
@@ -646,6 +789,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "App"
+          }
+        }
+      }
+    },
+    "Приложение не связано с Amnezia и OpenVPN Inc.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The app is not affiliated with Amnezia or OpenVPN Inc."
+          }
+        }
+      }
+    },
+    "Приложение не собирает данные и не передаёт их ни разработчику, ни третьим лицам: нет аналитики, рекламы и учётных записей. Трафик идёт только на сервер из вашего ключа. Ключ хранится в настройках VPN на телефоне, логи — только на телефоне; наружу они уходят, лишь если вы сами нажмёте «Поделиться» на экране «Логи».": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The app collects no data and shares nothing with the developer or third parties: no analytics, ads or accounts. Traffic goes only to the server from your key. The key is kept in the phone's VPN settings and the logs stay on the phone; they leave it only if you tap Share on the Logs screen yourself."
           }
         }
       }
@@ -914,6 +1079,17 @@
         }
       }
     },
+    "Что с данными": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your Data"
+          }
+        }
+      }
+    },
     "Чтобы подключаться к серверу, добавьте ключ vpn://… — его выдаёт владелец сервера.": {
       "extractionState": "manual",
       "localizations": {
@@ -921,6 +1097,83 @@
           "stringUnit": {
             "state": "translated",
             "value": "To connect to the server, add a vpn://… key — the server owner provides it."
+          }
+        }
+      }
+    },
+    "библиотеки внутри фреймворка": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "libraries inside the framework"
+          }
+        }
+      }
+    },
+    "маскировка трафика, форк Amnezia": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "traffic obfuscation, Amnezia fork"
+          }
+        }
+      }
+    },
+    "модули Go в плагине Cloak": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Go modules in the Cloak plugin"
+          }
+        }
+      }
+    },
+    "рантайм плагина Cloak": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "runtime of the Cloak plugin"
+          }
+        }
+      }
+    },
+    "шрифт": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "font"
+          }
+        }
+      }
+    },
+    "этот клиент": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "this client"
+          }
+        }
+      }
+    },
+    "ядро протокола OpenVPN": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "OpenVPN protocol core"
           }
         }
       }

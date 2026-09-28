@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Privacy manifest для OpenVPNAdapter.framework. Фреймворк собирается из исходников
+  Amnezia (make framework), своего манифеста у него нет — scripts/build-framework-source.sh
+  кладёт этот файл в бандл фреймворка как PrivacyInfo.xcprivacy (для уже собранного —
+  make framework-manifest). Проверяет make verify.
+
+  По сканированию бинаря (2026-09-27): stat/fstat — FileTimestamp C617.1 (файлы внутри
+  контейнера приложения); mach_absolute_time — SystemBootTime 35F9.1 (таймеры ядра
+  OpenVPN3 и Go-рантайм Cloak меряют интервалы внутри процесса).
+-->
+<plist version="1.0">
+<dict>
+	<key>NSPrivacyTracking</key>
+	<false/>
+	<key>NSPrivacyTrackingDomains</key>
+	<array/>
+	<key>NSPrivacyCollectedDataTypes</key>
+	<array/>
+	<key>NSPrivacyAccessedAPITypes</key>
+	<array>
+		<dict>
+			<key>NSPrivacyAccessedAPIType</key>
+			<string>NSPrivacyAccessedAPICategoryFileTimestamp</string>
+			<key>NSPrivacyAccessedAPITypeReasons</key>
+			<array>
+				<string>C617.1</string>
+			</array>
+		</dict>
+		<dict>
+			<key>NSPrivacyAccessedAPIType</key>
+			<string>NSPrivacyAccessedAPICategorySystemBootTime</string>
+			<key>NSPrivacyAccessedAPITypeReasons</key>
+			<array>
+				<string>35F9.1</string>
+			</array>
+		</dict>
+	</array>
+</dict>
+</plist>

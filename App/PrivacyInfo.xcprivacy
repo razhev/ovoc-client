@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Privacy manifest приложения OVoC Client (без него App Store Connect отвергает
+  загрузку с ITMS-91053). Трекинга нет, данные не собираются.
+
+  Required reason API — по сканированию бинарей Release (nm/strings, 2026-09-27):
+  • FileTimestamp C617.1 — экран «Логи» и TunnelManager читают даты изменения
+    файлов в App Group (NSFileModificationDate);
+  • встроенный OpenVPNAdapter.framework вызывает stat/fstat (FileTimestamp) и
+    mach_absolute_time (SystemBootTime, 35F9.1 — замер интервалов внутри
+    приложения). У фреймворка свой манифест (Config/OpenVPNAdapter-PrivacyInfo.xcprivacy),
+    здесь те же категории продублированы: фреймворк — часть бандла приложения.
+-->
+<plist version="1.0">
+<dict>
+	<key>NSPrivacyTracking</key>
+	<false/>
+	<key>NSPrivacyTrackingDomains</key>
+	<array/>
+	<key>NSPrivacyCollectedDataTypes</key>
+	<array/>
+	<key>NSPrivacyAccessedAPITypes</key>
+	<array>
+		<dict>
+			<key>NSPrivacyAccessedAPIType</key>
+			<string>NSPrivacyAccessedAPICategoryFileTimestamp</string>
+			<key>NSPrivacyAccessedAPITypeReasons</key>
+			<array>
+				<string>C617.1</string>
+			</array>
+		</dict>
+		<dict>
+			<key>NSPrivacyAccessedAPIType</key>
+			<string>NSPrivacyAccessedAPICategorySystemBootTime</string>
+			<key>NSPrivacyAccessedAPITypeReasons</key>
+			<array>
+				<string>35F9.1</string>
+			</array>
+		</dict>
+	</array>
+</dict>
+</plist>

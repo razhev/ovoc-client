@@ -155,19 +155,25 @@ struct StoveScreen: View {
 
             Spacer()
 
-            Text(verbatim: Bundle.main.displayName)
-                .font(.pkDisplay(17, relativeTo: .headline))
-                .foregroundStyle(Pk.sazha)
-                .padding(.horizontal, 15)
-                .padding(.vertical, 5)
-                .background {
-                    ZStack {
-                        Capsule().fill(Pk.sazha).offset(y: 3)
-                        Capsule().fill(Pk.muka)
-                        Capsule().strokeBorder(Pk.sazha, lineWidth: 2)
+            // Название — вход в «О приложении» (лицензия GPL, данные, компоненты).
+            NavigationLink {
+                AboutView()
+            } label: {
+                Text(verbatim: Bundle.main.displayName)
+                    .font(.pkDisplay(17, relativeTo: .headline))
+                    .foregroundStyle(Pk.sazha)
+                    .padding(.horizontal, 15)
+                    .padding(.vertical, 5)
+                    .background {
+                        ZStack {
+                            Capsule().fill(Pk.sazha).offset(y: 3)
+                            Capsule().fill(Pk.muka)
+                            Capsule().strokeBorder(Pk.sazha, lineWidth: 2)
+                        }
                     }
-                }
-                .accessibilityAddTraits(.isHeader)
+            }
+            .buttonStyle(.plain)
+            .accessibilityHint(Text("Открывает «О приложении»"))
 
             Spacer()
 

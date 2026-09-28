@@ -15,6 +15,13 @@ set -euo pipefail
 # (необязательно ASC_KEY_PATH) либо файл Secrets/asc.env (шаблон —
 # Secrets/asc.env.example). Сам ключ — ~/.private_keys/AuthKey_<Key ID>.p8.
 #
+# Чем подписывать и загружать — ASC_AUTH:
+#   key     (по умолчанию) — API-ключом. Distribution-подпись Apple разрешает только
+#           ключу с ролью Admin; у ключа с ролью App Manager экспорт падает с
+#           «Cloud signing permission error» — тогда скрипт сам повторяет экспорт
+#           через Apple ID из Xcode;
+#   account — Apple ID, добавленным в Xcode → Settings → Accounts. API-ключ не нужен.
+#
 # Перед загрузкой скрипт проверяет окружение и прогоняет ворота:
 # make release-check (нет DEBUG-моста и файлов ключа в бандле) и проверку
 # каталога строк. Пропустить ворота (уже прошли только что): RELEASE_CHECK=0.
@@ -43,20 +50,38 @@ command -v xcodegen >/dev/null  || fail "нет xcodegen — brew install xcodeg
 [[ -d "Frameworks/OpenVPNAdapter.framework" ]] || fail "нет Frameworks/OpenVPNAdapter.framework — сначала make framework && make verify" 2
 [[ -f "$EXPORT_OPTIONS" ]] || fail "нет $EXPORT_OPTIONS" 2
 
-# ── 1. Реквизиты API-ключа App Store Connect ──
+# ── 1. Чем подписывать и загружать: API-ключ или Apple ID из Xcode ──
 if [[ -f "Secrets/asc.env" ]]; then
     # shellcheck disable=SC1091
     set -a; source "Secrets/asc.env"; set +a
 fi
+: "${ASC_AUTH:=key}"
 : "${ASC_KEY_ID:=}"
 : "${ASC_ISSUER_ID:=}"
-[[ -n "$ASC_KEY_ID" && "$ASC_KEY_ID" != "ABC123DEFG" ]] \
-    || fail "не задан ASC_KEY_ID — заполните Secrets/asc.env (шаблон: Secrets/asc.env.example) или экспортируйте переменную" 2
-[[ -n "$ASC_ISSUER_ID" && "$ASC_ISSUER_ID" != 12345678-* ]] \
-    || fail "не задан ASC_ISSUER_ID — заполните Secrets/asc.env или экспортируйте переменную" 2
-KEY_PATH="${ASC_KEY_PATH:-$HOME/.private_keys/AuthKey_${ASC_KEY_ID}.p8}"
-[[ -f "$KEY_PATH" ]] \
-    || fail "нет файла ключа $KEY_PATH — скачайте AuthKey_${ASC_KEY_ID}.p8 из App Store Connect и положите в ~/.private_keys/ (docs/TESTFLIGHT.md, шаг 6.1)" 2
+ACCOUNT_AUTH=(-allowProvisioningUpdates)
+case "$ASC_AUTH" in
+    account)
+        AUTH=("${ACCOUNT_AUTH[@]}")
+        AUTH_NAME="Apple ID из Xcode"
+        ;;
+    key)
+        [[ -n "$ASC_KEY_ID" && "$ASC_KEY_ID" != "ABC123DEFG" ]] \
+            || fail "не задан ASC_KEY_ID — заполните Secrets/asc.env (шаблон: Secrets/asc.env.example) или экспортируйте переменную; без API-ключа: ASC_AUTH=account" 2
+        [[ -n "$ASC_ISSUER_ID" && "$ASC_ISSUER_ID" != 12345678-* ]] \
+            || fail "не задан ASC_ISSUER_ID — заполните Secrets/asc.env или экспортируйте переменную" 2
+        KEY_PATH="${ASC_KEY_PATH:-$HOME/.private_keys/AuthKey_${ASC_KEY_ID}.p8}"
+        [[ -f "$KEY_PATH" ]] \
+            || fail "нет файла ключа $KEY_PATH — скачайте AuthKey_${ASC_KEY_ID}.p8 из App Store Connect и положите в ~/.private_keys/ (docs/TESTFLIGHT.md, шаг 6.1)" 2
+        AUTH=(-allowProvisioningUpdates
+              -authenticationKeyPath "$KEY_PATH"
+              -authenticationKeyID "$ASC_KEY_ID"
+              -authenticationKeyIssuerID "$ASC_ISSUER_ID")
+        AUTH_NAME="API-ключ ${ASC_KEY_ID}"
+        ;;
+    *)
+        fail "ASC_AUTH=${ASC_AUTH} — ожидается key или account" 2
+        ;;
+esac
 
 # ── 2. Согласованность: Team ID в project.yml и в ExportOptions.plist ──
 TEAM_YML="$(sed -nE 's/^[[:space:]]*DEVELOPMENT_TEAM:[[:space:]]*"?([A-Z0-9]+)"?.*/\1/p' project.yml | head -1)"
@@ -66,7 +91,7 @@ TEAM_PLIST="$(/usr/libexec/PlistBuddy -c 'Print :teamID' "$EXPORT_OPTIONS" 2>/de
 
 VERSION="$(sed -nE 's/^[[:space:]]*MARKETING_VERSION:[[:space:]]*"?([^"]+)"?.*/\1/p' project.yml | head -1)"
 BUILD="$(sed -nE 's/^[[:space:]]*CURRENT_PROJECT_VERSION:[[:space:]]*"?([^"]+)"?.*/\1/p' project.yml | head -1)"
-echo "Версия: ${VERSION} (сборка ${BUILD}), команда ${TEAM_YML}, ключ ${ASC_KEY_ID}"
+echo "Версия: ${VERSION} (сборка ${BUILD}), команда ${TEAM_YML}, авторизация: ${AUTH_NAME}"
 if [[ -f "$UPLOADS_LOG" ]] && grep -q "	${VERSION}	${BUILD}	" "$UPLOADS_LOG"; then
     fail "сборка ${VERSION} (${BUILD}) уже загружалась (см. ${UPLOADS_LOG#"$ROOT"/}) — поднимите CURRENT_PROJECT_VERSION в project.yml и повторите make gen" 2
 fi
@@ -88,10 +113,6 @@ fi
 # ── 4. Архив ──
 mkdir -p "$LOG_DIR" "$(dirname "$ARCHIVE")"
 rm -rf "$ARCHIVE" "$EXPORT_DIR"
-AUTH=(-allowProvisioningUpdates
-      -authenticationKeyPath "$KEY_PATH"
-      -authenticationKeyID "$ASC_KEY_ID"
-      -authenticationKeyIssuerID "$ASC_ISSUER_ID")
 
 echo "Архив Release… (полный лог: ${ARCHIVE_LOG#"$ROOT"/})"
 echo "  ⚠ При первой distribution-подписи Связка ключей может спросить пароль Mac → «Всегда разрешать»."
@@ -115,18 +136,51 @@ echo "  в архиве: ${ARCHIVED_VERSION} (${ARCHIVED_BUILD}), ITSAppUsesNonE
 if find "$ARCHIVE/Products" \( -name "*.vpnkey" -o -name "*.ovpn" \) | grep -q .; then
     fail "в архиве лежит файл ключа" 5
 fi
+# Ссылки «О приложении»: для внутреннего тестирования можно без них, для внешних
+# тестеров — нужны (исходники по GPL, политика конфиденциальности).
+for key in OVoCSourceCodeURL OVoCPrivacyPolicyURL; do
+    value="$(/usr/libexec/PlistBuddy -c "Print :${key}" "$APP_PLIST" 2>/dev/null || true)"
+    if [[ -z "$value" ]]; then
+        echo "  ⚠ ${key} пустой — для внутреннего тестирования можно; перед внешней группой задайте его в project.yml (docs/TESTFLIGHT.md, «Первая загрузка»)."
+    else
+        echo "  ${key}: ${value}"
+    fi
+done
 
 # ── 5. Экспорт + загрузка ──
-echo "Загрузка в App Store Connect… (полный лог: ${EXPORT_LOG#"$ROOT"/})"
-if ! xcodebuild -exportArchive -archivePath "$ARCHIVE" \
+export_and_upload() {   # аргументы — флаги авторизации xcodebuild
+    rm -rf "$EXPORT_DIR"
+    xcodebuild -exportArchive -archivePath "$ARCHIVE" \
         -exportOptionsPlist "$EXPORT_OPTIONS" -exportPath "$EXPORT_DIR" \
-        "${AUTH[@]}" >"$EXPORT_LOG" 2>&1; then
+        "$@" >"$EXPORT_LOG" 2>&1
+}
+export_failed() {
     echo ""
     grep -E "error:|Error Domain|EXPORT FAILED|ITMS-" "$EXPORT_LOG" \
         | sed 's/^[[:space:]]*//' | sort -u | head -30 | sed 's/^/    /'
     fail "экспорт/загрузка не прошли (коды ITMS-* — docs/TESTFLIGHT.md)" 6
+}
+
+echo "Загрузка в App Store Connect… (полный лог: ${EXPORT_LOG#"$ROOT"/})"
+if ! export_and_upload "${AUTH[@]}"; then
+    # Distribution-подпись через API-ключ Apple разрешает только роли Admin.
+    # У Apple ID владельца аккаунта права есть — повторяем экспорт через него.
+    if [[ "$ASC_AUTH" == "key" ]] && grep -q "Cloud signing permission error" "$EXPORT_LOG"; then
+        cp "$EXPORT_LOG" "${EXPORT_LOG%.log}-key.log"
+        echo "  ⚠ API-ключу не хватает роли Admin для distribution-подписи (Cloud signing permission error)."
+        echo "    Повторяю через Apple ID из Xcode (Settings → Accounts). Чтобы не тратить попытку:"
+        echo "    ASC_AUTH=account в Secrets/asc.env — либо ключ с ролью Admin."
+        export_and_upload "${ACCOUNT_AUTH[@]}" || export_failed
+    else
+        export_failed
+    fi
 fi
 grep -E "Upload succeeded|EXPORT SUCCEEDED" "$EXPORT_LOG" | head -2 | sed 's/^/  /' || true
+# Символы встроенного фреймворка: он собирается без dSYM, отчёты о падениях внутри
+# него придут без имён функций. На загрузку и работу сборки не влияет.
+if grep -q "Upload Symbols Failed" "$EXPORT_LOG"; then
+    echo "  ⚠ dSYM для OpenVPNAdapter.framework нет в архиве — на загрузку не влияет (docs/TESTFLIGHT.md)."
+fi
 
 printf '%s\t%s\t%s\t%s\n' "$(date '+%Y-%m-%d %H:%M')" "$ARCHIVED_VERSION" "$ARCHIVED_BUILD" "$(git rev-parse --short HEAD 2>/dev/null || echo '?')" >>"$UPLOADS_LOG"
 echo ""

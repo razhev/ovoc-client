@@ -301,6 +301,16 @@ DEVICE-TESTING.md, этап F; ещё не выполнялся.
 | 6.3 | **Пользователь** | В App Store Connect: внешняя группа тестеров + публичная ссылка; заметки Beta App Review — готовый текст в docs/TESTFLIGHT.md, приложить отдельный тестовый ключ | **ждёт** |
 | 6.4 | Агент | docs/TESTFLIGHT.md: текст заметок для ревью, шаблон сообщения родственникам (ru), памятка «перезаливать ≤90 дней» (скрипт печатает дату и ведёт `build/testflight/uploads.log`), запасной вариант с внутренними тестерами, таблица ошибок | сделано |
 
+**Подготовка к первой загрузке (2026-09-27).**
+- Privacy manifest у приложения, расширения и фреймворка. Причины выбраны по сканированию бинарей Release: C617.1 и 35F9.1; манифест фреймворка — `Config/OpenVPNAdapter-PrivacyInfo.xcprivacy`, в фреймворк его кладёт `make framework-manifest`.
+- `LICENSE` (GPL-3.0), `THIRD_PARTY_LICENSES.md`, тексты лицензий в `App/Licenses`.
+- `App/AboutView.swift`: экран «О приложении» и карточка «Что с данными» (правило 5.4) на экране импорта.
+- `PRIVACY.md`.
+- `make release-check` проверяет manifest и лицензии; `make testflight` предупреждает о пустых `OVoCSourceCodeURL` / `OVoCPrivacyPolicyURL`.
+- `ITSAppUsesNonExemptEncryption=false` перепроверен по таблице Apple и оставлен.
+
+Ручные шаги — docs/TESTFLIGHT.md, «Первая загрузка».
+
 Номер сборки поднимается руками: `CURRENT_PROJECT_VERSION` в `project.yml` перед каждой
 загрузкой (скрипт отказывается заливать номер, который уже заливался).
 

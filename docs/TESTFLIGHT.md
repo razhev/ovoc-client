@@ -33,6 +33,9 @@
 Дальше — только руками. **Часть 1** — сборка у вас на телефоне через TestFlight (внутреннее
 тестирование, без ревью Apple). **Часть 2** — раздача другим людям.
 
+**Состояние на 2026-09-28:** шаги 1–5 пройдены. Сборка **0.1.0 (1)** загружена и обработана
+Apple: годна для внутреннего тестирования, действует до 2026-12-27. Следующий шаг — 6.
+
 ### Часть 1. Первая сборка у себя (≈ 1 час, из них 5–30 минут — ожидание Apple)
 
 1. **Обновить фреймворк на Mac** — один раз, если он собран до 2026-09-27:
@@ -49,6 +52,8 @@
 4. **API-ключ** — шаг 6.1б ниже. Это **не** внутри страницы приложения, а в общем разделе
    «Users and Access» — прямая ссылка: <https://appstoreconnect.apple.com/access/integrations/api>.
    - вкладка Integrations → Team Keys → «Generate API Key» (или «+»), роль App Manager;
+   - роли App Manager хватает, если в Xcode добавлен ваш Apple ID: подпись для распространения
+     скрипт тогда делает через него. Подписывать самим ключом Apple разрешает только роли Admin;
    - скачать `.p8` — его можно скачать **только один раз**;
    - положить файл в `~/.private_keys/`;
    - Key ID и Issuer ID вписать в `Secrets/asc.env` (или сказать агенту).
@@ -168,6 +173,13 @@ Review** — тоже про App Store: её не трогать. Всё, что
 3. **Generate API Key** (или «+»):
    - **Name**: `ovocclient testflight`;
    - **Access**: **App Manager**.
+
+   Про роль. Подпись сборки для распространения (distribution) через API-ключ Apple разрешает
+   только ключу с ролью **Admin**. С ролью App Manager экспорт отвечает «Cloud signing
+   permission error» — и `make testflight` сам повторяет его через Apple ID, добавленный в
+   Xcode → Settings → Accounts (у владельца аккаунта права есть). Так прошла первая загрузка
+   2026-09-28. Ключ с ролью Admin нужен, только если Apple ID в Xcode нет (например, на сервере
+   сборки): такой ключ может управлять всем аккаунтом, хранить его надо строже.
 4. **Generate**. На странице появятся **Issuer ID** (вверху, общий для команды) и строка ключа
    с **Key ID**. Нажать **Download API Key** — скачается `AuthKey_<Key ID>.p8`.
    **Скачать можно только один раз**: если файл потерян — ключ отозвать (Revoke) и сделать новый.
@@ -204,7 +216,8 @@ make testflight
 1. Проверяет инструменты: `xcodebuild`, `xcodegen`, наличие фреймворка, `Config/ExportOptions.plist`.
 2. Читает `Secrets/asc.env` (или переменные окружения `ASC_KEY_ID`, `ASC_ISSUER_ID`,
    необязательно `ASC_KEY_PATH`), проверяет, что файл ключа `~/.private_keys/AuthKey_<Key ID>.p8`
-   существует.
+   существует. С `ASC_AUTH=account` (в `Secrets/asc.env` или в окружении) ключ не нужен вовсе:
+   подпись и загрузка идут через Apple ID из Xcode.
 3. Сверяет Team ID в `project.yml` и `Config/ExportOptions.plist`; печатает версию и номер
    сборки; отказывается заливать номер, который уже заливался (`build/testflight/uploads.log`).
 4. **Ворота**: `make release-check` (в бандле нет DEBUG-моста и ни одного файла ключа; privacy
@@ -223,7 +236,9 @@ make testflight
    тестирования можно, перед внешней группой — «Первая загрузка», шаги 7–8).
 7. `xcodebuild -exportArchive` с `Config/ExportOptions.plist` (`method: app-store-connect`,
    `destination: upload`) — переподписывает и **загружает** сборку. Лог:
-   `build/logs/xcodebuild-export.log`.
+   `build/logs/xcodebuild-export.log`. Если ключу не хватило роли («Cloud signing permission
+   error»), экспорт повторяется через Apple ID из Xcode; лог первой попытки —
+   `build/logs/xcodebuild-export-key.log`.
 8. Дописывает строку в `build/testflight/uploads.log` (дата, версия, сборка, коммит) и печатает
    дату, до которой нужно перезалить следующую сборку.
 
@@ -517,7 +532,9 @@ this build for TestFlight testing?
 | письмо или ошибка `ITMS-91053: Missing API declaration` | в коде появился новый required reason API, не объявленный в манифесте | добавить категорию и причину в `App/PrivacyInfo.xcprivacy` (`PacketTunnel/…`, `Config/OpenVPNAdapter-PrivacyInfo.xcprivacy`) — как в комментариях этих файлов |
 | `⚠ OVoCSourceCodeURL пустой` / `⚠ OVoCPrivacyPolicyURL пустой` | ссылки ещё не заданы | для внутреннего тестирования — ничего; перед внешней группой — «Первая загрузка», шаги 7–8 |
 | archive: «No profiles for 'com.razhev.ovocclient' were found» / «doesn't include the … entitlement» | автоподпись не смогла завести distribution-профиль | проверить, что у API-ключа роль App Manager; на портале у обоих App ID включены Network Extensions и App Groups; повторить |
-| archive: «Cloud signing permission error» / «You don't have permission to create a certificate» | роли ключа не хватает для выпуска distribution-сертификата | создать новый ключ с ролью **Admin**, вписать в `Secrets/asc.env` |
+| export: `⚠ API-ключу не хватает роли Admin…`, затем загрузка проходит | у ключа роль App Manager; скрипт повторил экспорт через Apple ID из Xcode | ничего; чтобы не тратить попытку — `ASC_AUTH=account` в `Secrets/asc.env` |
+| export: «Cloud signing permission error» и повтор тоже не прошёл («No Accounts», ошибка входа) | в Xcode нет Apple ID или сессия устарела | Xcode → Settings → Accounts → добавить Apple ID (или войти заново); либо новый ключ с ролью **Admin** в `Secrets/asc.env` |
+| export: `warning: Upload Symbols Failed … dSYM for the OpenVPNAdapter.framework` | фреймворк собирается без отладочных символов | ничего: на загрузку и работу не влияет; отчёты о падениях внутри фреймворка придут без имён функций |
 | archive висит на CodeSign | ждёт диалог Связки ключей | пароль Mac → «Всегда разрешать»; запускать из Terminal.app, не из песочницы |
 | export: `ITMS-90189` / «Redundant Binary Upload» | такая пара версия+сборка уже есть в App Store Connect | поднять `CURRENT_PROJECT_VERSION` |
 | export: `ITMS-90062` / «CFBundleShortVersionString … must be greater» | версия ниже, чем уже загруженная | поднять `MARKETING_VERSION` |

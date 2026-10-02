@@ -102,11 +102,11 @@ IPv6-сайт при поднятом VPN, переключение Wi-Fi ↔ LT
 ```bash
 make gen        # сгенерировать OVoCClient.xcodeproj из project.yml
 make build      # собрать оба таргета БЕЗ подписи — быстрая проверка компиляции
-make test       # юнит-тесты ConfigKit — на Mac, телефон не нужен
+make test       # ConfigKit + сохранение сетевых настроек при reconnect — на Mac
 make framework  # собрать OpenVPNAdapter.framework из исходников Amnezia + наш патч (основной способ)
 make framework-manifest # положить privacy manifest в уже собранный фреймворк (make framework делает сам)
 make fetch      # готовый бинарь v1.0.42 — НЕРАБОЧИЙ (дефект метки GCM), только для сравнения
-make verify     # ворота: arm64? символы Cloak? setPTCloak в заголовках?
+make verify     # arm64, Cloak, API + связь бинарника с исходниками и AEAD-патчем
 
 make devices    # какие iPhone видит Mac и готовы ли они к установке
 make ddi        # смонтировать на телефон образ разработчика (VPN на Mac выключить)
@@ -148,6 +148,14 @@ python3 scripts/decode-vpnkey.py --schema Secrets/my.vpnkey
 - **ConfigKit** — локальный SPM-пакет со всей логикой разбора ключа `vpn://…`
   (zlib-распаковка, двойной разбор `last_config`, типы Cloak-полей, сборка
   профиля). Тестируется на Mac: `make test`.
+- Маршруты и DNS остаются на месте при resetTun/reconnect; старые настройки заменяются
+  новыми без промежуточного снятия. При окончательном отключении их снимает iOS.
+  Автотесты этой границы находятся в `Tests/TunnelRuntimeTests`, проверка отсутствия утечки
+  на телефоне — [«Регрессия P1»](docs/DEVICE-TESTING.md).
+- Импорт выбирает фактический endpoint Cloak (`remote` → `RemoteHost` → `hostName`) и
+  фиксирует один IPv4 в транспорте и маршруте исключения. После смены IP домена ключ нужно
+  импортировать заново. Профили, сохранённые до этого исправления с доменом или отдельным
+  адресом Cloak, тоже нужно переимпортировать.
 - Расширение ничего не парсит: приложение при импорте собирает готовый текст
   `.ovpn` и передаёт его через `providerConfiguration` — это единственное место,
   где лежит профиль с приватным ключом. App Group — только для логов.

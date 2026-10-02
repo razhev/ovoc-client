@@ -2,17 +2,18 @@
 set -euo pipefail
 
 # ГЛАВНЫЕ ворота качества фреймворка — гоняем ДО любой интеграции.
-# Три проверки:
+# Четыре проверки:
 #   1. lipo: бинарь содержит только arm64 (device-only, симулятора нет);
 #   2. nm:   внутри есть символы Go-части Cloak (значит Cloak реально вшит);
 #   3. в Headers/ есть setPTCloak — печатаем точную строку объявления,
 #      по ней пишется код провайдера (форк менял API в марте 2026).
+#   4. хэш бинарника связан с исходниками и текущим исправлением AEAD.
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 FW="$ROOT/Frameworks/OpenVPNAdapter.framework"
 
 if [[ ! -d "$FW" ]]; then
-    echo "FAIL: $FW не найден. Сначала: make fetch"
+    echo "FAIL: $FW не найден. Сначала: make framework"
     exit 1
 fi
 
@@ -28,28 +29,32 @@ FAILED=0
 # ── 1. Архитектуры ──
 ARCHS="$(lipo -archs "$BIN" 2>/dev/null || true)"
 if [[ "$ARCHS" == "arm64" ]]; then
-    echo "PASS [1/3] lipo: only arm64"
+    echo "PASS [1/4] lipo: only arm64"
 else
-    echo "FAIL [1/3] lipo: '$ARCHS' (ожидали ровно 'arm64')"
+    echo "FAIL [1/4] lipo: '$ARCHS' (ожидали ровно 'arm64')"
     FAILED=1
 fi
 
 # ── 2. Символы Cloak ──
 SYMS="$(nm -gU "$BIN" 2>/dev/null || true)"
 if grep -q "Cloak_dial" <<<"$SYMS" && grep -q "Initialize_cloak_c_client" <<<"$SYMS"; then
-    echo "PASS [2/3] nm: Cloak_dial + Initialize_cloak_c_client найдены"
+    echo "PASS [2/4] nm: Cloak_dial + Initialize_cloak_c_client найдены"
 else
-    echo "FAIL [2/3] nm: символы Cloak не найдены — Cloak НЕ вшит в этот бинарь."
-    echo "        Взять фреймворк из 3rd-prebuilt (см. fetch-framework.sh) или собрать из исходников."
+    echo "FAIL [2/4] nm: символы Cloak не найдены — Cloak НЕ вшит в этот бинарь."
+    echo "        Собрать из исходников: make framework."
     FAILED=1
 fi
 
 # ── 3. setPTCloak в заголовках ──
 if grep -rq "setPTCloak" "$FW/Headers/"; then
-    echo "PASS [3/3] Headers: setPTCloak найден. Объявление:"
+    echo "PASS [3/4] Headers: setPTCloak найден. Объявление:"
     grep -rn "setPTCloak" "$FW/Headers/" | sed 's/^/        /'
 else
-    echo "FAIL [3/3] Headers: setPTCloak отсутствует — этот API обязателен для включения Cloak."
+    echo "FAIL [3/4] Headers: setPTCloak отсутствует — этот API обязателен для включения Cloak."
+    FAILED=1
+fi
+
+if ! python3 "$ROOT/scripts/framework-provenance.py" verify --framework "$FW"; then
     FAILED=1
 fi
 

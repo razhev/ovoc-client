@@ -17,6 +17,8 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
+./scripts/verify-framework.sh
+
 DERIVED="build/DerivedData-check"
 mkdir -p build
 

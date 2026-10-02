@@ -15,7 +15,12 @@
 | Архитектура | arm64 only, `LC_VERSION_MIN_IPHONEOS`: minos 10.0, SDK 17.5 |
 | Символы Cloak | `Cloak_dial`, `Initialize_cloak_c_client` — присутствуют (`nm -gU`) |
 
-Ворота проверки: `make verify` (три PASS обязательны перед любой интеграцией).
+Эта таблица описывает исходный бинарник, по которому исследовался API. В приложении
+используется сборка из исходников с исправлением AEAD (`make framework`).
+`make verify` проверяет arm64, символы Cloak, API и квитанцию
+`Frameworks/OpenVPNAdapter.build.json`: коммиты, хэш текущего патча и хэш бинарника.
+Без квитанции или при несовпадении требуется пересборка. Готовый `v1.0.42` проверку не проходит;
+`make fetch` сохраняет его только в `build/cache/prebuilt-v1.0.42` для сравнения.
 
 ## Главное отличие от upstream (ss-abramchuk)
 
@@ -58,7 +63,7 @@ adapter.reconnect(afterTimeInterval:)
 | Метод | Ядро | События |
 |---|---|---|
 | `reconnect(afterTimeInterval: n)` | таймер n сек → `new_client()`: старая сессия останавливается, tun разбирается (`tun_builder_teardown` → `resetTun` → наш `configureTunnel(nil)`), новая сессия собирает tun заново из свежего PUSH_REPLY | `RECONNECTING` → … → `CONNECTED` |
-| `pause(withReason:)` | сессия останавливается **с разборкой tun** (маршруты сняты — трафик мимо VPN), io_context живёт | `PAUSE` |
+| `pause(withReason:)` | сессия останавливается с разборкой tun адаптера; системные маршруты сохраняет наш провайдер, io_context живёт | `PAUSE` |
 | `resume()` | `new_client()` — полное рукопожатие заново | `RESUME`, `RECONNECTING` → `CONNECTED` |
 | `disconnect()` | `graceful_stop()`: explicit-exit-notify, стоп | `DISCONNECTED` |
 
@@ -90,10 +95,12 @@ func openVPNAdapter(_ openVPNAdapter: OpenVPNAdapter,
 // перед каждым подключением (tun_builder_new) и при разборке tun (tun_builder_teardown,
 // в том числе после stopTunnel). Ошибка в completion → ФАТАЛЬНАЯ #20
 // OpenVPNAdapterErrorTUNSetupFailed с системной ошибкой в NSUnderlyingErrorKey.
-// Во время остановки setTunnelNetworkSettings(nil) у iOS проваливается, а перед
-// переподключением следом всё равно придут новые настройки — на очистку мы
-// ВСЕГДА отвечаем nil, иначе штатное отключение или переподключение выглядит
-// как фатальная ошибка.
+// На resetTun ВСЕГДА отвечаем completionHandler(nil), НЕ вызывая
+// setTunnelNetworkSettings(nil): иначе при reconnect исчезнут маршруты и DNS
+// и появится окно трафика мимо VPN. resetTun может прийти ДО RECONNECTING,
+// поэтому решение не зависит от reasserting или счётчика reconnect.
+// Новые настройки заменяют старые напрямую; при окончательном завершении
+// провайдера системный интерфейс и маршруты снимает iOS.
 // Мы: дополняем settings (matchDomains, excludedRoutes, DNS-fallback,
 //     IPv6-раковина при отсутствии ipv6Settings) →
 //     setTunnelNetworkSettings(networkSettings) { completionHandler($0) }
@@ -130,26 +137,27 @@ NSString *const OpenVPNAdapterErrorMessageKey;  // текст OpenVPN в userInf
 
 ## OpenVPNAdapterPacketFlow
 
-Протокол в точности повторяет два метода `NEPacketTunnelFlow`
-(`readPackets(completionHandler:)` / `writePackets(_:withProtocols:)`), поэтому мост —
-пустое расширение:
-
-```swift
-extension NEPacketTunnelFlow: OpenVPNAdapterPacketFlow {}
-```
+Протокол повторяет два метода `NEPacketTunnelFlow`
+(`readPackets(completionHandler:)` / `writePackets(_:withProtocols:)`). Наш
+`PacketFlowBridge` реализует их отдельным объектом: считает пакеты, диагностирует
+петлю маршрутов и отбрасывает IPv6 только в режиме раковины. Когда сервер выдал
+IPv6-настройки, IPv6 проходит в адаптер. Режим обновляется после успешного
+применения новых настроек, до completion делегата.
 
 ## Схема работы провайдера (следствие API)
 
 ```
 startTunnel:
   cfg.fileContent = ovpnText.data(using: .utf8)   // текст уже содержит <cloak>
-  cfg.tunPersist = true
+  // cfg.tunPersist остаётся false: внутренний tun адаптера пересоздаётся
   cfg.setPTCloak()
   try adapter.apply(configuration: cfg)           // ошибки — дословно в лог
   запустить сторожевой таймер 30 сек
   adapter.connect(using: packetFlow)
 
 делегат configureTunnel...:
+  networkSettings == nil → completion(nil), системные маршруты и DNS остаются
+  phase не starting/connected → отказ применять запоздавшие настройки
   networkSettings.dnsSettings.matchDomains = [""]
   добавить NEIPv4Route(serverIP /32) в excludedRoutes   // tunnelRemoteAddress будет 127.0.0.1!
   DNS-fallback: адаптер → dhcp-option DNS из конфига → dns1/dns2

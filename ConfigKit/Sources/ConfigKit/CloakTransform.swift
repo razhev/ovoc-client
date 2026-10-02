@@ -3,6 +3,14 @@ import Foundation
 /// Приведение Cloak-конфига к виду, который ждёт Go-часть внутри фреймворка.
 /// Порт setupCloak() из ios_controller.mm (amnezia-client, тег 4.8.21.0).
 public enum CloakTransform {
+    /// Тот же порядок приоритетов для подключения и для маршрута-исключения.
+    static func remoteHost(fields: [String: JSONValue], hostName: String) -> String {
+        for key in ["remote", "RemoteHost"] {
+            if let host = fields[key]?.asString, !host.isEmpty { return host }
+        }
+        return hostName
+    }
+
     /// Итоговый JSON для блока <cloak> в профиле.
     ///
     /// Правила (менять нельзя — по ним работает Go json.Unmarshal на той стороне):
@@ -15,20 +23,13 @@ public enum CloakTransform {
         var dict = fields
 
         dict["NumConn"] = .number(1)
-        if let remote = dict["remote"]?.asString, !remote.isEmpty {
-            dict["RemoteHost"] = .string(remote)
-        }
+        dict["RemoteHost"] = .string(remoteHost(fields: fields, hostName: hostName))
         if let port = dict["port"]?.asString, !port.isEmpty {
             dict["RemotePort"] = .string(port)
         }
         dict.removeValue(forKey: "remote")
         dict.removeValue(forKey: "port")
         dict.removeValue(forKey: "transport_proto")
-
-        // Страховка: Cloak должен знать, куда подключаться.
-        if dict["RemoteHost"]?.asString?.isEmpty ?? true {
-            dict["RemoteHost"] = .string(hostName)
-        }
 
         var out: [String: Any] = [:]
         for (key, value) in dict {

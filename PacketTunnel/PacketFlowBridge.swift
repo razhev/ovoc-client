@@ -23,8 +23,9 @@ final class PacketFlowBridge: NSObject, OpenVPNAdapterPacketFlow {
     private var loopedPackets = 0
     /// IPv6-пакеты, отброшенные мостом: провайдер заводит их в туннель
     /// маршрутом-«раковиной» (см. configureTunnel), чтобы они не ушли мимо VPN;
-    /// серверу IPv6 не нужен — до адаптера они не доходят.
+    /// включается только когда сервер не выдал IPv6-настройки.
     private var sunkIPv6Packets = 0
+    private var ipv6SinkEnabled = true
 
     private let lock = NSLock()
     private var outbound = Counter()
@@ -42,6 +43,14 @@ final class PacketFlowBridge: NSObject, OpenVPNAdapterPacketFlow {
     init(flow: NEPacketTunnelFlow, logger: RingLogger) {
         self.flow = flow
         self.logger = logger
+    }
+
+    /// Вызывается после успешного применения сетевых настроек, перед запуском
+    /// чтения адаптера; чтение пакетов может приходить с другого потока.
+    func setIPv6SinkEnabled(_ enabled: Bool) {
+        lock.lock()
+        ipv6SinkEnabled = enabled
+        lock.unlock()
     }
 
     /// Новое подключение: счётчики с нуля, первые пачки — подробно.
@@ -79,23 +88,14 @@ final class PacketFlowBridge: NSObject, OpenVPNAdapterPacketFlow {
         }
     }
 
-    /// Раковина IPv6: пакеты семейства AF_INET6 до адаптера не доходят.
+    /// В режиме раковины AF_INET6 отбрасывается; с IPv6 сервера идёт в адаптер.
     /// Обычная пачка целиком IPv4 — возвращаем как есть, без копирования.
     private func dropIPv6(_ packets: [Data], _ protocols: [NSNumber]) -> ([Data], [NSNumber]) {
-        let ipv6 = NSNumber(value: AF_INET6)
-        guard protocols.contains(ipv6) else { return (packets, protocols) }
-
-        var kept: [Data] = []
-        var keptProtocols: [NSNumber] = []
-        var dropped = 0
-        for (packet, family) in zip(packets, protocols) {
-            if family == ipv6 {
-                dropped += 1
-            } else {
-                kept.append(packet)
-                keptProtocols.append(family)
-            }
-        }
+        lock.lock()
+        let sinkEnabled = ipv6SinkEnabled
+        lock.unlock()
+        let filtered = IPv6PacketFilter.filter(packets, protocols: protocols, sinkEnabled: sinkEnabled)
+        let dropped = filtered.dropped
 
         lock.lock()
         let firstSunk = sunkIPv6Packets == 0
@@ -105,7 +105,7 @@ final class PacketFlowBridge: NSObject, OpenVPNAdapterPacketFlow {
             // Одна строка на подключение: раковина работает, IPv6 не утёк.
             logger.log("ipv6 sink: first IPv6 packet entered the tunnel and was dropped (n=\(dropped))")
         }
-        return (kept, keptProtocols)
+        return (filtered.packets, filtered.protocols)
     }
 
     @objc(writePackets:withProtocols:)

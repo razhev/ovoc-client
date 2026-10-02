@@ -23,7 +23,8 @@ EXPECTED_SHA256="c6d6b3f745265771bdcb4bcdebb3ff5e39fe4bfee54958a86b5d3229f1151c1
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 CACHE="$ROOT/build/cache"
 ZIP="$CACHE/openvpnadapter.zip"
-DEST="$ROOT/Frameworks"
+# Эталон для сравнения хранится отдельно от фреймворка приложения.
+DEST="$CACHE/prebuilt-v1.0.42"
 
 mkdir -p "$CACHE"
 

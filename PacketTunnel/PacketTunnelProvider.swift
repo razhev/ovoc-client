@@ -124,9 +124,11 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
 
         let configuration = OpenVPNConfiguration()
         configuration.fileContent = ovpn.data(using: .utf8)
-        // tunPersist НЕ включаем: рабочий код Amnezia (4.8.12.x) его не ставит.
-        // С ним при цикле переподключений туннель продолжал забирать весь трафик,
-        // и телефон оставался без интернета.
+        // tunPersist НЕ включаем: адаптер должен пересоздать свои сокеты и
+        // получить свежий PUSH_REPLY. Системные маршруты и DNS сохраняются
+        // независимо от этого: TunnelNetworkSettingsUpdate не передаёт resetTun
+        // в setTunnelNetworkSettings(nil). Пока Cloak восстанавливается, трафик
+        // ждёт в туннеле; пользователь может отключить VPN обычной кнопкой.
         //
         // Проверено и отброшено: compressionMode / peerInfo из более позднего
         // рецепта Amnezia (PR #2360). В этой сборке ядра пользовательский
@@ -326,9 +328,9 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
     // MARK: - Sleep/wake — намеренно простой проброс
 
     /// Почему не pause()/resume() адаптера. pause у ядра — это остановка
-    /// сессии с разборкой tun (interim_finalize → tun_builder_teardown): без
-    /// tunPersist маршруты снимаются, и пока телефон «спит», фоновый трафик
-    /// (push, почта) идёт мимо VPN; resume — полное рукопожатие Cloak заново.
+    /// сессии с разборкой его tun (interim_finalize → tun_builder_teardown),
+    /// resume — полное рукопожатие Cloak заново. Наши системные маршруты при
+    /// resetTun сохраняются, но фоновый трафик всё равно ждал бы восстановления.
     /// А iOS дёргает sleep/wake очень часто — в логах бывали пары через 2–3 сек.
     /// Проброс дешевле и безопаснее: за короткий сон сокет живёт, за долгий
     /// умирает — тогда ping 10 / ping-restart от сервера дают ошибку транспорта,
@@ -444,36 +446,26 @@ extension PacketTunnelProvider: OpenVPNAdapterDelegate {
         completionHandler: @escaping (Error?) -> Void
     ) {
         stateQueue.async {
-            self.configureTunnel(networkSettings, completionHandler: completionHandler)
+            if networkSettings == nil {
+                self.logger.log("configureTunnel: adapter reset acknowledged; system routes and DNS retained (phase=\(self.phase))")
+            }
+            TunnelNetworkSettingsUpdate.apply(
+                networkSettings,
+                using: self.configureTunnel,
+                completionHandler: completionHandler
+            )
         }
     }
 
     /// Только на stateQueue.
     private func configureTunnel(
-        _ networkSettings: NEPacketTunnelNetworkSettings?,
+        _ settings: NEPacketTunnelNetworkSettings,
         completionHandler: @escaping (Error?) -> Void
     ) {
-        guard let settings = networkSettings else {
-            // nil приходит из resetTun адаптера: перед каждым подключением
-            // (tun_builder_new) — в том числе перед КАЖДЫМ переподключением при
-            // смене сети — и при разборке tun (tun_builder_teardown), в том числе
-            // при остановке по команде пользователя. Любой отказ здесь адаптер
-            // превращает в фатальную ошибку #20 «Failed to reset tunnel», а
-            // сам отказ ни о чём не говорит: во время остановки
-            // setTunnelNetworkSettings(nil) у iOS проваливается (система уже сама
-            // разбирает туннель), а при переподключении следом всё равно придут
-            // новые настройки, и их ошибка — настоящая — обработается ниже.
-            // Поэтому очистку никогда не считаем фатальной: отказ только логируем.
-            let stopping = phase == .stopping || phase == .stopped
-            logger.log("configureTunnel: clearing network settings"
-                       + (stopping ? " (while stopping)" : reconnectCount > 0 ? " (reconnect #\(reconnectCount))" : ""))
-            setTunnelNetworkSettings(nil) { [weak self] error in
-                if let error {
-                    self?.logger.log("clearing network settings failed: \(Self.brief(error)) — ignored"
-                                     + (stopping ? ", tunnel is stopping" : ", new settings follow"))
-                }
-                completionHandler(nil)
-            }
+        // Запоздавший PUSH_REPLY после stop/watchdog не должен снова ставить
+        // маршруты. nil/resetTun при этом по-прежнему получает успех выше.
+        guard phase == .starting || phase == .connected else {
+            completionHandler(Self.makeError(6, "Подключение отменено"))
             return
         }
 
@@ -538,7 +530,8 @@ extension PacketTunnelProvider: OpenVPNAdapterDelegate {
         // IPv4 и DNS не задеты: DNS-серверы — IPv4-литералы, идут в туннель как
         // и раньше; link-local (fe80::/10) остаётся на своих интерфейсах.
         let ipv6Mode: String
-        if settings.ipv6Settings == nil {
+        let sinkIPv6 = settings.ipv6Settings == nil
+        if sinkIPv6 {
             let sink = NEIPv6Settings(addresses: [Self.ipv6SinkAddress], networkPrefixLengths: [64])
             sink.includedRoutes = [NEIPv6Route.default()]
             settings.ipv6Settings = sink
@@ -567,6 +560,8 @@ extension PacketTunnelProvider: OpenVPNAdapterDelegate {
         setTunnelNetworkSettings(settings) { [weak self] error in
             if let error {
                 self?.logger.log("setTunnelNetworkSettings failed: \(error.localizedDescription)")
+            } else {
+                self?.packetBridge.setIPv6SinkEnabled(sinkIPv6)
             }
             completionHandler(error)
         }

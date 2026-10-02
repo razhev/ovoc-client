@@ -49,6 +49,8 @@ command -v xcodegen >/dev/null  || fail "нет xcodegen — brew install xcodeg
 [[ -d "$PROJECT" ]] || fail "нет $PROJECT — сначала make gen (или запускайте через make testflight)" 2
 [[ -d "Frameworks/OpenVPNAdapter.framework" ]] || fail "нет Frameworks/OpenVPNAdapter.framework — сначала make framework && make verify" 2
 [[ -f "$EXPORT_OPTIONS" ]] || fail "нет $EXPORT_OPTIONS" 2
+# Не отключается RELEASE_CHECK=0: старый бинарник нельзя отправить в TestFlight.
+./scripts/verify-framework.sh || fail "фреймворк не прошёл проверку — make framework" 3
 
 # ── 1. Чем подписывать и загружать: API-ключ или Apple ID из Xcode ──
 if [[ -f "Secrets/asc.env" ]]; then
@@ -101,6 +103,7 @@ fi
 
 # ── 3. Ворота ──
 if [[ "${RELEASE_CHECK:-1}" != "0" ]]; then
+    mkdir -p "$LOG_DIR"
     echo "Ворота Release (make release-check)…"
     ./scripts/check-release.sh >"$LOG_DIR/release-check.log" 2>&1 \
         || { grep -E "^FAIL" "$LOG_DIR/release-check.log" | sed 's/^/    /'; fail "make release-check не прошёл — лог: ${LOG_DIR#"$ROOT"/}/release-check.log" 3; }

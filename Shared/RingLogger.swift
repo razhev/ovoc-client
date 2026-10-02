@@ -109,7 +109,7 @@ final class RingLogger {
         return try? FileHandle(forWritingTo: url)
     }
 
-    /// Ротация усечением: когда файл превышает лимит, оставляем вторую половину.
+    /// Ротация: оставляем последние целые строки в пределах половины лимита.
     /// Примитивно, зато без второго файла и лишней памяти. Атомарная запись
     /// подменяет файл новым, поэтому открытый дескриптор после неё закрываем —
     /// следующая строка откроет уже новый файл.
@@ -117,7 +117,7 @@ final class RingLogger {
         guard let size = try? FileManager.default.attributesOfItem(atPath: url.path)[.size] as? Int,
               size > maxBytes,
               let data = try? Data(contentsOf: url) else { return }
-        let tail = data.suffix(maxBytes / 2)
+        let tail = RingLogTail.keepingLastLines(in: data, maxBytes: maxBytes / 2)
         try? handle?.close()
         handle = nil
         try? tail.write(to: url, options: .atomic)

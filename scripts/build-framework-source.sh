@@ -23,7 +23,7 @@ set -euo pipefail
 # поэтому только клон + их .xcodeproj.
 
 ADAPTER_REPO="https://github.com/amnezia-vpn/OpenVPNAdapter"
-ADAPTER_COMMIT="8bb3da5"
+ADAPTER_COMMIT="8bb3da50ae2ad07c76a815bc670e9e70e0e3e3ad"
 OPENVPN3_COMMIT="e901077a05a5e3d018260d0955acb1a21e05578d"
 DEPLOYMENT_TARGET="16.0"   # как у приложения; в проекте форка стоит 10.0 — Xcode 26 его не поддерживает
 
@@ -33,6 +33,7 @@ DERIVED="$ROOT/build/DerivedData-OpenVPNAdapter"
 PATCH="$ROOT/patches/openvpn3-aead-auth-tag.patch"
 DEST="$ROOT/Frameworks"
 BUILD_LOG="$ROOT/build/framework-build.log"
+mkdir -p "$ROOT/build"
 
 # ── 1. Исходники на зафиксированных коммитах ──
 if [[ ! -d "$SRC/.git" ]]; then
@@ -81,5 +82,6 @@ rm -rf "$DEST/OpenVPNAdapter.framework"
 mkdir -p "$DEST"
 cp -R "$FW_PATH" "$DEST/"
 "$ROOT/scripts/framework-privacy-manifest.sh"   # своего манифеста у фреймворка нет
+python3 "$ROOT/scripts/framework-provenance.py" record --framework "$DEST/OpenVPNAdapter.framework" --source "$SRC"
 echo "OK: ${DEST#"$ROOT"/}/OpenVPNAdapter.framework (из исходников, с исправлением метки GCM)"
 echo "Дальше обязательно: make verify"

@@ -10,14 +10,16 @@ gen:
 	xcodegen generate
 
 ## Собрать оба таргета БЕЗ подписи — ворота компиляции (не нужны аккаунт, телефон, сеть)
-build: gen
+build: gen verify
 	xcodebuild -project $(PROJECT) -scheme $(SCHEME) \
 		-destination 'generic/platform=iOS' build \
 		CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO
 
-## Юнит-тесты ConfigKit — на Mac, без телефона и подписи
+## ConfigKit + политика сетевых настроек туннеля — на Mac, без телефона и подписи
 test:
 	cd ConfigKit && swift test
+	swift test
+	python3 -B -m unittest discover -s Tests -p 'test_*.py'
 
 ## Собрать OpenVPNAdapter.framework из исходников Amnezia с нашим исправлением
 ## (patches/openvpn3-aead-auth-tag.patch). ОСНОВНОЙ способ получить фреймворк.
@@ -33,7 +35,7 @@ framework-manifest:
 fetch:
 	./scripts/fetch-framework.sh
 
-## Ворота качества: arm64? символы Cloak? setPTCloak в заголовках?
+## Ворота: arm64, Cloak, API, соответствие бинарника исходникам и AEAD-патчу
 verify:
 	./scripts/verify-framework.sh
 

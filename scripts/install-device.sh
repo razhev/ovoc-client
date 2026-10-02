@@ -38,9 +38,10 @@ if [[ ! -d "$PROJECT" ]]; then
     exit 2
 fi
 if [[ ! -d "Frameworks/OpenVPNAdapter.framework" ]]; then
-    echo "FAIL: нет Frameworks/OpenVPNAdapter.framework. Сначала: make fetch && make verify"
+    echo "FAIL: нет Frameworks/OpenVPNAdapter.framework. Сначала: make framework && make verify"
     exit 2
 fi
+./scripts/verify-framework.sh
 
 # ── 1. Устройство ──
 DEVICE_LINE="$(python3 scripts/find-device.py)" || exit $?

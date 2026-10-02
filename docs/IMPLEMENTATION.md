@@ -1,6 +1,8 @@
 # План имплементации: OVoC Client (iOS-клиент OpenVPN over Cloak)
 
-> Детализация утверждённого PLAN.md. После утверждения сохраняется как `docs/IMPLEMENTATION.md` и пушится. Все зафиксированные решения из IMPLEMENTATION_PROMPT.md соблюдены без изменений.
+> Детализация исходного плана с последующими уточнениями. Датированные результаты ниже
+> описывают соответствующие этапы; текущее состояние — в [PLAN.md](../PLAN.md) и
+> [README.md](../README.md). IMPLEMENTATION_PROMPT.md сохранён как исторический документ.
 
 ## Контекст
 
@@ -78,20 +80,25 @@ xcodebuild -project OVoCClient.xcodeproj -scheme OVoCClient \
 - **`scripts/fetch-framework.sh`**:
   - `curl -L` → `https://github.com/amnezia-vpn/3rd-build-ga/releases/download/v1.0.42/openvpnadapter.zip` в кэш
   - переменная `EXPECTED_SHA256`: при первом запуске пустая → скрипт печатает вычисленный хэш и требует вписать его в скрипт (фиксация); при последующих — сравнивает и падает при расхождении
-  - распаковка в `Frameworks/OpenVPNAdapter.framework`
+  - распаковка в `build/cache/prebuilt-v1.0.42/OpenVPNAdapter.framework` только для сравнения;
+    рабочий бинарник приложения не перезаписывается
   - закомментированный запасной источник: repo `3rd-prebuilt`, ветка `feature/special-handshake`, путь `openvpn/apple/OpenVPNAdapter-ios/OpenVPNAdapter.framework`
-- **`scripts/verify-framework.sh`** — три проверки с явным PASS/FAIL и ненулевым exit при провале:
+- **`scripts/verify-framework.sh`** — проверки с явным PASS/FAIL и ненулевым exit при провале:
   1. `lipo -info` бинаря → **только** arm64;
   2. `nm -gU` → есть `Cloak_dial` и `Initialize_cloak_c_client`;
   3. `grep -r setPTCloak Frameworks/OpenVPNAdapter.framework/Headers/` → найден; скрипт **печатает полную строку объявления**.
-- **`scripts/build-framework-source.sh`** — запасной путь (клон `--recursive -b master-amnezia https://github.com/amnezia-vpn/OpenVPNAdapter` + xcodebuild их framework-таргета; SPM у форка сломан — только клон). Пишем, но не запускаем — понадобится только при провале ворот или баге iOS 26.
+  4. `framework-provenance.py` сверяет квитанцию сборки: закреплённые коммиты, SHA-256 патча и бинарника.
+- **`scripts/build-framework-source.sh`** — основной путь: закреплённые исходники адаптера и OpenVPN3,
+  AEAD-патч, xcodebuild framework-таргета, privacy manifest и квитанция сборки.
+  Готовый `v1.0.42` неработоспособен, поэтому собирать из исходников обязательно.
 
-**Команды/проверка:** `make fetch && make verify` → SHA-256 зафиксирован в скрипте, три PASS. Затем **читаем реальные заголовки** и фиксируем в `docs/FRAMEWORK-API.md`:
+**Команды/проверка:** `make framework && make verify`. Затем **читаем реальные заголовки** и фиксируем в `docs/FRAMEWORK-API.md`:
 - точную сигнатуру `setPTCloak` (свойство/метод, тип аргумента);
 - сигнатуру делегата `configureTunnelWithNetworkSettings` и **тип completion** (форк менял API в марте 2026 — код провайдера пишем только по этим заголовкам, не по памяти);
 - имена событий/ошибок (`OpenVPNAdapterEvent`, `OpenVPNAdapterErrorFatalKey`).
 
-Если проверка 2 или 3 провалилась: переключаемся на запасной источник `3rd-prebuilt`; если и там нет — `build-framework-source.sh`. Дальше фазы не идём, пока нет трёх PASS.
+Если проверка провалилась, пересобираем `make framework`. Проверка запускается также
+перед build/install/release-check/testflight; `RELEASE_CHECK=0` её не отключает.
 
 **Действует:** агент.
 
@@ -110,7 +117,7 @@ xcodebuild -project OVoCClient.xcodeproj -scheme OVoCClient \
 - **`Sources/ConfigKit/AmneziaModels.swift`** — Codable-модели: `AmneziaConfig {hostName, description?, dns1?, dns2?, defaultContainer?, containers}`, `AmneziaContainer {container, openvpn?, cloak?, shadowsocks?}`. **Двойной разбор**: `openvpn.last_config` и `cloak.last_config` — JSON-СТРОКИ, парсятся вторым проходом: `OpenVPNLastConfig {config, clientId?}`; Cloak — в словарь `[String: JSONValue]` (свой enum, сохраняющий число/строку как есть — исходные типы полей в ключе не гарантированы). Рядом с `last_config` в объекте `cloak` могут лежать `port`, `transport_proto` — модель их видит.
 - **`Sources/ConfigKit/CloakTransform.swift`** — `public static func makeCloakJSON(cloak:hostName:) throws -> Data`, порт `setupCloak` из `ios_controller.mm`:
   - `NumConn = 1` (число, принудительно — защита памяти расширения);
-  - `RemoteHost` ← поле `remote` (если есть; иначе `hostName`), `RemotePort` ← `port`; ключи `remote`, `port`, `transport_proto` — удалить;
+  - `RemoteHost` ← первое непустое `remote` / `RemoteHost` / `hostName`, `RemotePort` ← `port`; ключи `remote`, `port`, `transport_proto` — удалить;
   - **типы**: только `NumConn` и `StreamTimeout` — числа (`"300"` → `300`); все остальные значения — строки (`UID`/`PublicKey` — base64-строки как есть). Иначе Go `json.Unmarshal` на той стороне сломается;
   - результат — канонический JSON `Data`.
 - **`Sources/ConfigKit/OVPNProfileBuilder.swift`** — `public static func build(ovpnText:serverIP:dns1:dns2:cloakJSON:) -> String`:
@@ -161,8 +168,9 @@ xcodebuild -project OVoCClient.xcodeproj -scheme OVoCClient \
 
 - **`project.yml`**: подключить `Frameworks/OpenVPNAdapter.framework` к таргету PacketTunnel (link + embed в приложение, code-sign-on-copy). `make gen && make build` (без подписи) — линковка с SDK 26 проверяется уже здесь.
 - **`PacketTunnel/PacketTunnelProvider.swift`** — полная реализация **строго по заголовкам из `docs/FRAMEWORK-API.md`** (шаг 0.2):
-  - `startTunnel`: конфиг из `providerConfiguration` → `OpenVPNConfiguration` (`fileContent` = готовый .ovpn, `tunPersist = true`, вызов `setPTCloak`) → `adapter.apply(...)` (ошибки — в лог дословно) → **сторожевой таймер 30 сек** (Cloak-рукопожатие многосекундное; системное убийство ≈60 c недокументировано) → `adapter.connect(using: packetFlow)`. Логин/пароль не нужны (сертификаты в профиле);
-  - `extension NEPacketTunnelFlow: OpenVPNAdapterPacketFlow {}` — мост потока пакетов;
+  - `startTunnel`: конфиг из `providerConfiguration` → `OpenVPNConfiguration` (`fileContent` = готовый .ovpn, `tunPersist` остаётся `false`, вызов `setPTCloak`) → `adapter.apply(...)` (ошибки — в лог дословно) → **сторожевой таймер 30 сек** (Cloak-рукопожатие многосекундное; системное убийство ≈60 c недокументировано) → `adapter.connect(using: packetBridge)`. Логин/пароль не нужны (сертификаты в профиле);
+  - `PacketFlowBridge` — отдельный мост потока пакетов, с учётом пакетов и IPv6-фильтром;
+  - `configureTunnel(nil)` подтверждается без снятия системных маршрутов и DNS; новые настройки заменяют старые напрямую. Проверка P1 на физическом iPhone ещё не выполнена;
   - делегат `configureTunnelWithNetworkSettings`: `dnsSettings.matchDomains = [""]` всегда; DNS-fallback (адаптер → строки `dhcp-option DNS` из конфига → dns1/dns2); **`NEIPv4Route(serverIP, 255.255.255.255)` в `excludedRoutes`** (вторая половина защиты от петли — `tunnelRemoteAddress` будет `127.0.0.1`, автоисключение iOS не сработает); затем `setTunnelNetworkSettings`;
   - `handleEvent`: `.connected` → снять таймер, завершить старт; `.disconnected` → завершить стоп либо `cancelTunnelWithError`;
   - `handleError`: фатальность по `OpenVPNAdapterErrorFatalKey`; фатальные → `last_error.txt` (App Group);
@@ -355,7 +363,7 @@ DEVICE-TESTING.md, этап F; ещё не выполнялся.
 
 ## Верификация (сквозная, из PLAN.md)
 
-- **Mac, без телефона:** `cd ConfigKit && swift test` — зелёный; `make build` (unsigned) — BUILD SUCCEEDED; `make verify` — 3 PASS.
+- **Mac, без телефона:** `make test` — ConfigKit, Runtime/Shared и Python-проверки происхождения фреймворка; `make build` (unsigned) — BUILD SUCCEEDED; `make verify` — 4 PASS.
 - **iPhone:** `make install` → «Подключить» → значок VPN → сайт-определитель показывает IP сервера → сайты открываются → 10 минут стабильно (память < 50 МБ в heartbeat) → чистое отключение.
 - **Раздача:** сборка «Ready to Test» → установка по публичной ссылке → родственник подключается.
 

@@ -7,8 +7,8 @@ public struct ImportedConfig: Codable, Equatable {
     /// Полный текст .ovpn: DNS подставлен, route для IP сервера гарантирован,
     /// блок <cloak> дописан.
     public let ovpnProfile: String
-    /// IPv4 сервера — для excludedRoutes (если hostName был доменом,
-    /// адрес разрешён и зафиксирован в момент импорта).
+    /// Фактический IPv4 Cloak — одновременно для RemoteHost и excludedRoutes.
+    /// Если endpoint был доменом, адрес зафиксирован в момент импорта.
     public let serverIP: String
     public let dns1: String
     public let dns2: String
@@ -56,25 +56,28 @@ public struct ImportedConfig: Codable, Equatable {
         }
 
         let ovpnText = try openvpn.ovpnConfigText()
-        let cloakFields = try cloak.effectiveFields()
+        var cloakFields = try cloak.effectiveFields()
 
         // Значения по умолчанию — как в PLAN.md.
         let dns1 = config.dns1?.isEmpty == false ? config.dns1! : "1.1.1.1"
         let dns2 = config.dns2?.isEmpty == false ? config.dns2! : "1.0.0.1"
 
-        // Для маршрутов нужен именно IPv4-литерал; RemoteHost в Cloak-конфиге
-        // при этом остаётся исходным hostName (Go-сторона резолвит его сама).
+        // Cloak может подключаться к remote/RemoteHost, отличному от hostName.
+        // Разрешаем именно его и фиксируем один IPv4 в транспорте и маршруте:
+        // повторный DNS в Go мог бы выбрать другой адрес и создать петлю.
+        let remoteHost = CloakTransform.remoteHost(fields: cloakFields, hostName: config.hostName)
         let serverIP: String
-        if isIPv4Literal(config.hostName) {
-            serverIP = config.hostName
+        if isIPv4Literal(remoteHost) {
+            serverIP = remoteHost
         } else {
-            let resolved = try resolve(config.hostName)
+            let resolved = try resolve(remoteHost)
             guard isIPv4Literal(resolved) else {
-                throw VPNKeyError.notAnIPv4(config.hostName)
+                throw VPNKeyError.notAnIPv4(remoteHost)
             }
             serverIP = resolved
         }
 
+        cloakFields["remote"] = .string(serverIP)
         let cloakJSON = try CloakTransform.makeCloakJSON(fields: cloakFields, hostName: config.hostName)
         let profile = OVPNProfileBuilder.build(
             ovpnText: ovpnText,

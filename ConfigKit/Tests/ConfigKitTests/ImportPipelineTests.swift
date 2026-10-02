@@ -45,7 +45,7 @@ final class ImportPipelineTests: XCTestCase {
     }
 
     // Кейс 16: hostName — домен → serverIP берётся из резолвера и попадает в route,
-    // а RemoteHost в Cloak-конфиге остаётся доменом (Go резолвит его сам).
+    // и RemoteHost фиксируется тем же IP: повторного DNS в Go нет.
     func testHostNameDomainResolved() throws {
         let json = SyntheticKey.serverJSON(
             hostName: "vpn.example.org",
@@ -63,14 +63,50 @@ final class ImportPipelineTests: XCTestCase {
         XCTAssertTrue(imported.ovpnProfile.contains("route 198.51.100.7 255.255.255.255 net_gateway"))
 
         let cloak = try SyntheticKey.cloakDict(fromProfile: imported.ovpnProfile)
-        XCTAssertEqual(cloak["RemoteHost"] as? String, "vpn.example.org")
+        XCTAssertEqual(cloak["RemoteHost"] as? String, "198.51.100.7")
     }
 
     // Резолвер вернул не-IPv4 → типизированная ошибка.
     func testResolverReturningGarbageFails() throws {
-        let json = SyntheticKey.serverJSON(hostName: "vpn.example.org")
+        let json = SyntheticKey.serverJSON(
+            hostName: "vpn.example.org",
+            cloakLast: SyntheticKey.cloakLastConfig(removeKeys: ["RemoteHost"])
+        )
         XCTAssertThrowsError(try ImportedConfig.make(fromKey: SyntheticKey.key(from: json)) { _ in "не-адрес" }) {
             XCTAssertEqual($0 as? VPNKeyError, .notAnIPv4("vpn.example.org"))
         }
+    }
+
+    func testRouteFollowsCloakEndpointInsteadOfManagementHost() throws {
+        let json = SyntheticKey.serverJSON(
+            hostName: "management.example.org",
+            ovpnText: SyntheticKey.sampleOVPNNoPlaceholdersNoRoute,
+            cloakLast: SyntheticKey.cloakLastConfig(extra: ["RemoteHost": "198.51.100.20"])
+        )
+        let imported = try ImportedConfig.make(fromKey: SyntheticKey.key(from: json)) { _ in
+            XCTFail("Management host must not be resolved when Cloak has an IP endpoint")
+            return "203.0.113.10"
+        }
+        XCTAssertEqual(imported.serverIP, "198.51.100.20")
+        XCTAssertTrue(imported.ovpnProfile.contains("route 198.51.100.20 255.255.255.255 net_gateway"))
+        let cloak = try SyntheticKey.cloakDict(fromProfile: imported.ovpnProfile)
+        XCTAssertEqual(cloak["RemoteHost"] as? String, imported.serverIP)
+    }
+
+    func testRemoteOverrideIsResolvedOnceAndPinnedInCloak() throws {
+        let json = SyntheticKey.serverJSON(
+            cloakSiblings: ["remote": "edge.example.org", "port": "443"]
+        )
+        var resolved: [String] = []
+        let imported = try ImportedConfig.make(fromKey: SyntheticKey.key(from: json)) { host in
+            resolved.append(host)
+            return "198.51.100.30"
+        }
+        XCTAssertEqual(resolved, ["edge.example.org"])
+        XCTAssertEqual(imported.serverIP, "198.51.100.30")
+        let cloak = try SyntheticKey.cloakDict(fromProfile: imported.ovpnProfile)
+        XCTAssertEqual(cloak["RemoteHost"] as? String, imported.serverIP)
+        XCTAssertEqual(cloak["ServerName"] as? String, "example-mask.com", "SNI must remain unchanged")
+        XCTAssertNil(cloak["remote"])
     }
 }

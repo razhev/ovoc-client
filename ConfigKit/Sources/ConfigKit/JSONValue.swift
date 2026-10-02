@@ -60,8 +60,7 @@ public enum JSONValue: Codable, Equatable {
     public var asInt: Int? {
         switch self {
         case .number(let value):
-            guard value == value.rounded() else { return nil }
-            return Int(value)
+            return Int(exactly: value)
         case .string(let value): return Int(value.trimmingCharacters(in: .whitespaces))
         default: return nil
         }

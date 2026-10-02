@@ -115,7 +115,10 @@ personal-ios-client/
 ├── Makefile               # короткие команды: make gen / build / test / install / logs / testflight … (список — в README)
 ├── README.md              # статус, команды, архитектура, отладка, дизайн «Печка»
 ├── PLAN.md                # этот файл
-├── IMPLEMENTATION_PROMPT.md # самодостаточный промпт для агента (выжимка исследования)
+├── CHANGELOG.md           # изменения по версиям
+├── Package.swift          # тесты TunnelRuntime и SharedRuntime на Mac
+├── Tests/                 # reconnect, IPv6, ротация логов и Python-проверки происхождения framework
+├── IMPLEMENTATION_PROMPT.md # исторический промпт первого планирования
 ├── .gitignore             # прячет: Secrets/* (кроме asc.env.example), *.vpnkey, *.ovpn, *.p8, Frameworks/, *.xcodeproj, build/
 │
 ├── App/                   # ── приложение (то, что видит пользователь) ──
@@ -138,11 +141,13 @@ personal-ios-client/
 ├── PacketTunnel/          # ── расширение (сам VPN) ──
 │   ├── PacketTunnelProvider.swift # ядро VPN: запуск, маршруты, DNS, IPv6, смена сети, ошибки (детали ниже)
 │   ├── PacketFlowBridge.swift    # мост packetFlow ↔ адаптер: счётчики пакетов, IPv6-раковина, детектор петли
+│   ├── Runtime/                  # политика обновления сетевых настроек и IPv6-фильтр
 │   └── PrivacyInfo.xcprivacy     # privacy manifest расширения
 │
 ├── Shared/                # компилируется в ОБЕ цели
 │   ├── SharedPaths.swift         # ID App Group и пути (tunnel.log, app.log, last_error.txt)
 │   ├── RingLogger.swift          # лог-файл в App Group + os.Logger; heartbeat раз в 30 с
+│   ├── RingLogTail.swift         # ротация по строкам с сохранением границ UTF-8
 │   └── TunnelIPC.swift           # ключи providerConfiguration, которыми приложение передаёт профиль расширению
 │
 ├── ConfigKit/             # ── локальный Swift-пакет: вся логика разбора ключа, тестируется на Mac без телефона ──
@@ -156,7 +161,7 @@ personal-ios-client/
 │   │   ├── CloakTransform.swift  # приведение полей Cloak (NumConn=1, RemoteHost/RemotePort, типы)
 │   │   ├── OVPNProfileBuilder.swift # подстановка DNS, route для IP сервера, блок <cloak>
 │   │   └── ImportedConfig.swift  # итоговая модель импорта (профиль, IP сервера, DNS) — в файлы не пишется
-│   └── Tests/ConfigKitTests/     # 41 юнит-тест на синтетических ключах — гоняются на Mac
+│   └── Tests/ConfigKitTests/     # 45 юнит-тестов на синтетических ключах — гоняются на Mac
 │
 ├── Config/ExportOptions.plist    # экспорт архива для TestFlight (app-store-connect, загрузка сразу)
 ├── Config/OpenVPNAdapter-PrivacyInfo.xcprivacy # privacy manifest фреймворка (кладётся в бандл фреймворка)
@@ -164,6 +169,7 @@ personal-ios-client/
 ├── THIRD_PARTY_LICENSES.md       # компоненты, версии, лицензии
 ├── PRIVACY.md                    # политика конфиденциальности (ru + en)
 ├── Frameworks/OpenVPNAdapter.framework  # в .gitignore, собирается `make framework`
+├── Frameworks/OpenVPNAdapter.build.json # квитанция локальной сборки: коммиты, хэши патча и бинарника
 ├── patches/openvpn3-aead-auth-tag.patch # наш патч к OpenVPN3: метка GCM записывается и проверяется
 ├── Secrets/                      # в .gitignore: твой ключ, реквизиты API-ключа; в git только asc.env.example
 ├── docs/                         # IMPLEMENTATION, DEVICE-TESTING, FRAMEWORK-API, TESTFLIGHT
@@ -171,7 +177,8 @@ personal-ios-client/
     ├── build-framework-source.sh # `make framework`: фреймворк из исходников форка Amnezia + наш патч (основной путь)
     ├── framework-privacy-manifest.sh # `make framework-manifest`: privacy manifest в собранный фреймворк
     ├── fetch-framework.sh        # `make fetch`: готовый бинарь v1.0.42 — нерабочий, только для сравнения
-    ├── verify-framework.sh       # `make verify`: arm64? символы Cloak? setPTCloak? (ворота M2)
+    ├── verify-framework.sh       # `make verify`: arm64, символы Cloak, setPTCloak и происхождение бинарника
+    ├── framework-provenance.py   # запись/проверка квитанции сборки framework
     ├── decode-vpnkey.py          # dev-утилита на Mac: разобрать ключ (`--schema` — только структура, без секретов)
     ├── find-device.py            # найти подключённый iPhone (UDID) в выводе devicectl
     ├── mount-ddi.sh              # `make ddi`: смонтировать образ разработчика (VPN на Mac выключить)
@@ -275,7 +282,7 @@ personal-ios-client/
 - Иконка «Мёд» — печь с колобком вместо щита.
 - Источник правды — холст Design «Печка — мультяшный OVoC Client»; сцену пересобирает `make scene` (нужен Node.js). Подробнее — README, «Дизайн «Печка»».
 
-### M6 — Раздача через TestFlight — инструменты ✅ 2026-09-26; загрузка ждёт
+### M6 — Раздача через TestFlight — сборки 1 и 2 загружены
 В App Store Connect создаём запись приложения. `make testflight` собирает архив и заливает его (через API-ключ из M0).
 
 Раздача: **внешняя группа тестеров + публичная ссылка** (лучший вариант для семьи: поставить приложение TestFlight → нажать ссылку). Первую сборку каждой версии проверяет Beta App Review; в заметках для ревью пишем, что это личный клиент к собственному серверу, прикладываем отдельный тестовый ключ. Запасной вариант, если ревью буксует: внутренние тестеры (до 100 человек, вообще без ревью, но нужно добавить их Apple ID в команду).
@@ -286,6 +293,7 @@ personal-ios-client/
 - **Готово (PR #4):** `make testflight` — проверки реквизитов и Team ID, защита от повторного номера сборки, ворота `release-check` + `strings-check`, Release-архив и загрузка через API-ключ (без fastlane и altool); `Config/ExportOptions.plist`; docs/TESTFLIGHT.md — пошагово: запись приложения и API-ключ (6.1), `make testflight` (6.2), внешняя группа и публичная ссылка с готовым текстом для Beta App Review (6.3), шаблон сообщения родственникам (6.4), памятка «90 дней», запасной вариант с внутренними тестерами.
 - **Первая загрузка ✅ 2026-09-28:** запись приложения (`com.razhev.ovocclient`) и API-ключ созданы, сборка 0.1.0 (1) загружена и обработана Apple. **Как вышло:** ключу с ролью App Manager Apple не дал подписать сборку для распространения («Cloud signing permission error» — это разрешено только роли Admin); подпись и загрузка прошли через Apple ID из Xcode. `make testflight` теперь делает такой повтор сам; `ASC_AUTH=account` — сразу через Apple ID, без ключа.
 - **Установка у себя ✅ 2026-09-28:** внутренняя группа, приглашение (пришлось **Reinvite**: тестера добавили в группу раньше, чем туда попала сборка, и письмо не ушло), Accept → Install — работает.
+- **Проверка API 2026-10-02:** у сборки 0.1.0 (2) `processingState=VALID`, внутреннее и внешнее тестирование — `IN_BETA_TESTING`. Точная дата одобрения не установлена.
 - **Ждёт тебя:** шаги 7–12 для раздачи по публичной ссылке; близких можно добавлять внутренними тестерами уже сейчас.
 
 **Подготовка к первой загрузке ✅ (2026-09-27).** Список «сверить перед первой загрузкой» из разбора публикации 2026-09-26 закрыт так:
@@ -389,6 +397,7 @@ personal-ios-client/
 ## Как проверяется результат (end-to-end)
 
 - **На Mac, без телефона:** `make test` — ConfigKit, сетевые настройки, IPv6-фильтр, ротация логов и происхождение фреймворка; `make build` — BUILD SUCCEEDED; `make verify` — архитектура, символы, API, происхождение бинарника; `make release-check` — сборки, отсутствие DEBUG-моста/ключей, privacy manifest и лицензии; `make strings-check` — PASS.
+- **Проверено 2026-10-02 для сборки 0.1.0 (3):** 63 теста (45 ConfigKit, 9 Runtime/Shared, 9 Python), Debug/Release и 107 строк локализации прошли проверки. Проверка P1 на физическом iPhone ещё не выполнена.
 - **На iPhone (главная проверка):** `make install` → «Добавить ключ» → «Вставить» → «Разрешить» → «Подключить» → значок VPN → сайт-определитель показывает **IP сервера** → сайты открываются → 10 минут стабильно → чистое отключение; `make logs` — в `tunnel.log` `event: connected`, heartbeat с пакетами, без `Transport error`. Чек-листы этапов — docs/DEVICE-TESTING.md (этапы C–F и «Хвост гейта M3»).
 - **Раздача:** `make testflight` → сборка «Ready to Test» → устанавливается по публичной ссылке → один родственник подключается и видит IP сервера.
 

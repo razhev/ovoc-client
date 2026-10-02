@@ -1,6 +1,8 @@
 # План имплементации: OVoC Client (iOS-клиент OpenVPN over Cloak)
 
-> Детализация утверждённого PLAN.md. После утверждения сохраняется как `docs/IMPLEMENTATION.md` и пушится. Все зафиксированные решения из IMPLEMENTATION_PROMPT.md соблюдены без изменений.
+> Детализация исходного плана с последующими уточнениями. Датированные результаты ниже
+> описывают соответствующие этапы; текущее состояние — в [PLAN.md](../PLAN.md) и
+> [README.md](../README.md). IMPLEMENTATION_PROMPT.md сохранён как исторический документ.
 
 ## Контекст
 
@@ -166,8 +168,9 @@ xcodebuild -project OVoCClient.xcodeproj -scheme OVoCClient \
 
 - **`project.yml`**: подключить `Frameworks/OpenVPNAdapter.framework` к таргету PacketTunnel (link + embed в приложение, code-sign-on-copy). `make gen && make build` (без подписи) — линковка с SDK 26 проверяется уже здесь.
 - **`PacketTunnel/PacketTunnelProvider.swift`** — полная реализация **строго по заголовкам из `docs/FRAMEWORK-API.md`** (шаг 0.2):
-  - `startTunnel`: конфиг из `providerConfiguration` → `OpenVPNConfiguration` (`fileContent` = готовый .ovpn, `tunPersist = true`, вызов `setPTCloak`) → `adapter.apply(...)` (ошибки — в лог дословно) → **сторожевой таймер 30 сек** (Cloak-рукопожатие многосекундное; системное убийство ≈60 c недокументировано) → `adapter.connect(using: packetFlow)`. Логин/пароль не нужны (сертификаты в профиле);
-  - `extension NEPacketTunnelFlow: OpenVPNAdapterPacketFlow {}` — мост потока пакетов;
+  - `startTunnel`: конфиг из `providerConfiguration` → `OpenVPNConfiguration` (`fileContent` = готовый .ovpn, `tunPersist` остаётся `false`, вызов `setPTCloak`) → `adapter.apply(...)` (ошибки — в лог дословно) → **сторожевой таймер 30 сек** (Cloak-рукопожатие многосекундное; системное убийство ≈60 c недокументировано) → `adapter.connect(using: packetBridge)`. Логин/пароль не нужны (сертификаты в профиле);
+  - `PacketFlowBridge` — отдельный мост потока пакетов, с учётом пакетов и IPv6-фильтром;
+  - `configureTunnel(nil)` подтверждается без снятия системных маршрутов и DNS; новые настройки заменяют старые напрямую. Проверка P1 на физическом iPhone ещё не выполнена;
   - делегат `configureTunnelWithNetworkSettings`: `dnsSettings.matchDomains = [""]` всегда; DNS-fallback (адаптер → строки `dhcp-option DNS` из конфига → dns1/dns2); **`NEIPv4Route(serverIP, 255.255.255.255)` в `excludedRoutes`** (вторая половина защиты от петли — `tunnelRemoteAddress` будет `127.0.0.1`, автоисключение iOS не сработает); затем `setTunnelNetworkSettings`;
   - `handleEvent`: `.connected` → снять таймер, завершить старт; `.disconnected` → завершить стоп либо `cancelTunnelWithError`;
   - `handleError`: фатальность по `OpenVPNAdapterErrorFatalKey`; фатальные → `last_error.txt` (App Group);
@@ -360,7 +363,7 @@ DEVICE-TESTING.md, этап F; ещё не выполнялся.
 
 ## Верификация (сквозная, из PLAN.md)
 
-- **Mac, без телефона:** `cd ConfigKit && swift test` — зелёный; `make build` (unsigned) — BUILD SUCCEEDED; `make verify` — 3 PASS.
+- **Mac, без телефона:** `make test` — ConfigKit, Runtime/Shared и Python-проверки происхождения фреймворка; `make build` (unsigned) — BUILD SUCCEEDED; `make verify` — 4 PASS.
 - **iPhone:** `make install` → «Подключить» → значок VPN → сайт-определитель показывает IP сервера → сайты открываются → 10 минут стабильно (память < 50 МБ в heartbeat) → чистое отключение.
 - **Раздача:** сборка «Ready to Test» → установка по публичной ссылке → родственник подключается.
 

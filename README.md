@@ -8,6 +8,7 @@
 
 ## Что где
 
+- **[CHANGELOG.md](CHANGELOG.md)** — изменения по версиям и оставшиеся проверки текущего релиза.
 - **[PLAN.md](PLAN.md)** — полный план разработки: архитектура, этапы (M0–M6) с проверками, риски.
 - **[docs/IMPLEMENTATION.md](docs/IMPLEMENTATION.md)** — детальный план имплементации по шагам (Фаза 0 → M6), тест-стратегия, план коммитов, открытые вопросы.
 - **[docs/DEVICE-TESTING.md](docs/DEVICE-TESTING.md)** — инструкция по тестированию на iPhone: подготовка аккаунта и телефона, чек-лист первого запуска, каналы отладки, таблица «симптом → что делать».
@@ -15,7 +16,7 @@
 - **[THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md)** — лицензия приложения (GPL-3.0) и сторонних компонентов; тексты — в `App/Licenses`, в приложении — экран «О приложении».
 - **[PRIVACY.md](PRIVACY.md)** — политика конфиденциальности (ru + en) — её URL нужен для внешнего тестирования в TestFlight.
 - **[docs/FRAMEWORK-API.md](docs/FRAMEWORK-API.md)** — зафиксированный API `OpenVPNAdapter.framework`, выписанный из реальных заголовков. По нему пишется код провайдера.
-- **[IMPLEMENTATION_PROMPT.md](IMPLEMENTATION_PROMPT.md)** — самодостаточный промпт для агента (выжимка исследования).
+- **[IMPLEMENTATION_PROMPT.md](IMPLEMENTATION_PROMPT.md)** — исторический промпт первого планирования; актуальные команды и устройство проекта описаны здесь и в PLAN.md.
 
 ## Статус
 
@@ -86,6 +87,11 @@ App ID и App Group, импорт ключа вставкой → «Подклю
 5.4) и тестовый ключ для ревьюера выложены секретными Gist, Test Information заполнена,
 сборка 0.1.0 (2) — со ссылкой на политику внутри приложения — отправлена на Beta App Review.
 
+**Проверка TestFlight 2026-10-02:** App Store Connect API подтверждает для сборки 0.1.0 (2)
+`processingState=VALID`, внутреннее и внешнее состояния — `IN_BETA_TESTING`.
+Точная дата одобрения не установлена. Изменения подготовленной сборки 0.1.0 (3) —
+в [CHANGELOG.md](CHANGELOG.md); проверка P1 на физическом iPhone ещё предстоит.
+
 **Хвост гейта M3 (2026-09-26)**: закрыта утечка IPv6 — при отсутствии IPv6
 от сервера расширение ставит IPv6-настройки с ULA-адресом и default-маршрутом в туннель, а мост
 отбрасывает такие пакеты (`ipv6=sink(…)` в логе, `ipv6-sunk N` в heartbeat); при смене сети
@@ -102,7 +108,7 @@ IPv6-сайт при поднятом VPN, переключение Wi-Fi ↔ LT
 ```bash
 make gen        # сгенерировать OVoCClient.xcodeproj из project.yml
 make build      # собрать оба таргета БЕЗ подписи — быстрая проверка компиляции
-make test       # ConfigKit + сохранение сетевых настроек при reconnect — на Mac
+make test       # ConfigKit, reconnect, IPv6, UTF-8 логов и происхождение framework — на Mac
 make framework  # собрать OpenVPNAdapter.framework из исходников Amnezia + наш патч (основной способ)
 make framework-manifest # положить privacy manifest в уже собранный фреймворк (make framework делает сам)
 make fetch      # готовый бинарь v1.0.42 — НЕРАБОЧИЙ (дефект метки GCM), только для сравнения

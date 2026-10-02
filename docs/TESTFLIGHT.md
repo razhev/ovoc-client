@@ -33,6 +33,11 @@
 Дальше — только руками. **Часть 1** — сборка у вас на телефоне через TestFlight (внутреннее
 тестирование, без ревью Apple). **Часть 2** — раздача другим людям.
 
+**Проверено через App Store Connect API 2026-10-02:** сборка **0.1.0 (2)** обработана
+(`processingState=VALID`), состояния внутреннего и внешнего тестирования — `IN_BETA_TESTING`.
+Точная дата одобрения не установлена. Проверки IPv6-only сети и P1 при смене сети на
+физическом iPhone по-прежнему не выполнены. Ниже сохранён ход первой загрузки.
+
 **Состояние на 2026-09-28:**
 - Шаги 1–6 пройдены: сборка **0.1.0 (1)** стоит у вас через TestFlight и работает.
 - Для внешней группы:
@@ -53,8 +58,9 @@
 
 ### Часть 1. Первая сборка у себя (≈ 1 час, из них 5–30 минут — ожидание Apple)
 
-1. **Обновить фреймворк на Mac** — один раз, если он собран до 2026-09-27:
-   `make framework-manifest` → строка `OK: privacy manifest → …`. Затем `make release-check`:
+1. **Обновить фреймворк на Mac:** `make framework && make verify`. С 2026-10-02 нужны
+   четыре проверки, включая квитанцию `Frameworks/OpenVPNAdapter.build.json`; одного
+   добавления privacy manifest к старому бинарнику недостаточно. Затем `make release-check`:
    все строки `PASS`, в том числе «privacy manifest» и «лицензии».
 2. **Соглашения Apple.** Открыть <https://appstoreconnect.apple.com> под Apple ID аккаунта
    разработчика.
@@ -139,7 +145,7 @@
 - `make install` хотя бы раз проходил: он зарегистрировал на портале App ID
   `com.razhev.ovocclient` и `com.razhev.ovocclient.tunnel` с нужными capability. Без этого
   запись приложения в App Store Connect создать нельзя (bundle ID выбирается из списка портала).
-- `Frameworks/OpenVPNAdapter.framework` собран (`make framework`), `make verify` — 3×PASS. В
+- `Frameworks/OpenVPNAdapter.framework` собран (`make framework`), `make verify` — 4×PASS. В
   фреймворке лежит privacy manifest (`make framework` кладёт его сам; для собранного раньше —
   `make framework-manifest`).
 - `make release-check` — зелёный. Его `make testflight` прогоняет сам, но лучше знать заранее.
@@ -236,6 +242,7 @@ make testflight
 `FAIL: …` и останавливается, ничего не заливая):
 
 1. Проверяет инструменты: `xcodebuild`, `xcodegen`, наличие фреймворка, `Config/ExportOptions.plist`.
+   Запускает `make verify`: архитектура, Cloak, API и квитанция сборки с текущим AEAD-патчем.
 2. Читает `Secrets/asc.env` (или переменные окружения `ASC_KEY_ID`, `ASC_ISSUER_ID`,
    необязательно `ASC_KEY_PATH`), проверяет, что файл ключа `~/.private_keys/AuthKey_<Key ID>.p8`
    существует. С `ASC_AUTH=account` (в `Secrets/asc.env` или в окружении) ключ не нужен вовсе:
@@ -245,7 +252,7 @@ make testflight
 4. **Ворота**: `make release-check` (в бандле нет DEBUG-моста и ни одного файла ключа; privacy
    manifest у приложения, расширения и фреймворка; тексты лицензий на месте) и
    `scripts/check-localization.py` (каталог строк сходится с кодом). Пропустить, если только что
-   гоняли: `RELEASE_CHECK=0 make testflight`.
+   гоняли: `RELEASE_CHECK=0 make testflight`. Проверка фреймворка из пункта 1 не отключается.
 5. `xcodebuild archive` — Release, `generic/platform=iOS`, автоподпись через API-ключ
    (`-allowProvisioningUpdates`): distribution-профили для приложения и расширения Xcode
    заводит сам. Архив: `build/testflight/OVoCClient.xcarchive`, лог:
@@ -373,7 +380,7 @@ gh repo edit razhev/personal-ios-client --visibility public --accept-visibility-
 сервера рассчитан на IPv4:
 - адрес сервера в ключе — IPv4;
 - исключение маршрута — `/32`;
-- для IPv6 расширение ставит «раковину» с маршрутом по умолчанию в туннель.
+- если VPN-сервер не выдал IPv6-настройки, расширение ставит «раковину» с маршрутом по умолчанию в туннель.
 
 Как Cloak поведёт себя в такой сети, заранее неизвестно — лучше увидеть самим, чем получить отказ
 ревью.
@@ -560,6 +567,7 @@ this build for TestFlight testing?
 | `FAIL: нет файла ключа ~/.private_keys/AuthKey_….p8` | `.p8` не скачан / лежит не там / Key ID с опечаткой | шаг 6.1б, п. 4–5; проверить `ls ~/.private_keys` |
 | `FAIL: Team ID расходится` | правили `DEVELOPMENT_TEAM` в `project.yml`, а `Config/ExportOptions.plist` — нет | вписать тот же Team ID в plist |
 | `FAIL: сборка … уже загружалась` | номер сборки не поднят | «Номер сборки» выше |
+| `FAIL происхождение фреймворка` | нет квитанции сборки или её коммиты/хэши не совпадают с текущими исходниками, патчем и бинарником | `make framework && make verify`; готовый v1.0.42 использовать нельзя |
 | `FAIL: make release-check не прошёл` | в Release попал DEBUG-мост или файл ключа; нет privacy manifest или текстов лицензий | `make release-check` — смотреть строки `FAIL` |
 | `FAIL privacy manifest` в release-check | фреймворк собран до 2026-09-27; или расширение собрано инкрементально сразу после добавления манифеста | `make framework-manifest`; начисто: `rm -rf build/DerivedData-check && make release-check` |
 | письмо или ошибка `ITMS-91053: Missing API declaration` | в коде появился новый required reason API, не объявленный в манифесте | добавить категорию и причину в `App/PrivacyInfo.xcprivacy` (`PacketTunnel/…`, `Config/OpenVPNAdapter-PrivacyInfo.xcprivacy`) — как в комментариях этих файлов |

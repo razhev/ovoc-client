@@ -77,7 +77,9 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
     private var probeDNS: [String] = []
     private var recoveryStartedAt: TimeInterval?
     private var lastProbeAt: TimeInterval = -.infinity
-    private lazy var healthProbe = TunnelHealthProbe(provider: self, queue: stateQueue)
+    private lazy var healthProbe = TunnelHealthProbe(provider: self, queue: stateQueue) { [weak self] message in
+        self?.logger.log("health transport: \(message)")
+    }
 
     /// Адрес-«раковина» для IPv6 (см. configureTunnel). ULA-префикс fd00::/8,
     /// 6f76:6f63 — «ovoc»; в реальной сети такого адреса нет.
@@ -219,8 +221,15 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
         let timer = DispatchSource.makeTimerSource(queue: stateQueue)
         timer.schedule(deadline: .now() + 5, repeating: 5)
         timer.setEventHandler { [weak self] in
-            guard let self, self.phase == .connected, self.recovery.state == .online,
-                  self.packetBridge.trafficActivity().needsProbe(at: ProcessInfo.processInfo.systemUptime) else { return }
+            guard let self, self.phase == .connected else { return }
+            let activity = self.packetBridge.trafficActivity()
+            if self.recovery.state == .verifying, activity.receivedInbound(since: self.lastProbeAt) {
+                self.logger.log("health: incoming tunnel traffic confirms data path")
+                self.perform(self.recovery.probeFinished(ticket: self.recovery.ticket, success: true))
+                return
+            }
+            guard self.recovery.state == .online,
+                  activity.needsProbe(at: ProcessInfo.processInfo.systemUptime) else { return }
             self.logger.log("health: outbound traffic without replies for 15s; checking tunnel")
             self.perform(self.recovery.checkHealth())
         }
@@ -277,18 +286,25 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
                     failTunnel("Не удалось пересоздать VPN: \(describe(error))")
                     return
                 }
+            case .activateTunnel:
+                if phase == .starting {
+                    logger.log("adapter and network settings ready; completing system tunnel start")
+                    finishStart(nil)
+                }
             case .probe(let ticket):
                 lastProbeAt = ProcessInfo.processInfo.systemUptime
+                let startedAt = lastProbeAt
                 logger.log("health: checking data path through tunnel (ticket=\(ticket))")
-                healthProbe.start(servers: probeDNS) { [weak self] success in
+                healthProbe.start(servers: probeDNS) { [weak self] probeReplied in
                     guard let self else { return }
+                    let receivedTraffic = self.packetBridge.trafficActivity().receivedInbound(since: startedAt)
+                    let success = probeReplied || receivedTraffic
                     self.logger.log("health: \(success ? "round trip OK" : "no reply") (ticket=\(ticket))")
                     self.perform(self.recovery.probeFinished(ticket: ticket, success: success))
                 }
             case .ready:
                 lastAdapterError = nil
                 if let url = SharedPaths.lastErrorURL { try? FileManager.default.removeItem(at: url) }
-                if phase == .starting { finishStart(nil) }
                 let elapsed = recoveryStartedAt.map { Int(ProcessInfo.processInfo.systemUptime - $0) } ?? 0
                 recoveryStartedAt = nil
                 logger.logMemory("tunnel verified, recovery=\(elapsed)s")
@@ -456,7 +472,7 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
         watchdog.schedule(deadline: .now() + 30)
         watchdog.setEventHandler { [weak self] in
             guard let self, self.phase == .starting else { return }
-            self.logger.log("start watchdog fired: no .connected event in 30s")
+            self.logger.log("start watchdog fired: tunnel not ready for activation in 30s")
             let message = self.refusalReason
                 ?? "Не удалось подключиться за 30 секунд — сервер недоступен или конфигурация неверна"
             self.writeLastError(message)

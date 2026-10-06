@@ -16,6 +16,7 @@ struct ReconnectCoordinator {
         case reconnect(attempt: Int)
         case stopAdapter
         case replaceAdapter(attempt: Int)
+        case activateTunnel
         case probe(ticket: Int)
         case ready
         case fail(String)
@@ -67,9 +68,12 @@ struct ReconnectCoordinator {
         if state == .reconnecting {
             state = .verifying
             // Handshake + data-plane verification share the same 30s budget.
-            return [.cancelProbe, .probe(ticket: ticket)]
+            return [.activateTunnel, .reassert(false), .cancelProbe, .probe(ticket: ticket)]
         }
-        return verify()
+        // iOS must finish starting (or reasserting) before a connection scoped
+        // to the virtual interface can reliably exchange traffic. Do not make
+        // activation depend on a probe that itself needs an activated tunnel.
+        return [.activateTunnel, .reassert(false)] + verify()
     }
 
     mutating func reconnecting() -> [Effect] {

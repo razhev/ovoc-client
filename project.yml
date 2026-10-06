@@ -27,7 +27,7 @@ settings:
     # Team ID платной команды (developer.apple.com → Membership). Не секрет:
     # он и так зашит в каждую подписанную сборку.
     DEVELOPMENT_TEAM: "222A4867MA"
-    CURRENT_PROJECT_VERSION: "5"
+    CURRENT_PROJECT_VERSION: "6"
     MARKETING_VERSION: "0.1.0"
 
 packages:

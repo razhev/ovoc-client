@@ -6,6 +6,7 @@ import NetworkExtension
 final class TunnelHealthProbe {
     private weak var provider: NEPacketTunnelProvider?
     private let queue: DispatchQueue
+    private let log: (String) -> Void
     private var connection: Network.NWConnection?
     private var legacySession: NWUDPSession?
     private var observation: NSKeyValueObservation?
@@ -15,9 +16,10 @@ final class TunnelHealthProbe {
     private var generation = 0
     private var sent = false
 
-    init(provider: NEPacketTunnelProvider, queue: DispatchQueue) {
+    init(provider: NEPacketTunnelProvider, queue: DispatchQueue, log: @escaping (String) -> Void) {
         self.provider = provider
         self.queue = queue
+        self.log = log
     }
 
     func start(servers: [String], completion: @escaping (Bool) -> Void) {
@@ -62,22 +64,33 @@ final class TunnelHealthProbe {
         let query = TunnelDNSQuery(id: UInt16.random(in: .min ... .max))
         let deadline = DispatchWorkItem { [weak self] in
             guard let self, self.generation == generation else { return }
+            self.log("DNS probe timed out (sent=\(self.sent))")
             self.nextServer()
         }
         timeout = deadline
         queue.asyncAfter(deadline: .now() + 4, execute: deadline)
 
         if #available(iOS 18.0, macOS 15.0, *) {
-            guard let interface = provider.virtualInterface else { finish(false); return }
+            guard let interface = provider.virtualInterface else {
+                log("virtual interface unavailable")
+                finish(false)
+                return
+            }
             let parameters = NWParameters.udp
             parameters.requiredInterface = interface
             let connection = Network.NWConnection(host: Network.NWEndpoint.Host(server), port: 53, using: parameters)
             self.connection = connection
             connection.stateUpdateHandler = { [weak self] state in
                 guard let self, self.generation == generation else { return }
-                if case .failed = state { self.nextServer(); return }
+                if case .waiting(let error) = state { self.log("waiting: \(error)") }
+                if case .failed(let error) = state {
+                    self.log("failed: \(error)")
+                    self.nextServer()
+                    return
+                }
                 guard case .ready = state, !self.sent else { return }
                 self.sent = true
+                self.log("sending DNS probe through \(interface.name)")
                 connection.send(content: query.data, completion: .contentProcessed { [weak self] error in
                     guard let self, self.generation == generation else { return }
                     if error != nil { self.nextServer() }

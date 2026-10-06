@@ -7,6 +7,17 @@ final class TunnelHealthTests: XCTestCase {
         XCTAssertFalse(activity.needsProbe(at: 10_000))
     }
 
+    func testVerificationOnlyAcceptsInboundTrafficFromCurrentCheck() {
+        var activity = TunnelTrafficActivity()
+        XCTAssertFalse(activity.receivedInbound(since: 100))
+        activity.inbound(at: 99)
+        activity.outbound(at: 101)
+        XCTAssertFalse(activity.receivedInbound(since: 100))
+        activity.inbound(at: 102)
+        XCTAssertTrue(activity.receivedInbound(since: 100))
+        XCTAssertFalse(activity.receivedInbound(since: 103))
+    }
+
     func testOutboundWithoutRepliesTriggersProbeAndInboundClearsSuspicion() {
         var activity = TunnelTrafficActivity()
         activity.outbound(at: 10)

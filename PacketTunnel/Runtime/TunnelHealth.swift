@@ -17,6 +17,13 @@ struct TunnelTrafficActivity {
     func needsProbe(at now: TimeInterval) -> Bool {
         unansweredSince.map { now - $0 >= 15 } ?? false
     }
+
+    /// Real decrypted traffic is stronger evidence than a failed synthetic
+    /// query. Only traffic received during this check counts, never old data
+    /// from before a network switch or a previous verification attempt.
+    func receivedInbound(since startedAt: TimeInterval) -> Bool {
+        lastInbound.map { $0 >= startedAt } ?? false
+    }
 }
 
 /// A root NS query sends no user hostname to the VPN's configured DNS servers.

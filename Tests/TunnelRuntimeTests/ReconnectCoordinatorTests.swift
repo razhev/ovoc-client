@@ -16,6 +16,47 @@ final class ReconnectCoordinatorTests: XCTestCase {
         return coordinator
     }
 
+    func testSystemStartCompletesBeforeScopedProbeCanRun() {
+        var c = ReconnectCoordinator()
+        c.start()
+        _ = c.pathChanged(wifi)
+        let effects = c.connected()
+        let activation = effects.firstIndex(of: .activateTunnel)
+        let probe = effects.firstIndex(of: .probe(ticket: c.ticket))
+        XCTAssertNotNil(activation)
+        XCTAssertNotNil(probe)
+        XCTAssertLessThan(activation ?? .max, probe ?? .min)
+        XCTAssertEqual(c.state, .verifying)
+        XCTAssertFalse(effects.contains(.ready)) // health still has its own deadline
+    }
+
+    func testRecoveryClearsReassertingBeforeScopedProbe() {
+        var c = online()
+        _ = c.pathChanged(cell)
+        _ = c.timerFired(ticket: c.ticket)
+        _ = c.reconnecting()
+        let effects = c.connected()
+        let resumed = effects.firstIndex(of: .reassert(false))
+        let probe = effects.firstIndex(of: .probe(ticket: c.ticket))
+        XCTAssertNotNil(resumed)
+        XCTAssertNotNil(probe)
+        XCTAssertLessThan(resumed ?? .max, probe ?? .min)
+        XCTAssertEqual(c.attempts, 1) // activation alone must not reset recovery budget
+    }
+
+    func testRealTrafficConfirmsStartupWhenSyntheticDNSDoesNotReply() {
+        var c = ReconnectCoordinator()
+        c.start()
+        _ = c.pathChanged(wifi)
+        _ = c.connected()
+        var activity = TunnelTrafficActivity()
+        activity.inbound(at: 101)
+        let effects = c.probeFinished(ticket: c.ticket, success: activity.receivedInbound(since: 100))
+        XCTAssertEqual(c.state, .online)
+        XCTAssertTrue(effects.contains(.ready))
+        XCTAssertFalse(effects.contains(.reassert(true)))
+    }
+
     func testNetworkLossImmediatelyReassertsAndWaitsWithoutTimer() {
         var c = online()
         let effects = c.pathChanged(offline)

@@ -3,7 +3,7 @@ import Foundation
 /// Ключи словаря `providerConfiguration` (`NETunnelProviderProtocol`),
 /// через который приложение передаёт расширению готовый конфиг.
 ///
-/// Расширение НИЧЕГО не парсит (лимит памяти 50 МБ): приложение при импорте
+/// Расширение не распаковывает ключ (лимит памяти 50 МБ): приложение при импорте
 /// собирает финальный текст .ovpn — с подставленным DNS, строкой route для IP
 /// сервера и дописанным блоком <cloak> — и кладёт его сюда целиком.
 enum TunnelConfigKeys {
@@ -14,4 +14,5 @@ enum TunnelConfigKeys {
     static let serverIP = "serverIP"
     static let dns1 = "dns1"
     static let dns2 = "dns2"
+    static let serviceBypassPolicy = ServiceBypassPolicy.configurationKey
 }

@@ -16,6 +16,7 @@ struct ContentView: View {
     @State private var busy = false
     @State private var launchActionDone = false
     @State private var showingImport = false
+    @State private var showingServiceBypass = false
 
     var body: some View {
         NavigationStack {
@@ -25,13 +26,18 @@ struct ContentView: View {
                 systemHint: tunnel.status.localizedHint,
                 errorText: tunnel.lastError,
                 notice: tunnel.notice,
-                actionEnabled: !busy && tunnel.isLoaded,
+                actionEnabled: !busy && !tunnel.profileOperationInProgress && tunnel.isLoaded,
+                bypassSummary: bypassSummary,
+                onServiceBypass: { showingServiceBypass = true },
                 onImport: { showingImport = true },
                 onToggle: toggle
             )
             .toolbar(.hidden, for: .navigationBar)
             .sheet(isPresented: $showingImport) {
                 ImportView(tunnel: tunnel)
+            }
+            .sheet(isPresented: $showingServiceBypass) {
+                ServiceBypassView(tunnel: tunnel)
             }
             .onChange(of: tunnel.status) { status in
                 // «ПЫХ!»: удар на вспышке и мягкий — когда колобок садится на окно.
@@ -64,6 +70,12 @@ struct ContentView: View {
     }
 
     // MARK: - Состояние экрана
+
+    private var bypassSummary: String? {
+        guard let selected = tunnel.serviceBypassPolicy?.services, !selected.isEmpty else { return nil }
+        let names = BypassService.allCases.filter { selected.contains($0) }.map(\.displayName).joined(separator: ", ")
+        return String(localized: "Без VPN: \(names)")
+    }
 
     private var stage: StoveStage {
         // Профили прочитаны, и боевого среди них нет. До конца загрузки —
@@ -109,6 +121,8 @@ struct StoveScreen: View {
     let errorText: String?
     let notice: String?
     let actionEnabled: Bool
+    var bypassSummary: String? = nil
+    var onServiceBypass: () -> Void = {}
     let onImport: () -> Void
     let onToggle: () -> Void
 
@@ -198,6 +212,16 @@ struct StoveScreen: View {
                     VStack(alignment: .leading, spacing: 14) {
                         PkChip(icon: stage.chipIcon, text: stage.chip, fill: stage.chipFill, ink: stage.chipInk)
                         PkHeading(text: stage.title)
+                        Button(action: onServiceBypass) {
+                            if let bypassSummary {
+                                Label { Text(verbatim: bypassSummary) } icon: { Image(systemName: "arrow.triangle.branch") }
+                            } else {
+                                Label("Без VPN", systemImage: "arrow.triangle.branch")
+                            }
+                        }
+                        .font(.pkText(15, .medium))
+                        .foregroundStyle(Pk.izrazets)
+                        .padding(.vertical, 6)
                         if let hint = hint {
                             hint
                                 .font(.pkText(16))
@@ -273,7 +297,9 @@ struct StoveScreen: View {
         case .noKey: return Text("Чтобы подключаться к серверу, добавьте ключ vpn://… — его выдаёт владелец сервера.")
         case .off: return Text("Нажмите «Подключить» — Вовка растопит печь.")
         case .connecting: return Text("Обычно это занимает несколько секунд.")
-        case .on: return Text("Трафик идёт через сервер.")
+        case .on:
+            return bypassSummary == nil ? Text("Трафик идёт через сервер.")
+                : Text("VPN включён. Выбранные сервисы подключаются напрямую.")
         default: return nil
         }
     }

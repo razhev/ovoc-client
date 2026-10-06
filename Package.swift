@@ -8,8 +8,8 @@ let package = Package(
     name: "TunnelRuntime",
     platforms: [.macOS(.v13)],
     targets: [
-        .target(name: "TunnelRuntime", path: "PacketTunnel/Runtime"),
-        .target(name: "SharedRuntime", path: "Shared"),
+        .target(name: "TunnelRuntime", dependencies: ["SharedRuntime"], path: "PacketTunnel/Runtime"),
+        .target(name: "SharedRuntime", path: "Shared", resources: [.process("Resources")]),
         .testTarget(name: "TunnelRuntimeTests", dependencies: ["TunnelRuntime"], path: "Tests/TunnelRuntimeTests"),
         .testTarget(name: "SharedRuntimeTests", dependencies: ["SharedRuntime"], path: "Tests/SharedRuntimeTests"),
     ]

@@ -25,6 +25,13 @@ final class TunnelManager: ObservableObject {
     /// Профили прочитаны: до этого момента неизвестно, есть ли ключ, и экран
     /// не должен мигать приглашением к импорту.
     @Published private(set) var isLoaded = false
+    @Published private(set) var profileOperationInProgress = false
+    @Published private(set) var serviceBypassPolicy: ServiceBypassPolicy?
+    @Published private(set) var serviceBypassError: String?
+
+    var canEditServiceBypass: Bool {
+        isLoaded && !loadFailed && hasRealConfig && !isTunnelActive && !profileOperationInProgress
+    }
 
     private var manager: NETunnelProviderManager?
     private var statusObserver: NSObjectProtocol?
@@ -55,6 +62,8 @@ final class TunnelManager: ObservableObject {
 
     /// Подтягивает существующий профиль (если есть) при запуске приложения.
     func load() async {
+        guard !profileOperationInProgress else { return }
+        profileOperationInProgress = true
         defer { isLoaded = true }
         do {
             let managers = try await NETunnelProviderManager.loadAllFromPreferences()
@@ -66,8 +75,11 @@ final class TunnelManager: ObservableObject {
             loadFailed = true
             logger.log("load FAILED: \(Self.raw(error))")
             lastError = explain(error)
+            refreshDerivedState()
+            profileOperationInProgress = false
             return
         }
+        profileOperationInProgress = false
         #if DEBUG
         await importDebugKeyIfPresent()
         startDebugCommandWatcher()
@@ -127,6 +139,11 @@ final class TunnelManager: ObservableObject {
     /// - Returns: название сервера из ключа (для сообщения на экране).
     @discardableResult
     func importKey(_ text: String, source: KeySource) async throws -> String {
+        guard !profileOperationInProgress else {
+            throw ImportFailure(errorDescription: Self.explainBypass(ServiceBypassError.profileBusy))
+        }
+        profileOperationInProgress = true
+        defer { profileOperationInProgress = false }
         logger.log("import[\(source.rawValue)]: start, text=\(text.utf8.count) bytes")
 
         // Разбор — не на главном потоке: если hostName в ключе — домен, внутри
@@ -291,6 +308,9 @@ final class TunnelManager: ObservableObject {
     func apply(config: ImportedConfig) async throws {
         let manager = self.manager ?? NETunnelProviderManager()
 
+        let preservedPolicy = (manager.protocolConfiguration as? NETunnelProviderProtocol)?
+            .providerConfiguration?[TunnelConfigKeys.serviceBypassPolicy]
+
         let proto = NETunnelProviderProtocol()
         proto.providerBundleIdentifier = Self.tunnelBundleID
         proto.serverAddress = config.serverIP
@@ -300,6 +320,9 @@ final class TunnelManager: ObservableObject {
             TunnelConfigKeys.dns1: config.dns1,
             TunnelConfigKeys.dns2: config.dns2,
         ]
+        if let preservedPolicy {
+            proto.providerConfiguration?[TunnelConfigKeys.serviceBypassPolicy] = preservedPolicy
+        }
 
         manager.protocolConfiguration = proto
         manager.localizedDescription = Bundle.main.displayName
@@ -311,21 +334,82 @@ final class TunnelManager: ObservableObject {
 
         do {
             try await manager.saveToPreferences()
+            // A successful save alone does not prove our in-memory profile is current.
+            try await manager.loadFromPreferences()
         } catch {
             // Сохранить не дали (например, «Не разрешать» в системном диалоге).
             // Объект в памяти уже изменён — перечитываем, чтобы прежний профиль
             // остался таким, каким лежит в настройках системы.
-            try? await self.manager?.loadFromPreferences()
+            do {
+                try await manager.loadFromPreferences()
+                self.manager = manager
+                loadFailed = false
+            } catch { loadFailed = true }
             refreshDerivedState()
             throw error
         }
         // Известная особенность NE: без повторного load свежесохранённый
         // профиль может не стартовать ("Missing protocol or protocol has
         // invalid type").
-        try await manager.loadFromPreferences()
-
         self.manager = manager
+        loadFailed = false
         refreshDerivedState()
+    }
+
+    // MARK: - Service routing preferences
+
+    func reloadServiceBypassProfile() async {
+        guard !profileOperationInProgress, let manager else { return }
+        profileOperationInProgress = true
+        defer { profileOperationInProgress = false }
+        do {
+            try await manager.loadFromPreferences()
+            loadFailed = false
+        } catch { loadFailed = true }
+        refreshDerivedState()
+    }
+
+    func saveServiceBypass(_ policy: ServiceBypassPolicy) async throws {
+        guard canEditServiceBypass, let manager else { throw ServiceBypassError.profileBusy }
+        profileOperationInProgress = true
+        defer { profileOperationInProgress = false }
+        if !policy.services.isEmpty {
+            _ = try ServiceBypassCatalog.load(bundle: .main).networks(for: policy)
+        }
+        let store = SystemServiceBypassProfileStore(manager: manager)
+        do {
+            try await ServiceBypassProfileUpdate.apply(policy, to: store)
+            loadFailed = false
+            refreshDerivedState()
+            lastError = nil
+            notice = String(localized: "Исключения сохранены. Они применятся при следующем подключении.")
+            logger.log("service bypass preferences saved: services=\(policy.services.map(\.rawValue).sorted().joined(separator: ","))")
+        } catch {
+            loadFailed = !store.stateIsKnown
+            refreshDerivedState()
+            logger.log("service bypass preferences FAILED")
+            throw error
+        }
+    }
+
+    static func explainBypass(_ error: Error) -> String {
+        guard let error = error as? ServiceBypassError else {
+            return String(localized: "Не удалось сохранить исключения. Откройте экран заново и повторите попытку.")
+        }
+        switch error {
+        case .dnsConflict:
+            return String(localized: "Исключения конфликтуют с DNS вашего VPN. Отключите исключения или измените DNS в профиле.")
+        case .profileBusy:
+            return String(localized: "Для изменения исключений отключите VPN и дождитесь завершения текущей операции.")
+        case .noProfile:
+            return String(localized: "Сначала добавьте ключ VPN.")
+        case .invalidPolicy:
+            return String(localized: "Настройки исключений повреждены или созданы другой версией приложения. Сохраните выбор заново на экране «Без VPN».")
+        case .tunnelAddressConflict:
+            return String(localized: "Исключения конфликтуют с адресом туннеля. Отключите исключения для подключения.")
+        case .invalidCatalog, .invalidNetwork, .tooManyRoutes, .missingNetworkSettings:
+            return String(localized: "Не удалось применить каталог исключений. Отключите исключения или обновите приложение.")
+        }
     }
 
     #if DEBUG
@@ -373,6 +457,9 @@ final class TunnelManager: ObservableObject {
     /// Без боевого профиля не подключаемся: профиль появляется только при импорте
     /// ключа (там же — системный диалог «…хочет добавить конфигурации VPN»).
     func connect(allowDummy: Bool = false) async {
+        guard !profileOperationInProgress else { return }
+        profileOperationInProgress = true
+        defer { profileOperationInProgress = false }
         lastError = nil
         notice = nil
         userRequestedStop = false
@@ -382,6 +469,15 @@ final class TunnelManager: ObservableObject {
             return
         }
         do {
+            try await manager.loadFromPreferences()
+            loadFailed = false
+            refreshDerivedState()
+            let policy = try ServiceBypassPolicy(configuration:
+                (manager.protocolConfiguration as? NETunnelProviderProtocol)?.providerConfiguration)
+            guard hasRealConfig || allowDummy else { throw ServiceBypassError.noProfile }
+            if !policy.services.isEmpty {
+                _ = try ServiceBypassCatalog.load(bundle: .main).networks(for: policy)
+            }
             // iOS держит включённым только один VPN-профиль. Если подключались
             // другим клиентом (AmneziaVPN), наш профиль выключен и старт упадёт
             // с configurationDisabled — включаем его обратно.
@@ -401,9 +497,13 @@ final class TunnelManager: ObservableObject {
             logger.log("startVPNTunnel requested")
         } catch {
             logger.log("connect FAILED: \(Self.raw(Self.unwrap(error).error))")
-            lastError = explain(error)
+            lastError = error is ServiceBypassError ? Self.explainBypass(error) : explain(error)
             // Устаревший профиль лечится перечитыванием — следующее нажатие сработает.
-            try? await manager.loadFromPreferences()
+            do {
+                try await manager.loadFromPreferences()
+                loadFailed = false
+            } catch { loadFailed = true }
+            refreshDerivedState()
         }
     }
 
@@ -434,6 +534,14 @@ final class TunnelManager: ObservableObject {
         status = manager?.connection.status ?? .invalid
         let providerConfig = (manager?.protocolConfiguration as? NETunnelProviderProtocol)?.providerConfiguration
         hasRealConfig = (providerConfig?[TunnelConfigKeys.ovpnConfig] as? String)?.isEmpty == false
+        serviceBypassPolicy = nil
+        serviceBypassError = nil
+        guard !loadFailed else {
+            serviceBypassError = String(localized: "Не удалось прочитать профиль VPN. Откройте экран заново.")
+            return
+        }
+        do { serviceBypassPolicy = try ServiceBypassPolicy(configuration: providerConfig) }
+        catch { serviceBypassError = Self.explainBypass(error) }
     }
 
     /// Почему туннель отключился сам. Источники: причина от системы
@@ -453,7 +561,11 @@ final class TunnelManager: ObservableObject {
         if let url = SharedPaths.lastErrorURL,
            let text = try? String(contentsOf: url, encoding: .utf8), !text.isEmpty {
             // Текст расширения показываем как есть: он же лежит в tunnel.log.
-            parts.append(text)
+            if let error = ServiceBypassError.allCases.first(where: { text.contains($0.localizedDescription) }) {
+                parts.append(Self.explainBypass(error))
+            } else {
+                parts.append(text)
+            }
         }
         if !extensionWroteLogSince(startRequestedAt) {
             parts.append(String(localized:

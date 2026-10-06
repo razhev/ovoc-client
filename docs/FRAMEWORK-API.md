@@ -81,9 +81,12 @@ reachability.startTracking { (status: OpenVPNReachabilityStatus) in … }  // к
 reachability.stopTracking()
 ```
 Планирование/отмена трекера уходят на главную очередь через `dispatch_async`; колбэк приходит
-из `SCNetworkReachability` на главном run loop расширения. README адаптера рекомендует по
-смене статуса звать `reconnect(afterTimeInterval:)`. Мы: при переходе wifi ↔ cellular и при
-возврате сети в фазе `.connected` — `reconnect(afterTimeInterval: 2)`.
+из `SCNetworkReachability` на главном run loop расширения. С 2026-10-06 провайдер этот класс
+не использует: сеть отслеживает `NWPathMonitor` на `stateQueue`. `NetworkPathSnapshot` сравнивает
+доступность, физический интерфейс и его адреса, игнорируя виртуальные интерфейсы и изменения
+наших DNS/маршрутов. При наличии IPv4 смена временного IPv6-адреса не считается сменой сети.
+Переход между Wi-Fi с одинаковыми адресами может не изменить снимок; остановку трафика
+проверяет отдельная проба. Решение о reconnect принимает `ReconnectCoordinator`.
 
 ## OpenVPNAdapterDelegate (точные Swift-сигнатуры)
 
@@ -122,8 +125,10 @@ func openVPNAdapterDidReceiveClockTick(_ openVPNAdapter: OpenVPNAdapter)
 connecting, getConfig, assignIP, addRoutes, echo, info, warn, pause, resume,
 relay, compressionEnabled, unsupportedFeature, unknown`
 
-Нам важны: `.connected` (снять сторожевой таймер, завершить старт),
-`.disconnected` (завершить стоп / cancelTunnelWithError), `.reconnecting` (лог).
+Нам важны: `.connected` (начать проверку трафика), `.disconnected` (завершить стоп либо
+разрешить замену адаптера), `.reconnecting` (подтвердить начало попытки). После `.connected`
+завершаем системный старт и снимаем `reasserting` **до** проверки через виртуальный интерфейс.
+Проверка подтверждает здоровье сессии отдельно, сохраняя дедлайн и бюджет восстановления.
 
 ## Ошибки
 
@@ -139,7 +144,12 @@ NSString *const OpenVPNAdapterErrorMessageKey;  // текст OpenVPN в userInf
 
 Протокол повторяет два метода `NEPacketTunnelFlow`
 (`readPackets(completionHandler:)` / `writePackets(_:withProtocols:)`). Наш
-`PacketFlowBridge` реализует их отдельным объектом: считает пакеты, диагностирует
+`PacketFlowBridge` выдаёт каждому адаптеру отдельный `AdapterFlow` и сохраняет единый
+`PacketReadPump`: в исходниках фреймворка каждый `establishTunnel` вызывает `startReading`,
+а прежняя рекурсивная цепочка чтения не отменяется. Pump держит только один системный read
+и последний callback. Поколение не позволяет старому адаптеру заново читать после замены.
+**Фреймворк хранит packetFlow слабо** — провайдер удерживает `adapterFlow` весь срок работы.
+Мост считает пакеты, диагностирует
 петлю маршрутов и отбрасывает IPv6 только в режиме раковины. Когда сервер выдал
 IPv6-настройки, IPv6 проходит в адаптер. Режим обновляется после успешного
 применения новых настроек, до completion делегата.
@@ -153,7 +163,9 @@ startTunnel:
   cfg.setPTCloak()
   try adapter.apply(configuration: cfg)           // ошибки — дословно в лог
   запустить сторожевой таймер 30 сек
-  adapter.connect(using: packetFlow)
+  запустить NWPathMonitor и ReconnectCoordinator
+  удержать packetBridge.makeAdapterFlow() в adapterFlow (у фреймворка weak-ссылка)
+  adapter.connect(using: adapterFlow)
 
 делегат configureTunnel...:
   networkSettings == nil → completion(nil), системные маршруты и DNS остаются
@@ -164,10 +176,27 @@ startTunnel:
   ipv6Settings == nil → NEIPv6Settings(fd00:6f76:6f63::2/64) + NEIPv6Route.default()  // раковина
   setTunnelNetworkSettings(...) { completionHandler($0) }
 
-handleEvent .connected → снять таймер, completionHandler(nil) старта; повторно — reasserting = false
-handleEvent .reconnecting → reasserting = true (tun соберётся заново тем же configureTunnel)
-reachability wifi ↔ cellular в .connected → adapter.reconnect(afterTimeInterval: 2)
+handleEvent .connected → completion(nil) старта / reasserting=false → проверка трафика через туннель
+смена/потеря сети → reasserting=true сразу; без сети ждём, при наличии объединяем изменения за 2 с
+reconnect → дедлайн 30 с, включающий рукопожатие и проверку трафика; задержки повтора 5/10 с
+третья попытка → disconnect → ждём DISCONNECTED до 5 с → новый адаптер; зависший stop → ошибка
+handleEvent .reconnecting → не продлевает дедлайн уже начатой попытки
+15 с исходящих пакетов без входящих → контрольная проба; отсутствие трафика само по себе не ошибка
 handleError fatal      → last_error.txt + cancelTunnelWithError (только в фазах starting/connected;
                          во время стопа — только строка в логе)
 stopTunnel             → adapter.disconnect() + страховочный таймер 5 сек
 ```
+
+Проверка трафика — UDP DNS-запрос `NS .` к двум (если доступны) DNS-серверам текущих настроек,
+последовательно, до 4 с на каждый. Имена посещаемых сайтов не передаются. Проверяются ID и
+вопрос в ответе; DNS-ошибка тоже подтверждает двустороннюю передачу. iOS 18+: `NWConnection`
+с `requiredInterface = provider.virtualInterface`; iOS 16–17: `createUDPSessionThroughTunnel`.
+IP транспорта исключён из целей пробы, IPv6 не используется при включённой IPv6-раковине.
+Входящий пакет, успешно переданный в системный поток после начала текущей проверки, тоже
+подтверждает работоспособность; неудача отдельного DNS-запроса не должна разрывать рабочий VPN.
+Без свежего входящего трафика и ответа DNS проверка неуспешна. Короткие wake с недавним
+входящим трафиком не запускают лишние пробы.
+
+По логам устройства от 2026-10-06 ядро иногда перестаёт обрабатывать и reconnect, и stop
+после потери сети. В таком случае Swift завершает сессию с ошибкой после ограниченного
+восстановления; перезапуск зависшего процесса через VPN On Demand в эту реализацию не входит.

@@ -78,6 +78,17 @@
         }
       }
     },
+    "VPN включён. Выбранные сервисы подключаются напрямую.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "VPN is on. Selected services connect directly."
+          }
+        }
+      }
+    },
     "VPN выключен": {
       "extractionState": "manual",
       "localizations": {
@@ -96,6 +107,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "The VPN is on now — it will be disconnected while the key is being changed."
+          }
+        }
+      }
+    },
+    "Без VPN": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Outside VPN"
+          }
+        }
+      }
+    },
+    "Без VPN: %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Outside VPN: %@"
           }
         }
       }
@@ -122,6 +155,17 @@
         }
       }
     },
+    "В приложении нет аналитики, рекламы и учётных записей. Трафик идёт через сервер из вашего ключа; включённые вами исключения на экране «Без VPN» подключаются напрямую и видят IP обычной сети. Ключ и выбор исключений хранятся в настройках VPN на телефоне. Логи остаются на телефоне и отправляются, только если вы нажмёте «Поделиться» на экране «Логи».": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The app has no analytics, ads or accounts. Traffic goes through the server in your key; exceptions you enable in Outside VPN connect directly and see your regular network IP. Your key and exception selection are stored in VPN settings on your phone. Logs stay on your phone and are sent only when you tap Share in Logs."
+          }
+        }
+      }
+    },
     "В этом тексте нет ключа Amnezia: ключ начинается с vpn://": {
       "extractionState": "manual",
       "localizations": {
@@ -140,6 +184,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Version %@ (build %@)"
+          }
+        }
+      }
+    },
+    "Включить все": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Enable all"
           }
         }
       }
@@ -166,6 +221,17 @@
         }
       }
     },
+    "Выбранные сервисы будут подключаться напрямую и видеть IP вашей обычной сети.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Selected services will connect directly and see the IP address of your regular network."
+          }
+        }
+      }
+    },
     "Выбрать файл с ключом…": {
       "extractionState": "manual",
       "localizations": {
@@ -173,6 +239,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Choose a File with the Key…"
+          }
+        }
+      }
+    },
+    "Выключить все": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Disable all"
           }
         }
       }
@@ -195,6 +272,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Next, iOS will ask: “%@ Would Like to Add VPN Configurations”. Tap “Allow” and enter your passcode — without this permission the app cannot turn the VPN on. It asks only once."
+          }
+        }
+      }
+    },
+    "Для изменения исключений отключите VPN и дождитесь завершения текущей операции.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Disconnect the VPN and wait for the current operation to finish before changing exceptions."
           }
         }
       }
@@ -239,6 +327,50 @@
           "stringUnit": {
             "state": "translated",
             "value": "Importing…"
+          }
+        }
+      }
+    },
+    "Исключения действуют по сетевым адресам. Другие сервисы на тех же адресах также могут идти без VPN.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Exceptions apply to network addresses. Other services sharing those addresses may also bypass the VPN."
+          }
+        }
+      }
+    },
+    "Исключения конфликтуют с DNS вашего VPN. Отключите исключения или измените DNS в профиле.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Exceptions conflict with your VPN DNS. Disable exceptions or change the DNS in your profile."
+          }
+        }
+      }
+    },
+    "Исключения конфликтуют с адресом туннеля. Отключите исключения для подключения.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Exceptions conflict with the tunnel address. Disable exceptions to connect."
+          }
+        }
+      }
+    },
+    "Исключения сохранены. Они применятся при следующем подключении.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Exceptions saved. They will apply the next time you connect."
           }
         }
       }
@@ -430,6 +562,17 @@
         }
       }
     },
+    "Настройки исключений повреждены или созданы другой версией приложения. Сохраните выбор заново на экране «Без VPN».": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Exception settings are damaged or were created by another app version. Save your selection again in Outside VPN."
+          }
+        }
+      }
+    },
     "Не подключилось": {
       "extractionState": "manual",
       "localizations": {
@@ -485,6 +628,28 @@
         }
       }
     },
+    "Не удалось применить каталог исключений. Отключите исключения или обновите приложение.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Could not apply the exceptions catalog. Disable exceptions or update the app."
+          }
+        }
+      }
+    },
+    "Не удалось прочитать профиль VPN. Откройте экран заново.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Could not read the VPN profile. Reopen this screen."
+          }
+        }
+      }
+    },
     "Не удалось прочитать файл как текст. В файле должен лежать ключ vpn://…": {
       "extractionState": "manual",
       "localizations": {
@@ -503,6 +668,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Could not create or start the VPN profile."
+          }
+        }
+      }
+    },
+    "Не удалось сохранить исключения. Откройте экран заново и повторите попытку.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Could not save exceptions. Reopen this screen and try again."
           }
         }
       }
@@ -782,6 +958,17 @@
         }
       }
     },
+    "После сохранения подключите VPN обычной кнопкой. Для проверки откройте сервис заново.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "After saving, connect using the usual VPN button. Reopen the service to test it."
+          }
+        }
+      }
+    },
     "Приложение": {
       "extractionState": "manual",
       "localizations": {
@@ -800,17 +987,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "The app is not affiliated with Amnezia or OpenVPN Inc."
-          }
-        }
-      }
-    },
-    "Приложение не собирает данные и не передаёт их ни разработчику, ни третьим лицам: нет аналитики, рекламы и учётных записей. Трафик идёт только на сервер из вашего ключа. Ключ хранится в настройках VPN на телефоне, логи — только на телефоне; наружу они уходят, лишь если вы сами нажмёте «Поделиться» на экране «Логи».": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "The app collects no data and shares nothing with the developer or third parties: no analytics, ads or accounts. Traffic goes only to the server from your key. The key is kept in the phone's VPN settings and the logs stay on the phone; they leave it only if you tap Share on the Logs screen yourself."
           }
         }
       }
@@ -903,6 +1079,17 @@
         }
       }
     },
+    "Российские сервисы": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Russian services"
+          }
+        }
+      }
+    },
     "Сеть изменилась — соединение восстанавливается, ничего нажимать не нужно.": {
       "extractionState": "manual",
       "localizations": {
@@ -980,6 +1167,17 @@
         }
       }
     },
+    "Сначала добавьте ключ VPN.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Add a VPN key first."
+          }
+        }
+      }
+    },
     "Сначала добавьте ключ: без него подключаться некуда.": {
       "extractionState": "manual",
       "localizations": {
@@ -987,6 +1185,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Add a key first: without it there is nowhere to connect."
+          }
+        }
+      }
+    },
+    "Сохранить": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Save"
           }
         }
       }
@@ -1097,6 +1306,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "To connect to the server, add a vpn://… key — the server owner provides it."
+          }
+        }
+      }
+    },
+    "Экспериментальная функция. Каталог ещё проверяется на устройствах; отдельные возможности сервисов могут не работать.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Experimental feature. The catalog still needs device testing; some service features may not work."
+          }
+        }
+      }
+    },
+    "Яндекс, включая Go": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yandex, including Go"
           }
         }
       }

@@ -57,6 +57,8 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
     private var serverIP: String?
     private var fallbackDNS: [String] = []
     private var ovpnText = ""
+    /// Immutable for a session, including adapter reconnects.
+    private var serviceBypassNetworks: [IPNetwork] = []
 
     /// Сколько раз ядро переподключалось за эту сессию (событие .reconnecting).
     private var reconnectCount = 0
@@ -109,6 +111,22 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
             providerConfig?[TunnelConfigKeys.dns1] as? String,
             providerConfig?[TunnelConfigKeys.dns2] as? String,
         ].compactMap { $0 }
+
+        do {
+            let policy = try ServiceBypassPolicy(configuration: providerConfig)
+            serviceBypassNetworks = []
+            if !policy.services.isEmpty {
+                let catalog = try ServiceBypassCatalog.load(bundle: .main)
+                serviceBypassNetworks = try catalog.networks(for: policy)
+                logger.log("service bypass: catalog=\(catalog.catalogVersion) services=\(policy.services.map(\.rawValue).sorted().joined(separator: ",")) routes=\(serviceBypassNetworks.count)")
+            }
+        } catch {
+            let failure = (error as? ServiceBypassError) ?? .invalidCatalog
+            writeLastError(failure.localizedDescription)
+            logger.log("service bypass REFUSED: \(failure.rawValue)")
+            completionHandler(failure)
+            return
+        }
 
         logger.log("real tunnel: serverIP=\(serverIP ?? "nil") profile=\(ovpn.utf8.count) bytes")
 
@@ -459,7 +477,7 @@ extension PacketTunnelProvider: OpenVPNAdapterDelegate {
 
     /// Только на stateQueue.
     private func configureTunnel(
-        _ settings: NEPacketTunnelNetworkSettings,
+        _ adapterSettings: NEPacketTunnelNetworkSettings,
         completionHandler: @escaping (Error?) -> Void
     ) {
         // Запоздавший PUSH_REPLY после stop/watchdog не должен снова ставить
@@ -475,6 +493,12 @@ extension PacketTunnelProvider: OpenVPNAdapterDelegate {
             writeLastError(message)
             completionHandler(Self.makeError(4, message))
         }
+
+        // Never give our synthetic IPv6 settings back to the adapter's baseline:
+        // a reused callback object must not be mistaken for server IPv6 on reconnect.
+        let settings: NEPacketTunnelNetworkSettings
+        do { settings = try ServiceBypassRoutes.copyOf(adapterSettings) }
+        catch { refuse(ServiceBypassError.missingNetworkSettings.localizedDescription); return }
 
         // ── DNS: весь — в туннель (иначе часть запросов уйдёт мимо VPN) ──
         let adapterDNS = (settings.dnsSettings?.servers ?? []).filter(Self.isIPLiteral)
@@ -549,15 +573,22 @@ extension PacketTunnelProvider: OpenVPNAdapterDelegate {
             settings.mtu = 1400
         }
 
-        let included = settings.ipv4Settings?.includedRoutes?.count ?? 0
-        let excluded = settings.ipv4Settings?.excludedRoutes?.count ?? 0
+        let routedSettings: NEPacketTunnelNetworkSettings
+        do {
+            routedSettings = try ServiceBypassRoutes.applying(serviceBypassNetworks, to: settings)
+        } catch {
+            refuse(((error as? ServiceBypassError) ?? .invalidCatalog).localizedDescription)
+            return
+        }
+        let included = routedSettings.ipv4Settings?.includedRoutes?.count ?? 0
+        let excluded = routedSettings.ipv4Settings?.excludedRoutes?.count ?? 0
         logger.log("configureTunnel: remote=\(settings.tunnelRemoteAddress) "
                    + "routes incl=\(included) excl=\(excluded) serverExcluded=\(alreadyExcluded ? "by-profile" : "added") "
                    + "ipv6=\(ipv6Mode) "
                    + "dns=\(settings.dnsSettings?.servers.joined(separator: ",") ?? "none") "
                    + "mtu=\(settings.mtu?.stringValue ?? "default")")
 
-        setTunnelNetworkSettings(settings) { [weak self] error in
+        setTunnelNetworkSettings(routedSettings) { [weak self] error in
             if let error {
                 self?.logger.log("setTunnelNetworkSettings failed: \(error.localizedDescription)")
             } else {

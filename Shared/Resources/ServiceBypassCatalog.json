@@ -1,0 +1,314 @@
+{
+  "schemaVersion": 1,
+  "catalogVersion": "2026-10-06.1",
+  "reviewedAt": "2026-10-06",
+  "compatibility": "experimental-device-validation-pending",
+  "services": [
+    {
+      "id": "ozon",
+      "routes": [
+        {
+          "cidr": "185.73.193.0/24",
+          "source": "https://rdap.db.ripe.net/ip/185.73.193.0",
+          "registryName": "OZONRU-DCZ1-NET2",
+          "domains": [
+            "api.ozon.ru",
+            "cdn1.ozone.ru",
+            "ir.ozone.ru",
+            "ozon.ru",
+            "www.ozon.ru"
+          ],
+          "scope": "registered-or-announced-service-network"
+        },
+        {
+          "cidr": "185.73.194.0/24",
+          "source": "https://rdap.db.ripe.net/ip/185.73.194.0",
+          "registryName": "OZONRU-DCZ1-NET3",
+          "domains": [
+            "ozon.ru",
+            "www.ozon.ru",
+            "xapi.ozon.ru"
+          ],
+          "scope": "registered-or-announced-service-network"
+        },
+        {
+          "cidr": "185.73.195.0/24",
+          "source": "https://rdap.db.ripe.net/ip/185.73.195.0",
+          "registryName": "OZONRU-DCZ1-NET4",
+          "domains": [
+            "api.ozon.ru",
+            "cdn1.ozone.ru",
+            "ir.ozone.ru",
+            "xapi.ozon.ru"
+          ],
+          "scope": "registered-or-announced-service-network"
+        }
+      ]
+    },
+    {
+      "id": "wildberries",
+      "routes": [
+        {
+          "cidr": "185.138.252.0/22",
+          "source": "https://rdap.db.ripe.net/ip/185.138.252.0",
+          "registryName": "RU-WILDBERRIES-20160216",
+          "domains": [
+            "basket-20.wbbasket.ru"
+          ],
+          "scope": "registered-or-announced-service-network"
+        },
+        {
+          "cidr": "185.138.253.0/24",
+          "source": "https://rdap.db.ripe.net/ip/185.138.253.0",
+          "registryName": "RU-WILDBERRIES-20160216",
+          "domains": [
+            "basket-01.wbbasket.ru",
+            "basket-10.wbbasket.ru"
+          ],
+          "scope": "registered-or-announced-service-network"
+        },
+        {
+          "cidr": "185.138.255.0/24",
+          "source": "https://rdap.db.ripe.net/ip/185.138.255.0",
+          "registryName": "RU-WILDBERRIES-20160216",
+          "domains": [
+            "basket-01.wbbasket.ru",
+            "basket-10.wbbasket.ru",
+            "basket-20.wbbasket.ru"
+          ],
+          "scope": "registered-or-announced-service-network"
+        },
+        {
+          "cidr": "185.62.202.0/24",
+          "source": "https://rdap.db.ripe.net/ip/185.62.202.0",
+          "registryName": "WILDBERRIES-NETWORK-RU-2",
+          "domains": [
+            "card.wb.ru",
+            "search.wb.ru",
+            "wildberries.ru",
+            "www.wildberries.ru"
+          ],
+          "scope": "registered-or-announced-service-network"
+        },
+        {
+          "cidr": "213.184.155.0/24",
+          "source": "https://rdap.db.ripe.net/ip/213.184.155.0",
+          "registryName": "RU-WILDBERRIES-20000120",
+          "domains": [
+            "static-basket-01.wbbasket.ru"
+          ],
+          "scope": "registered-or-announced-service-network"
+        },
+        {
+          "cidr": "213.184.156.0/22",
+          "source": "https://rdap.db.ripe.net/ip/213.184.156.0",
+          "registryName": "RU-WILDBERRIES-20000120",
+          "domains": [
+            "basket-01.wbbasket.ru",
+            "basket-10.wbbasket.ru"
+          ],
+          "scope": "registered-or-announced-service-network"
+        },
+        {
+          "cidr": "213.184.156.0/24",
+          "source": "https://rdap.db.ripe.net/ip/213.184.156.0",
+          "registryName": "RU-WILDBERRIES-20000120",
+          "domains": [
+            "basket-20.wbbasket.ru"
+          ],
+          "scope": "registered-or-announced-service-network"
+        },
+        {
+          "cidr": "2a03:720::173:2/128",
+          "source": "https://rdap.db.ripe.net/ip/2a03:720::173:2",
+          "registryName": "RU-WILDBERRIES-20140702",
+          "domains": [
+            "wildberries.ru",
+            "www.wildberries.ru"
+          ],
+          "scope": "dns-host-snapshot"
+        },
+        {
+          "cidr": "85.198.77.0/24",
+          "source": "https://rdap.db.ripe.net/ip/85.198.77.0",
+          "registryName": "RU-WILDBERRIES-20050131",
+          "domains": [
+            "static-basket-01.wbbasket.ru"
+          ],
+          "scope": "registered-or-announced-service-network"
+        },
+        {
+          "cidr": "85.198.79.0/24",
+          "source": "https://rdap.db.ripe.net/ip/85.198.79.0",
+          "registryName": "RU-WILDBERRIES-20050131",
+          "domains": [
+            "static-basket-01.wbbasket.ru"
+          ],
+          "scope": "registered-or-announced-service-network"
+        }
+      ]
+    },
+    {
+      "id": "yandex",
+      "routes": [
+        {
+          "cidr": "213.180.193.0/24",
+          "source": "https://rdap.db.ripe.net/ip/213.180.193.0",
+          "registryName": "YANDEX-213-180-193-0",
+          "domains": [
+            "mobileproxy.passport.yandex.net"
+          ],
+          "scope": "registered-or-announced-service-network"
+        },
+        {
+          "cidr": "213.180.204.0/24",
+          "source": "https://rdap.db.ripe.net/ip/213.180.204.0",
+          "registryName": "YANDEX-213-180-204-0",
+          "domains": [
+            "tc.mobile.yandex.net"
+          ],
+          "scope": "registered-or-announced-service-network"
+        },
+        {
+          "cidr": "2a02:6b8:23::/48",
+          "source": "https://rdap.db.ripe.net/ip/2a02:6b8:23::",
+          "registryName": "YANDEX-V6-23--48",
+          "domains": [
+            "yastatic.net"
+          ],
+          "scope": "registered-or-announced-service-network"
+        },
+        {
+          "cidr": "2a02:6b8::/62",
+          "source": "https://rdap.db.ripe.net/ip/2a02:6b8::",
+          "registryName": "YANDEX-V6-0--62",
+          "domains": [
+            "api-maps.yandex.ru",
+            "avatars.mds.yandex.net",
+            "core-renderer-tiles.maps.yandex.net",
+            "disk.yandex.ru",
+            "downloader.disk.yandex.ru",
+            "go.yandex.ru",
+            "mail.yandex.ru",
+            "mobileproxy.passport.yandex.net",
+            "passport.yandex.com",
+            "passport.yandex.ru",
+            "taxi-routeinfo.taxi.yandex.net",
+            "taxi.yandex.ru",
+            "tc.mobile.yandex.net",
+            "ya.ru"
+          ],
+          "scope": "registered-or-announced-service-network"
+        },
+        {
+          "cidr": "2a02:6b8:a::/48",
+          "source": "https://rdap.db.ripe.net/ip/2a02:6b8:a::",
+          "registryName": "YANDEX-V6-a--48",
+          "domains": [
+            "yandex.ru"
+          ],
+          "scope": "registered-or-announced-service-network"
+        },
+        {
+          "cidr": "37.9.112.0/24",
+          "source": "https://rdap.db.ripe.net/ip/37.9.112.0",
+          "registryName": "YANDEX-37-9-112-0",
+          "domains": [
+            "taxi.yandex.ru"
+          ],
+          "scope": "registered-or-announced-service-network"
+        },
+        {
+          "cidr": "37.9.64.0/24",
+          "source": "https://rdap.db.ripe.net/ip/37.9.64.0",
+          "registryName": "YANDEX-37-9-64-0",
+          "domains": [
+            "yastatic.net"
+          ],
+          "scope": "registered-or-announced-service-network"
+        },
+        {
+          "cidr": "5.255.255.0/24",
+          "source": "https://rdap.db.ripe.net/ip/5.255.255.0",
+          "registryName": "YANDEX-5-255-255-0",
+          "domains": [
+            "ya.ru",
+            "yandex.ru"
+          ],
+          "scope": "registered-or-announced-service-network"
+        },
+        {
+          "cidr": "77.88.21.0/24",
+          "source": "https://rdap.db.ripe.net/ip/77.88.21.0",
+          "registryName": "YANDEX-77-88-21-0",
+          "domains": [
+            "downloader.disk.yandex.ru",
+            "mail.yandex.ru"
+          ],
+          "scope": "registered-or-announced-service-network"
+        },
+        {
+          "cidr": "77.88.44.0/24",
+          "source": "https://rdap.db.ripe.net/ip/77.88.44.0",
+          "registryName": "YANDEX-77-88-44-0",
+          "domains": [
+            "ya.ru",
+            "yandex.ru"
+          ],
+          "scope": "registered-or-announced-service-network"
+        },
+        {
+          "cidr": "77.88.55.0/24",
+          "source": "https://rdap.db.ripe.net/ip/77.88.55.0",
+          "registryName": "YANDEX-77-88-55-0",
+          "domains": [
+            "ya.ru",
+            "yandex.ru"
+          ],
+          "scope": "registered-or-announced-service-network"
+        },
+        {
+          "cidr": "87.250.247.0/24",
+          "source": "https://rdap.db.ripe.net/ip/87.250.247.0",
+          "registryName": "YANDEX-87-250-247-0",
+          "domains": [
+            "avatars.mds.yandex.net"
+          ],
+          "scope": "registered-or-announced-service-network"
+        },
+        {
+          "cidr": "87.250.250.0/24",
+          "source": "https://rdap.db.ripe.net/ip/87.250.250.0",
+          "registryName": "YANDEX-87-250-250-0",
+          "domains": [
+            "disk.yandex.ru",
+            "taxi-routeinfo.taxi.yandex.net"
+          ],
+          "scope": "registered-or-announced-service-network"
+        },
+        {
+          "cidr": "87.250.251.0/24",
+          "source": "https://rdap.db.ripe.net/ip/87.250.251.0",
+          "registryName": "YANDEX-87-250-251-0",
+          "domains": [
+            "api-maps.yandex.ru",
+            "core-renderer-tiles.maps.yandex.net",
+            "go.yandex.ru",
+            "tc.mobile.yandex.net"
+          ],
+          "scope": "registered-or-announced-service-network"
+        },
+        {
+          "cidr": "93.158.134.0/24",
+          "source": "https://rdap.db.ripe.net/ip/93.158.134.0",
+          "registryName": "YANDEX-93-158-134-0",
+          "domains": [
+            "passport.yandex.com",
+            "passport.yandex.ru"
+          ],
+          "scope": "registered-or-announced-service-network"
+        }
+      ]
+    }
+  ]
+}

@@ -31,6 +31,16 @@ final class TunnelHealthTests: XCTestCase {
         XCTAssertFalse(activity.needsProbe(at: 102))
     }
 
+    func testFinalOutboundPacketDoesNotMakeIdleTunnelPermanentlySuspicious() {
+        var activity = TunnelTrafficActivity()
+        activity.inbound(at: 10)
+        activity.outbound(at: 11) // e.g. a final TCP ACK, no response expected
+        XCTAssertFalse(activity.needsProbe(at: 26))
+        XCTAssertFalse(activity.needsProbe(at: 10_000))
+        activity.outbound(at: 10_001)
+        XCTAssertFalse(activity.needsProbe(at: 10_001))
+    }
+
     func testProbeRequiresMatchingDNSReplyAndAcceptsDNSErrorAsRoundTrip() {
         let query = TunnelDNSQuery(id: 0xabcd)
         XCTAssertEqual(Array(query.data), [0xab, 0xcd, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 1])

@@ -11,10 +11,12 @@ final class TunnelHealthProbe {
     private var legacySession: NWUDPSession?
     private var observation: NSKeyValueObservation?
     private var timeout: DispatchWorkItem?
-    private var completion: ((Bool) -> Void)?
+    private var completion: ((TunnelProbeResult) -> Void)?
     private var servers: [String] = []
     private var generation = 0
     private var sent = false
+    private var timedOutAfterSend = false
+    private var sendCompleted = false
 
     init(provider: NEPacketTunnelProvider, queue: DispatchQueue, log: @escaping (String) -> Void) {
         self.provider = provider
@@ -22,8 +24,9 @@ final class TunnelHealthProbe {
         self.log = log
     }
 
-    func start(servers: [String], completion: @escaping (Bool) -> Void) {
+    func start(servers: [String], completion: @escaping (TunnelProbeResult) -> Void) {
         cancel()
+        timedOutAfterSend = false
         self.servers = Array(NSOrderedSet(array: servers).array.compactMap { $0 as? String }.prefix(2))
         self.completion = completion
         nextServer()
@@ -48,22 +51,24 @@ final class TunnelHealthProbe {
         legacySession?.cancel()
         legacySession = nil
         sent = false
+        sendCompleted = false
     }
 
-    private func finish(_ success: Bool) {
+    private func finish(_ result: TunnelProbeResult) {
         let callback = completion
         cancel()
-        callback?(success)
+        callback?(result)
     }
 
     private func nextServer() {
         closeConnection()
-        guard !servers.isEmpty, let provider else { finish(false); return }
+        guard !servers.isEmpty, let provider else { finish(timedOutAfterSend ? .noReply : .inconclusive); return }
         let server = servers.removeFirst()
         let generation = generation
         let query = TunnelDNSQuery(id: UInt16.random(in: .min ... .max))
         let deadline = DispatchWorkItem { [weak self] in
             guard let self, self.generation == generation else { return }
+            self.timedOutAfterSend = self.timedOutAfterSend || self.sendCompleted
             self.log("DNS probe timed out (sent=\(self.sent))")
             self.nextServer()
         }
@@ -73,7 +78,7 @@ final class TunnelHealthProbe {
         if #available(iOS 18.0, macOS 15.0, *) {
             guard let interface = provider.virtualInterface else {
                 log("virtual interface unavailable")
-                finish(false)
+                finish(.inconclusive)
                 return
             }
             let parameters = NWParameters.udp
@@ -94,10 +99,11 @@ final class TunnelHealthProbe {
                 connection.send(content: query.data, completion: .contentProcessed { [weak self] error in
                     guard let self, self.generation == generation else { return }
                     if error != nil { self.nextServer() }
+                    else { self.sendCompleted = true }
                 })
                 connection.receiveMessage { [weak self] data, _, _, error in
                     guard let self, self.generation == generation else { return }
-                    if let data, query.accepts(data) { self.finish(true) }
+                    if let data, query.accepts(data) { self.finish(.success) }
                     else if error != nil { self.nextServer() }
                     // A malformed/unrelated reply is not success; let the deadline expire.
                 }
@@ -110,7 +116,7 @@ final class TunnelHealthProbe {
             session.setReadHandler({ [weak self] datagrams, error in
                 self?.queue.async { [weak self] in
                     guard let self, self.generation == generation else { return }
-                    if datagrams?.contains(where: query.accepts) == true { self.finish(true) }
+                    if datagrams?.contains(where: query.accepts) == true { self.finish(.success) }
                     else if error != nil { self.nextServer() }
                 }
             }, maxDatagrams: 1)
@@ -124,6 +130,7 @@ final class TunnelHealthProbe {
                         self?.queue.async { [weak self] in
                             guard let self, self.generation == generation else { return }
                             if error != nil { self.nextServer() }
+                            else { self.sendCompleted = true }
                         }
                     }
                 }

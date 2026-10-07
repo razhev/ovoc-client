@@ -86,17 +86,19 @@ class FrameworkProvenanceTests(unittest.TestCase):
         self.receipt.unlink()
         source = Path(self.temp.name) / "source"
         with mock.patch.object(provenance.subprocess, "check_output", side_effect=[
-            provenance.ADAPTER_COMMIT + "\n", provenance.OPENVPN3_COMMIT + "\n"
+            provenance.ADAPTER_COMMIT + "\n", provenance.OPENVPN3_COMMIT + "\n", provenance.CLOAK_COMMIT + "\n"
         ]) as read_head, mock.patch.object(provenance.subprocess, "run") as apply_patch:
             provenance.record(self.framework, source)
             self.assertEqual(read_head.call_args_list, [
                 mock.call(["git", "-C", str(source), "rev-parse", "HEAD"], text=True),
                 mock.call(["git", "-C", str(source / "Sources/OpenVPN3"), "rev-parse", "HEAD"], text=True),
+                mock.call(["git", "-C", str(source.parent / "Cloak-src"), "rev-parse", "HEAD"], text=True),
             ])
-            apply_patch.assert_called_once_with(
+            apply_patch.assert_any_call(
                 ["git", "-C", str(source / "Sources/OpenVPN3"), "apply", "--reverse", "--check", str(provenance.PATCH)],
                 check=True,
             )
+            self.assertEqual(apply_patch.call_count, 3)
         provenance.verify(self.framework)
         receipt = json.loads(self.receipt.read_text())
         self.assertEqual(receipt["binarySHA256"], provenance.digest(self.binary))

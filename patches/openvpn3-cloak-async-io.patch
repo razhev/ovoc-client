@@ -1,0 +1,255 @@
+diff --git a/openvpn/transport/client/pluggable/fw.hpp b/openvpn/transport/client/pluggable/fw.hpp
+index 3abd339..e8e5354 100644
+--- a/openvpn/transport/client/pluggable/fw.hpp
++++ b/openvpn/transport/client/pluggable/fw.hpp
+@@ -27,6 +27,7 @@
+ #ifdef OPENVPN_PLUGGABLE_TRANSPORTS
+ #include <openvpn/transport/client/pluggable/pt.hpp>
+ #include <string>
++#include <atomic>
+ 
+ #include "ck-ovpn-plugin.h"
+ 
+@@ -36,7 +37,7 @@ namespace openvpn {
+ namespace PluggableTransports {
+ 
+ #ifdef OPENVPN_PLUGGABLE_TRANSPORTS
+-class CloakTransport : public PluggableTransports::Connection, public PluggableTransports::Transport, public RC<thread_unsafe_refcount> {
++class CloakTransport : public PluggableTransports::Connection, public PluggableTransports::Transport {
+  public:
+   CloakTransport(){};
+ 
+@@ -65,7 +66,8 @@ class CloakTransport : public PluggableTransports::Connection, public PluggableT
+     // Start cloak connection
+     client_id = Cloak_dial();
+ 
+-    inited = true;
++    inited = client_id >= 0;
++    if (!inited) ret_out = 204;
+   };
+ 
+   size_t send(const openvpn_io::const_buffer& buffer) {
+@@ -102,8 +104,8 @@ class CloakTransport : public PluggableTransports::Connection, public PluggableT
+   };
+ 
+   void close() {
+-      Cloak_close_connection(client_id);
+-      inited = false;
++      if (inited.exchange(false))
++        Cloak_close_connection(client_id);
+   };
+ 
+   int native_handle() { return Cloak_native_handle(); };
+@@ -116,9 +118,9 @@ class CloakTransport : public PluggableTransports::Connection, public PluggableT
+   };
+ 
+  private:
+-  GoInt client_id;
+-  bool inited = false;
+-  int ret_out;
++  GoInt client_id = -1;
++  std::atomic<bool> inited{false};
++  int ret_out = 0;
+ };
+ 
+ struct Factory {
+diff --git a/openvpn/transport/client/pluggable/pt.hpp b/openvpn/transport/client/pluggable/pt.hpp
+index 5bdff18..4ecc98e 100644
+--- a/openvpn/transport/client/pluggable/pt.hpp
++++ b/openvpn/transport/client/pluggable/pt.hpp
+@@ -31,7 +31,7 @@
+ 
+ namespace openvpn {
+   namespace PluggableTransports {
+-    struct Connection : public RC<thread_unsafe_refcount>
++    struct Connection : public virtual RC<thread_safe_refcount>
+     {
+       typedef RCPtr<Connection> Ptr;
+ 
+@@ -42,7 +42,7 @@ namespace openvpn {
+       virtual int get_ret_out_int() = 0;
+     };
+ 
+-    struct Transport: public RC<thread_unsafe_refcount>
++    struct Transport: public virtual RC<thread_safe_refcount>
+     {
+       typedef RCPtr<Transport> Ptr;
+ 
+diff --git a/openvpn/transport/client/pluggable/ptcli.hpp b/openvpn/transport/client/pluggable/ptcli.hpp
+index a6f76a1..68e90d8 100644
+--- a/openvpn/transport/client/pluggable/ptcli.hpp
++++ b/openvpn/transport/client/pluggable/ptcli.hpp
+@@ -273,9 +273,14 @@ namespace openvpn {
+ 	OPENVPN_LOG("Contacting " << server_endpoint << " via PluggableTransports");
+ 	parent->transport_wait();
+ 
+-	async_connect(server_endpoint, [self=Ptr(this)](const Error::Type error_code)
++	async_connect(server_endpoint, [self=Ptr(this)](const Error::Type error_code, Connection::Ptr connected)
+ 					      {
+ 						OPENVPN_ASYNC_HANDLER;
++                        if (self->halt) {
++                          if (connected) connected->close();
++                          return;
++                        }
++                        self->connection = std::move(connected);
+ 						if (!error_code && !self->socket_protect())
+ 						  {
+ 						    self->config->stats->error(Error::SOCKET_PROTECT_ERROR);
+@@ -291,14 +296,17 @@ namespace openvpn {
+       void async_connect(openvpn_io::ip::tcp::endpoint server_endpoint, Handler&& completion) {
+ 	// capture io_context, config, and connection to avoid capturing self. This assumes that completion captures a reference-counted version of self.
+ 	openvpn_io::io_context& io_context = this->io_context;
+-	auto config = this->config;
+-	auto& connection = this->connection;
++	auto transport = config->transport;
++    auto work = openvpn_io::make_work_guard(io_context);
+ 	// handle async connect. We use post to dispatch elsewhere, then post again to come back to the "main" thread
+-	openvpn_io::post([&io_context, config, &connection, server_endpoint, completion=std::move(completion)]() {
++	openvpn_io::post([&io_context, transport, server_endpoint, work=std::move(work), completion=std::move(completion)]() mutable {
++      Connection::Ptr connection;
+ 	  Error::Type error_code = Error::SUCCESS;
+ 	  try
+ 	  {
+-	    connection = config->transport->dial(server_endpoint);
++	    connection = transport->dial(server_endpoint);
++        if (!connection || connection->get_ret_out_int() != 0)
++          error_code = Error::PT_CONNECT_ERROR;
+ 	  }
+ 	  catch (const std::exception& e)
+ 	  {
+@@ -308,8 +316,8 @@ namespace openvpn {
+ 			error_code = ec->code();
+ 	  }
+ 
+-	  openvpn_io::post(io_context, [error_code, completion=std::move(completion)]() {
+-		completion(error_code);
++	  openvpn_io::post(io_context, [error_code, connection=std::move(connection), completion=std::move(completion)]() mutable {
++		completion(error_code, std::move(connection));
+ 	  });
+ 	});
+       }
+diff --git a/openvpn/transport/ptlink.hpp b/openvpn/transport/ptlink.hpp
+index 992c756..acbe73c 100644
+--- a/openvpn/transport/ptlink.hpp
++++ b/openvpn/transport/ptlink.hpp
+@@ -67,7 +67,7 @@ namespace openvpn {
+     };
+ 
+     template <typename ReadHandler>
+-    class LinkImpl : public RC<thread_unsafe_refcount>
++    class LinkImpl : public RC<thread_safe_refcount>
+     {
+       typedef std::deque<BufferPtr> Queue;
+ 
+@@ -236,8 +236,9 @@ namespace openvpn {
+     // capture io_context and connection to avoid capturing self. This assumes that completion captures a reference-counted version of self.
+     openvpn_io::io_context& io_context = this->io_context;
+     auto connection = this->connection;
++    auto work = openvpn_io::make_work_guard(io_context);
+     // post to do an async recv, then post ot come back to the "main" thread.
+-    openvpn_io::post([&io_context, connection, mut_buf, completion=std::move(completion)]() mutable {
++    openvpn_io::post([&io_context, connection, mut_buf, work=std::move(work), completion=std::move(completion)]() mutable {
+       
+       Error::Type error_code = Error::SUCCESS;
+       size_t bytes_recvd = 0;
+@@ -246,6 +247,10 @@ namespace openvpn {
+       
+         OPENVPN_ASYNC_HANDLER;
+         bytes_recvd = connection->receive(mut_buf);
++        if (bytes_recvd == 0)
++          error_code = Error::NETWORK_EOF_ERROR;
++        else if (bytes_recvd > mut_buf.size())
++          error_code = Error::NETWORK_RECV_ERROR;
+       }
+       catch (const std::exception& e)
+       {
+@@ -265,56 +270,34 @@ namespace openvpn {
+       template <typename Handler>
+       void async_send(openvpn_io::const_buffer buf, Handler&& completion)
+       {
+-	    // capture io_context and connection to avoid capturing self. This assumes that completion captures a reference-counted version of self.
+-	    openvpn_io::io_context& io_context = this->io_context;
+-	    auto connection = this->connection;
+-	    // post to do an async send, then post ot come back to the "main" thread.
+-	    openvpn_io::post([&io_context, connection, buf, completion=std::move(completion)]() {
+-	      Error::Type error_code = Error::SUCCESS;
+-	      size_t bytes_sent = 0;
+-	      try
+-	      {
+-		bytes_sent = connection->send(buf);
+-	      }
+-	      catch (const std::exception& e)
+-	      {
+-		  error_code = Error::NETWORK_SEND_ERROR;
+-		  const ExceptionCode *ec = dynamic_cast<const ExceptionCode *>(&e);
+-		  if (ec && ec->code_defined())
+-		error_code = ec->code();
+-	      }
+-
+-	      openvpn_io::post(io_context, [error_code, bytes_sent, completion=std::move(completion)]() {
+-		completion(error_code, bytes_sent);
+-	      });
+-	    });	
++        // One writer owns queue.front() until its completion returns to the
++        // event loop. A blocked Cloak_write must never block stop/reconnect.
++        auto& context = io_context;
++        auto transport = connection;
++        auto work = openvpn_io::make_work_guard(context);
++        openvpn_io::post([&context, transport, buf, work=std::move(work),
++                         completion=std::move(completion)]() mutable {
++          Error::Type error = Error::SUCCESS;
++          size_t sent = 0;
++          try {
++            sent = transport->send(buf);
++            // The Go C API reports -1 through this unsigned interface.
++            if (!sent || sent > buf.size())
++              error = Error::NETWORK_SEND_ERROR;
++          } catch (const std::exception&) {
++            error = Error::NETWORK_SEND_ERROR;
++          }
++          openvpn_io::post(context, [error, sent, completion=std::move(completion)]() mutable {
++            completion(error, sent);
++          });
++        });
+       }
+ 
+       void queue_send_buffer(BufferPtr& buf)
+       {
+-	    OPENVPN_ASYNC_HANDLER; 
+-	    auto connection = this->connection;
+-	    BufferAllocated& aBuf = *buf;
+-	    size_t bytes_sent = 0;
+-	    try
+-	    {
+-		bytes_sent = connection->send(aBuf.const_buffer_clamp());
+-	    }
+-	    catch (const std::exception& e)
+-	    {
+-		stats->error(Error::PT_OVERFLOW);
+-		read_handler->pt_error_handler("PT_OVENETWORK_SEND_ERRORRFLOW"); // error sent more bytes than we asked for
+-		stop();
+-	    }
+-	    
+-            if (bytes_sent < buf->size()) {
+-	         buf->advance(bytes_sent);
+-	         queue_send_buffer(buf);
+-            }
+-	      
+-	    //queue.push_back(std::move(buf));
+-	    //if (queue.size() == 1) // send operation not currently active?
+-	    //  queue_send();
++        queue.push_back(std::move(buf));
++        if (queue.size() == 1)
++          queue_send();
+       }
+ 
+       void queue_send()
+@@ -408,7 +391,7 @@ namespace openvpn {
+     return requeue;
+       }
+ 
+-      void handle_recv(PacketFrom::SPtr pfp, Error::Type error, const int bytes_recvd)
++      void handle_recv(PacketFrom::SPtr pfp, Error::Type error, const size_t bytes_recvd)
+       {
+     OPENVPN_LOG_PTLINK_VERBOSE("Link::handle_recv: error_code=" << error_code);
+     if (!halt)

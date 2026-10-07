@@ -1,11 +1,18 @@
 import Foundation
 
+enum TunnelProbeResult {
+    case success, noReply, inconclusive
+}
+
 /// Monotonic packet activity, sampled under PacketFlowBridge's lock.
 struct TunnelTrafficActivity {
     private(set) var lastInbound: TimeInterval?
+    private var lastOutbound: TimeInterval?
     private(set) var unansweredSince: TimeInterval?
 
     mutating func outbound(at now: TimeInterval) {
+        if let lastOutbound, now - lastOutbound > 15 { unansweredSince = nil }
+        lastOutbound = now
         if unansweredSince == nil { unansweredSince = now }
     }
 
@@ -15,7 +22,8 @@ struct TunnelTrafficActivity {
     }
 
     func needsProbe(at now: TimeInterval) -> Bool {
-        unansweredSince.map { now - $0 >= 15 } ?? false
+        guard let lastOutbound, now - lastOutbound <= 5 else { return false }
+        return unansweredSince.map { now - $0 >= 15 } ?? false
     }
 
     /// Real decrypted traffic is stronger evidence than a failed synthetic

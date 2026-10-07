@@ -1,0 +1,177 @@
+diff --git a/cmd/ck-ovpn-plugin/ck-ovpn-plugin.go b/cmd/ck-ovpn-plugin/ck-ovpn-plugin.go
+index 895e935..254e8c0 100644
+--- a/cmd/ck-ovpn-plugin/ck-ovpn-plugin.go
++++ b/cmd/ck-ovpn-plugin/ck-ovpn-plugin.go
+@@ -1,3 +1,4 @@
++//go:build !windows
+ // +build !windows
+ 
+ //
+@@ -5,14 +6,14 @@
+ //  All rights reserved.
+ //
+ 
+-
+ package main
+ 
+ import (
+ 	"C"
+ 	"encoding/base64"
+ 	"net"
+-	"reflect"
++	"sync"
++	"sync/atomic"
+ 	"unsafe"
+ 
+ 	"github.com/cbeuw/Cloak/internal/common"
+@@ -28,11 +29,11 @@ import (
+ 	"syscall"
+ )
+ 
+-var fd int
++var fd int64 = -1
+ 
+ func socket_get_fd(network string, address string, c syscall.RawConn) error {
+ 	fn := func(s uintptr) {
+-		fd = int(s)
++		atomic.StoreInt64(&fd, int64(s))
+ 	}
+ 
+ 	if err := c.Control(fn); err != nil {
+@@ -44,7 +45,7 @@ func socket_get_fd(network string, address string, c syscall.RawConn) error {
+ 
+ //export Cloak_native_handle
+ func Cloak_native_handle() int {
+- 	return fd
++	return int(atomic.LoadInt64(&fd))
+ }
+ 
+ func generateClientConfigs(rawConfig client.RawConfig, state common.WorldState) (client.LocalConnConfig, client.RemoteConnConfig, client.AuthInfo) {
+@@ -58,6 +59,15 @@ func generateClientConfigs(rawConfig client.RawConfig, state common.WorldState)
+ var singleplexTCPConfig client.RawConfig
+ var CloakConnections = map[int]net.Conn{}
+ var nextID = 0
++var connectionsMu sync.RWMutex
++var configMu sync.Mutex
++var listeners = map[int]net.Listener{}
++
++func lookupConnection(id int) net.Conn {
++	connectionsMu.RLock()
++	defer connectionsMu.RUnlock()
++	return CloakConnections[id]
++}
+ 
+ //export Initialize_cloak_c_client
+ func Initialize_cloak_c_client(base64Config *C.char) (clientKey int) {
+@@ -87,7 +97,9 @@ func Initialize_cloak_c_client(base64Config *C.char) (clientKey int) {
+ 		return -1
+ 	}
+ 
++	configMu.Lock()
+ 	singleplexTCPConfig = *rawConfig
++	configMu.Unlock()
+ 
+ 	return 0
+ }
+@@ -102,7 +114,10 @@ func Cloak_dial() (clientKey int) {
+ 	var seshMaker func() *multiplex.Session
+ 
+ 	worldState := common.RealWorldState
+-	localConfig, remoteConfig, authInfo := generateClientConfigs(singleplexTCPConfig, worldState)
++	configMu.Lock()
++	rawConfig := singleplexTCPConfig
++	configMu.Unlock()
++	localConfig, remoteConfig, authInfo := generateClientConfigs(rawConfig, worldState)
+ 
+ 	var localDialer common.Dialer
+ 	var localListener *connutil.PipeListener
+@@ -135,7 +150,10 @@ func Cloak_dial() (clientKey int) {
+ 		return -1
+ 	}
+ 
++	connectionsMu.Lock()
++	defer connectionsMu.Unlock()
+ 	CloakConnections[nextID] = clientConn
++	listeners[nextID] = localListener
+ 
+ 	// This is the return value
+ 	clientKey = nextID
+@@ -146,7 +164,10 @@ func Cloak_dial() (clientKey int) {
+ 
+ //export Cloak_write
+ func Cloak_write(client_id int, buffer unsafe.Pointer, buffer_length C.int) int {
+-	var connection = CloakConnections[client_id]
++	var connection = lookupConnection(client_id)
++	if connection == nil || buffer == nil || buffer_length <= 0 {
++		return -1
++	}
+ 	var bytesBuffer = C.GoBytes(buffer, buffer_length)
+ 	numberOfBytesWritten, error := connection.Write(bytesBuffer)
+ 
+@@ -160,12 +181,11 @@ func Cloak_write(client_id int, buffer unsafe.Pointer, buffer_length C.int) int
+ //export Cloak_read
+ func Cloak_read(client_id int, buffer unsafe.Pointer, buffer_length int) int {
+ 
+-	var connection = CloakConnections[client_id]
+-	if connection == nil {
++	var connection = lookupConnection(client_id)
++	if connection == nil || buffer == nil || buffer_length <= 0 {
+ 		return -1
+ 	}
+-	header := reflect.SliceHeader{uintptr(buffer), buffer_length, buffer_length}
+-	bytesBuffer := *(*[]byte)(unsafe.Pointer(&header))
++	bytesBuffer := unsafe.Slice((*byte)(buffer), buffer_length)
+ 
+ 	numberOfBytesRead, error := connection.Read(bytesBuffer)
+ 
+@@ -178,10 +198,20 @@ func Cloak_read(client_id int, buffer unsafe.Pointer, buffer_length int) int {
+ 
+ //export Cloak_close_connection
+ func Cloak_close_connection(client_id int) {
+-	var connection = CloakConnections[client_id]
+-	connection.Close()
+-	syscall.Close(int(fd))
++	// Remove under the registry lock, then close outside it. net.Conn.Close
++	// unblocks concurrent reads/writes; never close a global, possibly reused FD.
++	connectionsMu.Lock()
++	connection := CloakConnections[client_id]
++	listener := listeners[client_id]
+ 	delete(CloakConnections, client_id)
++	delete(listeners, client_id)
++	connectionsMu.Unlock()
++	if connection != nil {
++		connection.Close()
++	}
++	if listener != nil {
++		listener.Close()
++	}
+ }
+ 
+ func main() {}
+diff --git a/internal/client/piper.go b/internal/client/piper.go
+index 43186ac..fbd4ffa 100644
+--- a/internal/client/piper.go
++++ b/internal/client/piper.go
+@@ -100,8 +100,10 @@ func RouteTCP(listener net.Listener, streamTimeout time.Duration, singleplex boo
+ 	for {
+ 		localConn, err := listener.Accept()
+ 		if err != nil {
+-			log.Fatal(err)
+-			continue
++			if sesh != nil {
++				sesh.Close()
++			}
++			return
+ 		}
+ 		if !singleplex && (sesh == nil || sesh.IsClosed()) {
+ 			sesh = newSeshFunc()
+@@ -117,6 +119,9 @@ func RouteTCP(listener net.Listener, streamTimeout time.Duration, singleplex boo
+ 			if err != nil {
+ 				log.Errorf("Failed to read first packet from proxy client: %v", err)
+ 				localConn.Close()
++				if singleplex {
++					sesh.Close()
++				}
+ 				return
+ 			}
+ 			var zeroTime time.Time

@@ -57,6 +57,94 @@ final class ReconnectCoordinatorTests: XCTestCase {
         XCTAssertFalse(effects.contains(.reassert(true)))
     }
 
+    func testNoEligibleDNSTargetsDoNotFailHealthyStartup() {
+        var c = ReconnectCoordinator()
+        c.start()
+        _ = c.pathChanged(wifi)
+        _ = c.connected()
+        let probeTicket = c.ticket
+        let effects = c.probeUnavailable(ticket: probeTicket)
+        XCTAssertEqual(c.state, .unverified)
+        XCTAssertTrue(effects.contains(.cancelTimer))
+        XCTAssertFalse(effects.contains(.ready)) // absence of a probe is not proof
+        XCTAssertFalse(effects.contains(.reassert(true)))
+        XCTAssertTrue(c.timerFired(ticket: probeTicket).isEmpty)
+        XCTAssertTrue(c.checkHealth().isEmpty) // do not repeat an unavailable probe
+        XCTAssertTrue(c.probeFinished(ticket: probeTicket, success: false).isEmpty)
+        XCTAssertTrue(c.probeFinished(ticket: c.ticket, success: true).contains(.ready))
+        XCTAssertEqual(c.state, .online)
+    }
+
+    func testUnavailableProbeKeepsBudgetUntilFreshTrafficAndStillTracksPaths() {
+        var c = online()
+        _ = c.pathChanged(cell)
+        _ = c.timerFired(ticket: c.ticket)
+        _ = c.reconnecting()
+        _ = c.connected()
+        _ = c.probeUnavailable(ticket: c.ticket)
+        XCTAssertEqual(c.attempts, 1)
+        XCTAssertEqual(c.state, .unverified)
+        let staleTicket = c.ticket
+        XCTAssertTrue(c.pathChanged(offline).contains(.reassert(true)))
+        XCTAssertEqual(c.state, .waitingForNetwork)
+        XCTAssertTrue(c.probeFinished(ticket: staleTicket, success: true).isEmpty)
+        _ = c.pathChanged(wifi)
+        _ = c.timerFired(ticket: c.ticket)
+        _ = c.reconnecting()
+        _ = c.connected()
+        _ = c.probeUnavailable(ticket: c.ticket)
+        XCTAssertEqual(c.attempts, 1)
+        _ = c.probeFinished(ticket: c.ticket, success: true)
+        XCTAssertEqual(c.attempts, 0)
+        XCTAssertEqual(c.state, .online)
+    }
+
+    func testAdapterRecoveryAndManualStopStillWorkWithoutDNSProbe() {
+        var c = online()
+        _ = c.checkHealth()
+        _ = c.probeUnavailable(ticket: c.ticket)
+        XCTAssertTrue(c.reconnecting().contains(.reassert(true)))
+        XCTAssertEqual(c.state, .reconnecting)
+        _ = c.connected()
+        _ = c.probeUnavailable(ticket: c.ticket)
+        let ticket = c.ticket
+        _ = c.stop()
+        XCTAssertTrue(c.probeFinished(ticket: ticket, success: true).isEmpty)
+        XCTAssertTrue(c.pathChanged(cell).isEmpty)
+        XCTAssertEqual(c.state, .stopped)
+    }
+
+    func testIndependentHandoffsWithoutProbeDoNotExhaustRecoveryBudget() {
+        var c = online()
+        _ = c.checkHealth()
+        _ = c.probeUnavailable(ticket: c.ticket)
+        for path in [cell, wifi, cell, wifi] {
+            _ = c.pathChanged(path)
+            XCTAssertTrue(c.timerFired(ticket: c.ticket).contains(.reconnect(attempt: 1)))
+            _ = c.reconnecting()
+            _ = c.connected()
+            _ = c.probeUnavailable(ticket: c.ticket)
+            XCTAssertEqual(c.state, .unverified)
+            XCTAssertEqual(c.attempts, 1)
+        }
+    }
+
+    func testRetriesOnSamePathStayBoundedWhenProbeIsUnavailable() {
+        var c = online()
+        _ = c.checkHealth()
+        _ = c.probeUnavailable(ticket: c.ticket)
+        for attempt in 1...3 {
+            XCTAssertTrue(c.pathChanged(wifi).isEmpty) // duplicate is not a new path
+            _ = c.reconnecting()
+            XCTAssertEqual(c.attempts, attempt)
+            _ = c.connected()
+            _ = c.probeUnavailable(ticket: c.ticket)
+            XCTAssertEqual(c.state, .unverified)
+        }
+        _ = c.reconnecting()
+        XCTAssertEqual(c.state, .failed)
+    }
+
     func testNetworkLossImmediatelyReassertsAndWaitsWithoutTimer() {
         var c = online()
         let effects = c.pathChanged(offline)
@@ -71,19 +159,48 @@ final class ReconnectCoordinatorTests: XCTestCase {
         XCTAssertTrue(c.timerFired(ticket: c.ticket).contains(.reconnect(attempt: 1)))
     }
 
-    func testRapidSwitchesInvalidateTimersAndOnlyReconnectLatestPath() {
+    func testBriefOfflineCellularAndReturnToWorkingWiFiChecksBeforeReconnect() {
         var c = online()
+        _ = c.pathChanged(offline)
         _ = c.pathChanged(cell)
         let oldTicket = c.ticket
         _ = c.pathChanged(wifi)
         XCTAssertTrue(c.timerFired(ticket: oldTicket).isEmpty)
-        XCTAssertTrue(c.connected().isEmpty)
+        let effects = c.timerFired(ticket: c.ticket)
+        XCTAssertTrue(effects.contains(.probe(ticket: c.ticket)))
+        XCTAssertFalse(effects.contains(.reconnect(attempt: 1)))
+        _ = c.probeFinished(ticket: c.ticket, success: true)
+        XCTAssertEqual(c.state, .online)
+        XCTAssertEqual(c.attempts, 0)
+    }
+
+    func testPathChangesDuringRecoveryPreserveOneAttemptAndItsDeadline() {
+        var c = online()
+        _ = c.pathChanged(cell)
         XCTAssertTrue(c.timerFired(ticket: c.ticket).contains(.reconnect(attempt: 1)))
-        XCTAssertTrue(c.connected().isEmpty) // wait for RECONNECTING acknowledgement
+        let deadline = c.ticket
+        for path in [wifi, offline, cell, wifi] {
+            XCTAssertTrue(c.pathChanged(path).isEmpty)
+            XCTAssertEqual(c.ticket, deadline)
+            XCTAssertEqual(c.attempts, 1)
+        }
+        XCTAssertTrue(c.connected().isEmpty)
         _ = c.reconnecting()
         _ = c.connected()
-        XCTAssertEqual(c.state, .verifying)
-        XCTAssertTrue(c.probeFinished(ticket: c.ticket, success: true).contains(.reassert(false)))
+        XCTAssertEqual(c.ticket, deadline)
+        _ = c.probeFinished(ticket: c.ticket, success: true)
+        XCTAssertEqual(c.state, .online)
+    }
+
+    func testUnacknowledgedReconnectStopsBeforeReplacement() {
+        var c = online()
+        _ = c.pathChanged(cell)
+        _ = c.timerFired(ticket: c.ticket)
+        let effects = c.timerFired(ticket: c.ticket)
+        XCTAssertTrue(effects.contains(.stopAdapter))
+        XCTAssertFalse(effects.contains(.reconnect(attempt: 2)))
+        _ = c.disconnected()
+        XCTAssertTrue(c.timerFired(ticket: c.ticket).contains(.replaceAdapter(attempt: 2)))
     }
 
     func testDuplicatesAndVirtualRouteUpdatesDoNotReconnect() {
@@ -110,8 +227,10 @@ final class ReconnectCoordinatorTests: XCTestCase {
         c.start()
         _ = c.pathChanged(wifi)
         _ = c.pathChanged(cell)
-        XCTAssertTrue(c.connected().contains(.reassert(true)))
-        XCTAssertEqual(c.state, .settling)
+        XCTAssertTrue(c.connected().contains(.activateTunnel))
+        XCTAssertEqual(c.state, .verifying)
+        _ = c.probeFinished(ticket: c.ticket, success: true)
+        XCTAssertEqual(c.state, .online)
     }
 
     func testRecoveryBudgetAndConfirmedStopBeforeLastAttempt() {
@@ -144,6 +263,7 @@ final class ReconnectCoordinatorTests: XCTestCase {
         _ = c.pathChanged(cell)
         for _ in 1...2 {
             _ = c.timerFired(ticket: c.ticket)
+            _ = c.reconnecting()
             _ = c.timerFired(ticket: c.ticket)
         }
         _ = c.timerFired(ticket: c.ticket)
@@ -185,7 +305,47 @@ final class ReconnectCoordinatorTests: XCTestCase {
         let check = c.checkHealth()
         XCTAssertFalse(check.contains(.reassert(true)))
         XCTAssertTrue(c.checkHealth().isEmpty) // one probe at a time
+        for _ in 1...2 {
+            XCTAssertFalse(c.probeFinished(ticket: c.ticket, success: false).contains(.reassert(true)))
+            XCTAssertEqual(c.state, .probeBackoff)
+            _ = c.timerFired(ticket: c.ticket)
+        }
         XCTAssertTrue(c.probeFinished(ticket: c.ticket, success: false).contains(.reassert(true)))
+        XCTAssertEqual(c.state, .settling)
+    }
+
+    func testProbeUnavailableNeverForcesReconnectAndHasCooldown() {
+        var c = online()
+        _ = c.checkHealth()
+        _ = c.probeFinished(ticket: c.ticket, result: .inconclusive)
+        XCTAssertEqual(c.state, .healthCooldown)
+        XCTAssertTrue(c.checkHealth().isEmpty)
+        XCTAssertEqual(c.attempts, 0)
+        _ = c.timerFired(ticket: c.ticket)
+        XCTAssertEqual(c.state, .online)
+    }
+
+    func testRealTrafficDuringProbeBackoffClearsFailureStreak() {
+        var c = online()
+        _ = c.checkHealth()
+        _ = c.probeFinished(ticket: c.ticket, success: false)
+        _ = c.probeFinished(ticket: c.ticket, success: true)
+        XCTAssertEqual(c.state, .online)
+        _ = c.checkHealth()
+        _ = c.probeFinished(ticket: c.ticket, success: false)
+        XCTAssertEqual(c.state, .probeBackoff)
+    }
+
+    func testReplyFromBeforePathChangeCannotValidateRecovery() {
+        var c = online()
+        _ = c.pathChanged(cell)
+        _ = c.timerFired(ticket: c.ticket)
+        _ = c.reconnecting()
+        _ = c.connected()
+        let deadline = c.ticket
+        _ = c.pathChanged(wifi)
+        XCTAssertTrue(c.probeFinished(ticket: deadline, success: true).isEmpty)
+        _ = c.timerFired(ticket: deadline)
         XCTAssertEqual(c.state, .settling)
     }
 

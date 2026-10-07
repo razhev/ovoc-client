@@ -223,7 +223,7 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
         timer.setEventHandler { [weak self] in
             guard let self, self.phase == .connected else { return }
             let activity = self.packetBridge.trafficActivity()
-            if self.recovery.state == .verifying, activity.receivedInbound(since: self.lastProbeAt) {
+            if (self.recovery.state == .verifying || self.recovery.state == .probeBackoff || self.recovery.state == .unverified), activity.receivedInbound(since: self.lastProbeAt) {
                 self.logger.log("health: incoming tunnel traffic confirms data path")
                 self.perform(self.recovery.probeFinished(ticket: self.recovery.ticket, success: true))
                 return
@@ -294,13 +294,18 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
             case .probe(let ticket):
                 lastProbeAt = ProcessInfo.processInfo.systemUptime
                 let startedAt = lastProbeAt
+                guard !probeDNS.isEmpty else {
+                    logger.log("health: no eligible DNS targets; monitoring path, adapter and incoming traffic")
+                    perform(recovery.probeUnavailable(ticket: ticket))
+                    continue
+                }
                 logger.log("health: checking data path through tunnel (ticket=\(ticket))")
-                healthProbe.start(servers: probeDNS) { [weak self] probeReplied in
+                healthProbe.start(servers: probeDNS) { [weak self] probeResult in
                     guard let self else { return }
                     let receivedTraffic = self.packetBridge.trafficActivity().receivedInbound(since: startedAt)
-                    let success = probeReplied || receivedTraffic
-                    self.logger.log("health: \(success ? "round trip OK" : "no reply") (ticket=\(ticket))")
-                    self.perform(self.recovery.probeFinished(ticket: ticket, success: success))
+                    let result: TunnelProbeResult = receivedTraffic ? .success : probeResult
+                    self.logger.log("health: \(result == .success ? "round trip OK" : (result == .noReply ? "no reply" : "inconclusive")) (ticket=\(ticket))")
+                    self.perform(self.recovery.probeFinished(ticket: ticket, result: result))
                 }
             case .ready:
                 lastAdapterError = nil

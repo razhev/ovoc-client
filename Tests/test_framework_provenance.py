@@ -38,6 +38,16 @@ class FrameworkProvenanceTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             provenance.verify(self.framework, self.patch)
 
+    def testChangingNativePatchRequiresRebuild(self):
+        with mock.patch.object(provenance, "NATIVE_PATCH", self.patch):
+            with self.assertRaises(ValueError):
+                provenance.verify(self.framework, self.patch)
+
+    def testChangingCloakPatchRequiresRebuild(self):
+        with mock.patch.object(provenance, "CLOAK_PATCH", self.patch):
+            with self.assertRaises(ValueError):
+                provenance.verify(self.framework, self.patch)
+
     def testMissingReceiptFails(self):
         self.receipt.unlink()
         with self.assertRaises(FileNotFoundError):

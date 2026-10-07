@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Bind a locally built framework to the pinned source and AEAD patch.
+"""Bind a locally built framework to the pinned sources and transport patches.
 
 This is a build consistency check, not a signature against a malicious local
 builder. The receipt lives beside the framework and applies before codesigning.

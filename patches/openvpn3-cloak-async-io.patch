@@ -76,7 +76,7 @@ index 5bdff18..4ecc98e 100644
        typedef RCPtr<Transport> Ptr;
  
 diff --git a/openvpn/transport/client/pluggable/ptcli.hpp b/openvpn/transport/client/pluggable/ptcli.hpp
-index a6f76a1..68e90d8 100644
+index a6f76a1..0b44480 100644
 --- a/openvpn/transport/client/pluggable/ptcli.hpp
 +++ b/openvpn/transport/client/pluggable/ptcli.hpp
 @@ -273,9 +273,14 @@ namespace openvpn {
@@ -117,7 +117,7 @@ index a6f76a1..68e90d8 100644
  	  }
  	  catch (const std::exception& e)
  	  {
-@@ -308,8 +316,8 @@ namespace openvpn {
+@@ -308,13 +316,19 @@ namespace openvpn {
  			error_code = ec->code();
  	  }
  
@@ -128,6 +128,25 @@ index a6f76a1..68e90d8 100644
  	  });
  	});
        }
+ 
+       bool socket_protect() {
++#ifdef OPENVPN_PLATFORM_IPHONE
++        // OpenVPNAdapter's iOS socket_protect is a no-op: provider-originated
++        // connections are handled by NetworkExtension. Cloak dials in Go after
++        // returning its local pipe, so no native socket is necessarily ready yet.
++        return true;
++#else
+ 	if (config->socket_protect)
+ 	  {
+ 	    int fd = connection->native_handle();
+@@ -325,6 +339,7 @@ namespace openvpn {
+ 	      }
+ 	  }
+ 	return true;
++#endif
+       }
+ 
+       // start I/O
 diff --git a/openvpn/transport/ptlink.hpp b/openvpn/transport/ptlink.hpp
 index 992c756..acbe73c 100644
 --- a/openvpn/transport/ptlink.hpp

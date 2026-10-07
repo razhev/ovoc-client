@@ -60,6 +60,8 @@ echo "PASS патч применён: ${PATCH#"$ROOT"/}"
 
 cp Lib/ios/arm64/ck-ovpn-plugin.h Sources/OpenVPN3/openvpn/transport/client/pluggable/ck-ovpn-plugin.h
 
+"$ROOT/scripts/test-cloak-native.sh"
+
 # ── 3. Сборка ──
 echo "Сборка фреймворка… (полный лог: ${BUILD_LOG#"$ROOT"/})"
 if ! xcodebuild -project OpenVPNAdapter.xcodeproj -scheme OpenVPNAdapter \
@@ -83,5 +85,5 @@ mkdir -p "$DEST"
 cp -R "$FW_PATH" "$DEST/"
 "$ROOT/scripts/framework-privacy-manifest.sh"   # своего манифеста у фреймворка нет
 python3 "$ROOT/scripts/framework-provenance.py" record --framework "$DEST/OpenVPNAdapter.framework" --source "$SRC"
-echo "OK: ${DEST#"$ROOT"/}/OpenVPNAdapter.framework (из исходников, с исправлением метки GCM)"
+echo "OK: ${DEST#"$ROOT"/}/OpenVPNAdapter.framework (из исходников, с исправлениями GCM и Cloak)"
 echo "Дальше обязательно: make verify"

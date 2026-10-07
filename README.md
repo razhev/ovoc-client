@@ -125,7 +125,7 @@ make test       # ConfigKit, reconnect, IPv6, UTF-8 логов и происхо
 make framework  # собрать OpenVPNAdapter.framework из исходников Amnezia + наш патч (основной способ)
 make framework-manifest # положить privacy manifest в уже собранный фреймворк (make framework делает сам)
 make fetch      # готовый бинарь v1.0.42 — НЕРАБОЧИЙ (дефект метки GCM), только для сравнения
-make verify     # arm64, Cloak, API + связь бинарника с исходниками и AEAD-патчем
+make verify     # arm64, Cloak, API + связь бинарника с исходниками и всеми транспортными патчами
 
 make devices    # какие iPhone видит Mac и готовы ли они к установке
 make ddi        # смонтировать на телефон образ разработчика (VPN на Mac выключить)

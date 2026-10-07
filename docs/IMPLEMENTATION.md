@@ -6,7 +6,7 @@
 
 ## Контекст
 
-Строим минимальный нативный iOS VPN-клиент к личному серверу AmneziaVPN (OpenVPN over Cloak) для себя и 3–5 родственников, раздача через TestFlight. Архитектура: SwiftUI-приложение + одно расширение `NEPacketTunnelProvider`, готовый бинарный `OpenVPNAdapter.framework` от Amnezia (Cloak вшит внутрь OpenVPN3), вся логика разбора ключа `vpn://` — в тестируемом на Mac SPM-пакете `ConfigKit`. Проект генерируется XcodeGen, вся сборка — CLI.
+Строим минимальный нативный iOS VPN-клиент к личному серверу AmneziaVPN (OpenVPN over Cloak) для себя и 3–5 родственников, раздача через TestFlight. Архитектура: SwiftUI-приложение + одно расширение `NEPacketTunnelProvider`, `OpenVPNAdapter.framework`, собираемый из зафиксированных исходников Amnezia с локальными исправлениями (Cloak вшит внутрь OpenVPN3), вся логика разбора ключа `vpn://` — в тестируемом на Mac SPM-пакете `ConfigKit`. Проект генерируется XcodeGen, вся сборка — CLI.
 
 **Состояние окружения (проверено 2026-08-20):**
 - Xcode 26.2 (17C52) ✅ — соответствует требованию Apple для TestFlight
@@ -89,7 +89,7 @@ xcodebuild -project OVoCClient.xcodeproj -scheme OVoCClient \
   3. `grep -r setPTCloak Frameworks/OpenVPNAdapter.framework/Headers/` → найден; скрипт **печатает полную строку объявления**.
   4. `framework-provenance.py` сверяет квитанцию сборки: закреплённые коммиты, SHA-256 патча и бинарника.
 - **`scripts/build-framework-source.sh`** — основной путь: закреплённые исходники адаптера и OpenVPN3,
-  AEAD-патч, xcodebuild framework-таргета, privacy manifest и квитанция сборки.
+  AEAD- и async I/O-патчи, пересборка Cloak с исправлением lifetime, тесты памяти/гонок, xcodebuild framework-таргета, privacy manifest и квитанция сборки.
   Готовый `v1.0.42` неработоспособен, поэтому собирать из исходников обязательно.
 
 **Команды/проверка:** `make framework && make verify`. Затем **читаем реальные заголовки** и фиксируем в `docs/FRAMEWORK-API.md`:

@@ -22,7 +22,7 @@ test:
 	python3 -B -m unittest discover -s Tests -p 'test_*.py'
 
 ## Собрать OpenVPNAdapter.framework из исходников Amnezia с нашим исправлением
-## (patches/openvpn3-aead-auth-tag.patch). ОСНОВНОЙ способ получить фреймворк.
+## (patches/openvpn3-*.patch, patches/cloak-*.patch). ОСНОВНОЙ способ получить фреймворк.
 framework:
 	./scripts/build-framework-source.sh
 
@@ -35,7 +35,7 @@ framework-manifest:
 fetch:
 	./scripts/fetch-framework.sh
 
-## Ворота: arm64, Cloak, API, соответствие бинарника исходникам и AEAD-патчу
+## Ворота: arm64, Cloak, API, соответствие бинарника исходникам и транспортным патчам
 verify:
 	./scripts/verify-framework.sh
 

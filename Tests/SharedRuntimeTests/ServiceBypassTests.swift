@@ -180,3 +180,89 @@ final class ServiceBypassProfileTests: XCTestCase {
         }
     }
 }
+
+final class ServiceBypassSelectionTests: XCTestCase {
+    @MainActor func testSwitchesPersistBeforeDismissAndSurviveConnectReload() async throws {
+        let store = FakeProfileStore()
+        let screen = ServiceBypassSelectionModel()
+        screen.synchronize(try ServiceBypassPolicy(configuration: store.configuration))
+        let all = Set(BypassService.allCases)
+        let write = try XCTUnwrap(screen.updateSelection(all, save: {
+            try await ServiceBypassProfileUpdate.apply($0, to: store)
+        }, readSaved: { try? ServiceBypassPolicy(configuration: store.configuration) }))
+        // The view disables Done and swipe dismissal synchronously, before the
+        // Task gets its first opportunity to start a preferences operation.
+        XCTAssertTrue(screen.isSaving)
+        await write.value
+        XCTAssertFalse(screen.isSaving)
+        XCTAssertNil(screen.saveError)
+
+        // Dismiss/recreate the screen and reload as connect() does: no explicit
+        // Save button is required for the all-services choice to survive.
+        try await store.reload()
+        let reopened = ServiceBypassSelectionModel()
+        reopened.synchronize(try ServiceBypassPolicy(configuration: store.configuration))
+        XCTAssertEqual(reopened.selection, all)
+        XCTAssertEqual(try ServiceBypassPolicy(configuration: store.persisted).services, all)
+
+        for service in BypassService.allCases {
+            let remaining = reopened.selection.subtracting([service])
+            let next = try XCTUnwrap(reopened.updateSelection(remaining, save: {
+                try await ServiceBypassProfileUpdate.apply($0, to: store)
+            }, readSaved: { try? ServiceBypassPolicy(configuration: store.configuration) }))
+            await next.value
+        }
+        try await store.reload()
+        XCTAssertEqual(try ServiceBypassPolicy(configuration: store.configuration).services, [])
+    }
+
+    @MainActor func testInFlightSaveLocksEditingAndIgnoresStaleProfileEvents() async throws {
+        let screen = ServiceBypassSelectionModel()
+        let all = Set(BypassService.allCases)
+        var persisted = ServiceBypassPolicy()
+        var resumeSave: CheckedContinuation<Void, Never>?
+        let started = expectation(description: "save started")
+        let write = try XCTUnwrap(screen.updateSelection(all, save: { policy in
+            await withCheckedContinuation { continuation in
+                resumeSave = continuation
+                started.fulfill()
+            }
+            persisted = policy
+        }, readSaved: { persisted }))
+        XCTAssertTrue(screen.isSaving)
+        await fulfillment(of: [started], timeout: 2)
+        screen.synchronize(ServiceBypassPolicy())
+        screen.synchronize(nil)
+        XCTAssertEqual(screen.selection, all)
+        let duplicate = screen.updateSelection([], save: { _ in XCTFail("Editing must be locked") },
+                                                readSaved: { persisted })
+        XCTAssertNil(duplicate)
+        XCTAssertEqual(screen.selection, all)
+        resumeSave?.resume()
+        await write.value
+        XCTAssertEqual(screen.selection, all)
+        XCTAssertFalse(screen.isSaving)
+    }
+
+    @MainActor func testFailedAutosaveRestoresActualChoiceAndAllowsRetry() async throws {
+        let store = FakeProfileStore()
+        store.failSave = true
+        let screen = ServiceBypassSelectionModel()
+        let save: @MainActor (ServiceBypassPolicy) async throws -> Void = {
+            try await ServiceBypassProfileUpdate.apply($0, to: store)
+        }
+        let read: @MainActor () -> ServiceBypassPolicy? = {
+            try? ServiceBypassPolicy(configuration: store.configuration)
+        }
+        let failed = try XCTUnwrap(screen.updateSelection([.ozon], save: save, readSaved: read))
+        await failed.value
+        XCTAssertNotNil(screen.saveError)
+        XCTAssertFalse(screen.isSaving)
+        XCTAssertEqual(screen.selection, [])
+        store.failSave = false
+        let retry = try XCTUnwrap(screen.updateSelection([.ozon], save: save, readSaved: read))
+        await retry.value
+        XCTAssertNil(screen.saveError)
+        XCTAssertEqual(screen.selection, [.ozon])
+    }
+}

@@ -221,13 +221,12 @@
         }
       }
     },
-    "Выбранные сервисы будут подключаться напрямую и видеть IP вашей обычной сети.": {
-      "extractionState": "manual",
+    "Выбранные сервисы работают напрямую, с IP вашей сети. Выбор сохраняется автоматически.": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Selected services will connect directly and see the IP address of your regular network."
+            "value": "Selected services connect directly using your network’s IP address. Choices are saved automatically."
           }
         }
       }
@@ -261,6 +260,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "Banking the fire…"
+          }
+        }
+      }
+    },
+    "Готово": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Done"
           }
         }
       }
@@ -947,6 +956,16 @@
         }
       }
     },
+    "Подробнее": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Details"
+          }
+        }
+      }
+    },
     "Политика конфиденциальности": {
       "extractionState": "manual",
       "localizations": {
@@ -954,17 +973,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Privacy Policy"
-          }
-        }
-      }
-    },
-    "После сохранения подключите VPN обычной кнопкой. Для проверки откройте сервис заново.": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "After saving, connect using the usual VPN button. Reopen the service to test it."
           }
         }
       }
@@ -1189,13 +1197,12 @@
         }
       }
     },
-    "Сохранить": {
-      "extractionState": "manual",
+    "Сохранение…": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Save"
+            "value": "Saving…"
           }
         }
       }

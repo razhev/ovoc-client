@@ -13,80 +13,88 @@ extension BypassService {
 struct ServiceBypassView: View {
     @ObservedObject var tunnel: TunnelManager
     @Environment(\.dismiss) private var dismiss
-    @State private var selection: Set<BypassService> = []
-    @State private var saveError: String?
+    @StateObject private var preferences = ServiceBypassSelectionModel()
+    @State private var isReady = false
+
+    private var canEdit: Bool {
+        isReady && !preferences.isSaving && tunnel.canEditServiceBypass
+    }
+
+    private func select(_ services: Set<BypassService>) {
+        guard canEdit else { return }
+        preferences.updateSelection(services, save: tunnel.saveServiceBypass,
+                                    readSaved: { tunnel.serviceBypassPolicy })
+    }
 
     var body: some View {
         NavigationStack {
             Form {
                 Section {
-                    Text("Выбранные сервисы будут подключаться напрямую и видеть IP вашей обычной сети.")
-                    Text("Исключения действуют по сетевым адресам. Другие сервисы на тех же адресах также могут идти без VPN.")
-                        .foregroundStyle(.secondary)
-                }
-                Section {
                     ForEach(BypassService.allCases, id: \.self) { service in
                         Toggle(isOn: Binding(
-                            get: { selection.contains(service) },
+                            get: { preferences.selection.contains(service) },
                             set: { enabled in
+                                var selection = preferences.selection
                                 if enabled { selection.insert(service) }
                                 else { selection.remove(service) }
-                                saveError = nil
+                                select(selection)
                             }
                         )) {
                             Text(verbatim: service.displayName)
                         }
                     }
-                    Button("Включить все") { selection = Set(BypassService.allCases) }
-                    Button("Выключить все") { selection = [] }
+                    if preferences.selection.count == BypassService.allCases.count {
+                        Button("Выключить все") { select([]) }
+                    } else {
+                        Button("Включить все") { select(Set(BypassService.allCases)) }
+                    }
                 } header: {
                     Text("Российские сервисы")
                 } footer: {
-                    if !tunnel.hasRealConfig {
+                    if !isReady || preferences.isSaving || tunnel.profileOperationInProgress {
+                        // Progress is shown separately, without an instruction
+                        // to disconnect a VPN that is already disconnected.
+                    } else if !tunnel.hasRealConfig {
                         Text("Сначала добавьте ключ VPN.")
                     } else if !tunnel.canEditServiceBypass {
                         Text("Для изменения исключений отключите VPN и дождитесь завершения текущей операции.")
+                    } else {
+                        Text("Выбранные сервисы работают напрямую, с IP вашей сети. Выбор сохраняется автоматически.")
                     }
                 }
-                .disabled(!tunnel.canEditServiceBypass)
+                .disabled(!canEdit)
 
-                Section {
-                    Text("Экспериментальная функция. Каталог ещё проверяется на устройствах; отдельные возможности сервисов могут не работать.")
-                    Text("После сохранения подключите VPN обычной кнопкой. Для проверки откройте сервис заново.")
+                if preferences.isSaving {
+                    ProgressView("Сохранение…")
+                } else if !isReady || tunnel.profileOperationInProgress {
+                    ProgressView()
                 }
-                if let error = saveError ?? tunnel.serviceBypassError {
+                if let error = preferences.saveError.map(TunnelManager.explainBypass) ?? tunnel.serviceBypassError {
                     Section { Text(verbatim: error).foregroundStyle(.red) }
                 }
                 Section {
-                    Button("Сохранить") {
-                        Task {
-                            do {
-                                try await tunnel.saveServiceBypass(ServiceBypassPolicy(services: selection))
-                                dismiss()
-                            } catch { saveError = TunnelManager.explainBypass(error) }
-                        }
+                    DisclosureGroup("Подробнее") {
+                        Text("Исключения действуют по сетевым адресам. Другие сервисы на тех же адресах также могут идти без VPN.")
+                        Text("Экспериментальная функция. Каталог ещё проверяется на устройствах; отдельные возможности сервисов могут не работать.")
                     }
-                    .disabled(!tunnel.canEditServiceBypass ||
-                              ServiceBypassPolicy(services: selection) == tunnel.serviceBypassPolicy)
-                    if tunnel.profileOperationInProgress { ProgressView() }
                 }
             }
             .tint(Pk.izrazets)
             .navigationTitle(Text("Без VPN"))
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Закрыть") { dismiss() }.disabled(tunnel.profileOperationInProgress)
+                    Button("Готово") { dismiss() }
+                        .disabled(preferences.isSaving || tunnel.profileOperationInProgress)
                 }
             }
-            .interactiveDismissDisabled(tunnel.profileOperationInProgress)
+            .interactiveDismissDisabled(preferences.isSaving || tunnel.profileOperationInProgress)
             .task {
+                isReady = false
                 await tunnel.reloadServiceBypassProfile()
-                selection = tunnel.serviceBypassPolicy?.services ?? []
+                preferences.synchronize(tunnel.serviceBypassPolicy)
+                isReady = true
             }
-            .onChange(of: tunnel.serviceBypassPolicy) { policy in selection = policy?.services ?? [] }
-            .onChange(of: tunnel.status) { _ in
-                if !tunnel.canEditServiceBypass { selection = tunnel.serviceBypassPolicy?.services ?? [] }
-            }
+            .onChange(of: tunnel.serviceBypassPolicy) { preferences.synchronize($0) }
         }
     }
 }

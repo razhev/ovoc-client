@@ -12,13 +12,10 @@ import OpenVPNAdapter
 /// Заодно мост — единственное место, где видно пакеты: он считает их и пишет
 /// размеры первых пачек после подключения. Первое боевое подключение рвалось
 /// ровно тогда, когда начинали идти данные; без этих чисел причину не найти.
-final class PacketFlowBridge: NSObject {
+final class PacketFlowBridge: NSObject, OpenVPNAdapterPacketFlow {
 
     private let flow: NEPacketTunnelFlow
     private let logger: RingLogger
-    private lazy var reader = PacketReadPump { [flow] completion in
-        flow.readPackets(completionHandler: completion)
-    }
 
     /// IPv4 VPN-сервера (4 байта). Пакет с таким адресом назначения внутри туннеля —
     /// это петля маршрутов: собственное соединение Cloak завернулось в наш же туннель.
@@ -33,7 +30,6 @@ final class PacketFlowBridge: NSObject {
     private let lock = NSLock()
     private var outbound = Counter()
     private var inbound = Counter()
-    private var activity = TunnelTrafficActivity()
     /// Сколько пачек ещё расписать подробно (на одно подключение), чтобы
     /// цикл переподключений не забил кольцевой лог.
     private var detailedBatchesLeft = 0
@@ -62,7 +58,6 @@ final class PacketFlowBridge: NSObject {
         lock.lock()
         outbound = Counter()
         inbound = Counter()
-        activity = TunnelTrafficActivity()
         loopedPackets = 0
         sunkIPv6Packets = 0
         detailedBatchesLeft = 24
@@ -78,48 +73,18 @@ final class PacketFlowBridge: NSObject {
              + "to-server-inside-tunnel \(loopedPackets), ipv6-sunk \(sunkIPv6Packets)"
     }
 
-    func trafficActivity() -> TunnelTrafficActivity {
-        lock.lock()
-        defer { lock.unlock() }
-        return activity
-    }
+    // MARK: - OpenVPNAdapterPacketFlow
 
-    /// Each adapter gets a separate endpoint; the OS read pump is shared.
-    func makeAdapterFlow() -> OpenVPNAdapterPacketFlow {
-        AdapterFlow(bridge: self, generation: reader.newGeneration())
-    }
-
-    func invalidateAdapterFlow() {
-        _ = reader.newGeneration()
-    }
-
-    func resetReader() {
-        reader.discardPendingConsumer()
-    }
-
-    private final class AdapterFlow: NSObject, OpenVPNAdapterPacketFlow {
-        private let bridge: PacketFlowBridge
-        private let generation: Int
-
-        init(bridge: PacketFlowBridge, generation: Int) {
-            self.bridge = bridge
-            self.generation = generation
-        }
-
-        @objc(readPacketsWithCompletionHandler:)
-        func readPackets(completionHandler: @escaping ([Data], [NSNumber]) -> Void) {
-            bridge.reader.request(generation: generation) { [weak self] packets, protocols in
-                guard let self, self.bridge.reader.isCurrent(self.generation) else { return }
-                let (kept, keptProtocols) = self.bridge.dropIPv6(packets, protocols)
-                self.bridge.note(kept, direction: "tun→vpn", isOutbound: true)
-                completionHandler(kept, keptProtocols)
+    @objc(readPacketsWithCompletionHandler:)
+    func readPackets(completionHandler: @escaping ([Data], [NSNumber]) -> Void) {
+        flow.readPackets { [weak self] packets, protocols in
+            guard let self else {
+                completionHandler(packets, protocols)
+                return
             }
-        }
-
-        @objc(writePackets:withProtocols:)
-        func writePackets(_ packets: [Data], withProtocols protocols: [NSNumber]) -> Bool {
-            guard bridge.reader.isCurrent(generation) else { return false }
-            return bridge.writePackets(packets, withProtocols: protocols)
+            let (kept, keptProtocols) = self.dropIPv6(packets, protocols)
+            self.note(kept, direction: "tun→vpn", isOutbound: true)
+            completionHandler(kept, keptProtocols)
         }
     }
 
@@ -143,10 +108,10 @@ final class PacketFlowBridge: NSObject {
         return (filtered.packets, filtered.protocols)
     }
 
-    private func writePackets(_ packets: [Data], withProtocols protocols: [NSNumber]) -> Bool {
-        guard flow.writePackets(packets, withProtocols: protocols) else { return false }
+    @objc(writePackets:withProtocols:)
+    func writePackets(_ packets: [Data], withProtocols protocols: [NSNumber]) -> Bool {
         note(packets, direction: "vpn→tun", isOutbound: false)
-        return true
+        return flow.writePackets(packets, withProtocols: protocols)
     }
 
     // MARK: - Учёт
@@ -165,8 +130,6 @@ final class PacketFlowBridge: NSObject {
         }
 
         lock.lock()
-        let now = ProcessInfo.processInfo.systemUptime
-        if isOutbound { activity.outbound(at: now) } else { activity.inbound(at: now) }
         loopedPackets += looped
         let firstLoop = looped > 0 && loopedPackets == looped
         var counter = isOutbound ? outbound : inbound

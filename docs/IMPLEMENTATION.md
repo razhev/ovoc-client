@@ -89,7 +89,7 @@ xcodebuild -project OVoCClient.xcodeproj -scheme OVoCClient \
   3. `grep -r setPTCloak Frameworks/OpenVPNAdapter.framework/Headers/` → найден; скрипт **печатает полную строку объявления**.
   4. `framework-provenance.py` сверяет квитанцию сборки: закреплённые коммиты, SHA-256 патча и бинарника.
 - **`scripts/build-framework-source.sh`** — основной путь: закреплённые исходники адаптера и OpenVPN3,
-  AEAD- и async I/O-патчи, пересборка Cloak с исправлением lifetime, тесты памяти/гонок, xcodebuild framework-таргета, privacy manifest и квитанция сборки.
+  AEAD-патч, прежняя закреплённая Go-библиотека Cloak, xcodebuild framework-таргета, privacy manifest и квитанция сборки. Новые транспортные патчи сборки 8 откачены в сборке 9.
   Готовый `v1.0.42` неработоспособен, поэтому собирать из исходников обязательно.
 
 **Команды/проверка:** `make framework && make verify`. Затем **читаем реальные заголовки** и фиксируем в `docs/FRAMEWORK-API.md`:

@@ -1,4 +1,3 @@
-import Network
 import NetworkExtension
 import OpenVPNAdapter
 
@@ -66,21 +65,6 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
     /// Момент ухода в сон — чтобы на wake написать, сколько спали.
     private var sleptAt: Date?
 
-    private var recovery = ReconnectCoordinator()
-    private var pathMonitor: NWPathMonitor?
-    private var recoveryTimer: DispatchSourceTimer?
-    private var activityTimer: DispatchSourceTimer?
-    private var adapterConfiguration: OpenVPNConfiguration?
-    // The framework keeps packetFlow weakly; retain the endpoint for this adapter.
-    private var adapterFlow: OpenVPNAdapterPacketFlow?
-    private var adapterHasDisconnected = false
-    private var probeDNS: [String] = []
-    private var recoveryStartedAt: TimeInterval?
-    private var lastProbeAt: TimeInterval = -.infinity
-    private lazy var healthProbe = TunnelHealthProbe(provider: self, queue: stateQueue) { [weak self] message in
-        self?.logger.log("health transport: \(message)")
-    }
-
     /// Адрес-«раковина» для IPv6 (см. configureTunnel). ULA-префикс fd00::/8,
     /// 6f76:6f63 — «ovoc»; в реальной сети такого адреса нет.
     private static let ipv6SinkAddress = "fd00:6f76:6f63::2"
@@ -144,7 +128,6 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
         }
 
         let configuration = OpenVPNConfiguration()
-        adapterConfiguration = configuration
         configuration.fileContent = ovpn.data(using: .utf8)
         // tunPersist НЕ включаем: адаптер должен пересоздать свои сокеты и
         // получить свежий PUSH_REPLY. Системные маршруты и DNS сохраняются
@@ -198,139 +181,9 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
         packetBridge.serverAddress = serverIP.split(separator: ".").compactMap { UInt8($0) }
         packetBridge.reset()
         logger.heartbeatExtra = { [weak self] in self?.packetBridge.summary() ?? "" }
-        startRecoveryTracking()
-        adapterHasDisconnected = false
-        let flow = packetBridge.makeAdapterFlow()
-        adapterFlow = flow
-        adapter.connect(using: flow)
-    }
-
-    /// Tracking and every recovery effect run on stateQueue, including deadlines.
-    private func startRecoveryTracking() {
-        recovery.start()
-        let monitor = NWPathMonitor()
-        pathMonitor = monitor
-        monitor.pathUpdateHandler = { [weak self, weak monitor] path in
-            guard let self, let monitor, self.pathMonitor === monitor else { return }
-            let snapshot = NetworkPathSnapshot(path)
-            self.logger.log("network path: available=\(snapshot.isAvailable) interface=\(snapshot.interface) addresses=\(snapshot.addresses.count)")
-            self.perform(self.recovery.pathChanged(snapshot))
-        }
-        monitor.start(queue: stateQueue)
-
-        let timer = DispatchSource.makeTimerSource(queue: stateQueue)
-        timer.schedule(deadline: .now() + 5, repeating: 5)
-        timer.setEventHandler { [weak self] in
-            guard let self, self.phase == .connected else { return }
-            let activity = self.packetBridge.trafficActivity()
-            if (self.recovery.state == .verifying || self.recovery.state == .probeBackoff || self.recovery.state == .unverified), activity.receivedInbound(since: self.lastProbeAt) {
-                self.logger.log("health: incoming tunnel traffic confirms data path")
-                self.perform(self.recovery.probeFinished(ticket: self.recovery.ticket, success: true))
-                return
-            }
-            guard self.recovery.state == .online,
-                  activity.needsProbe(at: ProcessInfo.processInfo.systemUptime) else { return }
-            self.logger.log("health: outbound traffic without replies for 15s; checking tunnel")
-            self.perform(self.recovery.checkHealth())
-        }
-        timer.resume()
-        activityTimer = timer
-    }
-
-    private func perform(_ effects: [ReconnectCoordinator.Effect]) {
-        if !effects.isEmpty {
-            logger.log("recovery: state=\(recovery.state.rawValue) attempt=\(recovery.attempts) ticket=\(recovery.ticket)")
-        }
-        for effect in effects {
-            switch effect {
-            case .reassert(let value):
-                reasserting = value
-                if value, recoveryStartedAt == nil { recoveryStartedAt = ProcessInfo.processInfo.systemUptime }
-            case .cancelTimer:
-                recoveryTimer?.cancel()
-                recoveryTimer = nil
-            case .cancelProbe:
-                healthProbe.cancel()
-            case .schedule(let ticket, let delay):
-                let timer = DispatchSource.makeTimerSource(queue: stateQueue)
-                timer.schedule(deadline: .now() + delay)
-                timer.setEventHandler { [weak self] in
-                    guard let self else { return }
-                    self.perform(self.recovery.timerFired(ticket: ticket))
-                }
-                recoveryTimer = timer
-                timer.resume()
-            case .reconnect(let attempt):
-                logger.log("recovery attempt \(attempt): requesting OpenVPN reconnect")
-                adapter.reconnect(afterTimeInterval: 0)
-            case .stopAdapter:
-                logger.log("recovery: stopping adapter before replacement (deadline 5s)")
-                adapter.disconnect()
-            case .replaceAdapter(let attempt):
-                guard let configuration = adapterConfiguration else { failTunnel("Потеряна конфигурация VPN"); return }
-                // DISCONNECTED is required before this effect. Old callbacks are
-                // rejected by adapter identity, including delayed settings/errors.
-                adapter.delegate = nil
-                let replacement = OpenVPNAdapter()
-                replacement.delegate = self
-                adapter = replacement
-                adapterHasDisconnected = false
-                do {
-                    _ = try adapter.apply(configuration: configuration)
-                    packetBridge.reset()
-                    logger.log("recovery attempt \(attempt): connecting new adapter")
-                    let flow = packetBridge.makeAdapterFlow()
-                    adapterFlow = flow
-                    adapter.connect(using: flow)
-                } catch {
-                    failTunnel("Не удалось пересоздать VPN: \(describe(error))")
-                    return
-                }
-            case .activateTunnel:
-                if phase == .starting {
-                    logger.log("adapter and network settings ready; completing system tunnel start")
-                    finishStart(nil)
-                }
-            case .probe(let ticket):
-                lastProbeAt = ProcessInfo.processInfo.systemUptime
-                let startedAt = lastProbeAt
-                guard !probeDNS.isEmpty else {
-                    logger.log("health: no eligible DNS targets; monitoring path, adapter and incoming traffic")
-                    perform(recovery.probeUnavailable(ticket: ticket))
-                    continue
-                }
-                logger.log("health: checking data path through tunnel (ticket=\(ticket))")
-                healthProbe.start(servers: probeDNS) { [weak self] probeResult in
-                    guard let self else { return }
-                    let receivedTraffic = self.packetBridge.trafficActivity().receivedInbound(since: startedAt)
-                    let result: TunnelProbeResult = receivedTraffic ? .success : probeResult
-                    self.logger.log("health: \(result == .success ? "round trip OK" : (result == .noReply ? "no reply" : "inconclusive")) (ticket=\(ticket))")
-                    self.perform(self.recovery.probeFinished(ticket: ticket, result: result))
-                }
-            case .ready:
-                lastAdapterError = nil
-                if let url = SharedPaths.lastErrorURL { try? FileManager.default.removeItem(at: url) }
-                let elapsed = recoveryStartedAt.map { Int(ProcessInfo.processInfo.systemUptime - $0) } ?? 0
-                recoveryStartedAt = nil
-                logger.logMemory("tunnel verified, recovery=\(elapsed)s")
-            case .fail(let message):
-                failTunnel(message)
-                return
-            }
-        }
-    }
-
-    private func failTunnel(_ message: String) {
-        logger.log("tunnel failed: \(message)")
-        writeLastError(message)
-        let error = Self.makeError(8, message)
-        stopRecoveryTracking()
-        adapter.disconnect()
-        if phase == .starting { finishStart(error) }
-        else if phase == .connected {
-            phase = .stopped
-            cancelTunnelWithError(error)
-        }
+        // Rollback: network changes and health checks do not request reconnects.
+        // The core retains its normal handling of protocol/transport errors.
+        adapter.connect(using: packetBridge)
     }
 
     private func startDummyTunnel(completionHandler: @escaping (Error?) -> Void) {
@@ -389,7 +242,6 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
 
             self.phase = .stopping
             self.stopCompletion = completionHandler
-            self.stopRecoveryTracking()
 
             let watchdog = DispatchSource.makeTimerSource(queue: self.stateQueue)
             watchdog.schedule(deadline: .now() + 5)
@@ -413,7 +265,6 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
         startWatchdog?.cancel()
         startWatchdog = nil
         phase = error == nil ? .connected : .stopped
-        if error != nil { stopRecoveryTracking() }
         completion(error)
     }
 
@@ -423,30 +274,20 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
         stopWatchdog?.cancel()
         stopWatchdog = nil
         phase = .stopped
-        stopRecoveryTracking()
         completion()
     }
 
-    /// Только на stateQueue.
-    private func stopRecoveryTracking() {
-        perform(recovery.stop())
-        packetBridge.invalidateAdapterFlow()
-        pathMonitor?.cancel()
-        pathMonitor = nil
-        activityTimer?.cancel()
-        activityTimer = nil
-    }
-
-    // MARK: - Sleep/wake
+    // MARK: - Sleep/wake — намеренно простой проброс
 
     /// Почему не pause()/resume() адаптера. pause у ядра — это остановка
     /// сессии с разборкой его tun (interim_finalize → tun_builder_teardown),
     /// resume — полное рукопожатие Cloak заново. Наши системные маршруты при
     /// resetTun сохраняются, но фоновый трафик всё равно ждал бы восстановления.
     /// А iOS дёргает sleep/wake очень часто — в логах бывали пары через 2–3 сек.
-    /// После wake проверяем путь; если давно не было входящих пакетов — делаем
-    /// пробу через туннель. Короткие частые sleep/wake не должны порождать запрос
-    /// каждые 2–3 секунды и держать радио включённым.
+    /// Проброс дешевле и безопаснее: за короткий сон сокет живёт, за долгий
+    /// умирает — тогда ping 10 / ping-restart от сервера дают ошибку транспорта,
+    /// и ядро переподключается само (.reconnecting → .connected). Проверено на
+    /// устройстве: десятки sleep/wake подряд без единого переподключения.
     override func sleep(completionHandler: @escaping () -> Void) {
         logger.log("sleep")
         stateQueue.async { self.sleptAt = Date() }
@@ -458,14 +299,6 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
             let slept = self.sleptAt.map { Int(Date().timeIntervalSince($0)) }
             self.sleptAt = nil
             self.logger.log("wake" + (slept.map { " after \($0)s" } ?? ""))
-            if let monitor = self.pathMonitor {
-                self.perform(self.recovery.pathChanged(NetworkPathSnapshot(monitor.currentPath)))
-            }
-            let now = ProcessInfo.processInfo.systemUptime
-            let lastInbound = self.packetBridge.trafficActivity().lastInbound ?? -.infinity
-            if now - lastInbound >= 30, now - self.lastProbeAt >= 30 {
-                self.perform(self.recovery.checkHealth())
-            }
         }
     }
 
@@ -477,7 +310,7 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
         watchdog.schedule(deadline: .now() + 30)
         watchdog.setEventHandler { [weak self] in
             guard let self, self.phase == .starting else { return }
-            self.logger.log("start watchdog fired: tunnel not ready for activation in 30s")
+            self.logger.log("start watchdog fired: no .connected event in 30s")
             let message = self.refusalReason
                 ?? "Не удалось подключиться за 30 секунд — сервер недоступен или конфигурация неверна"
             self.writeLastError(message)
@@ -565,13 +398,7 @@ extension PacketTunnelProvider: OpenVPNAdapterDelegate {
         completionHandler: @escaping (Error?) -> Void
     ) {
         stateQueue.async {
-            guard self.adapter === openVPNAdapter else {
-                // Teardown still needs its completion to unblock the old core.
-                completionHandler(networkSettings == nil ? nil : Self.makeError(6, "Подключение отменено"))
-                return
-            }
             if networkSettings == nil {
-                self.packetBridge.resetReader()
                 self.logger.log("configureTunnel: adapter reset acknowledged; system routes and DNS retained (phase=\(self.phase))")
             }
             TunnelNetworkSettingsUpdate.apply(
@@ -695,26 +522,13 @@ extension PacketTunnelProvider: OpenVPNAdapterDelegate {
                    + "dns=\(settings.dnsSettings?.servers.joined(separator: ",") ?? "none") "
                    + "mtu=\(settings.mtu?.stringValue ?? "default")")
 
-        let configuringAdapter = adapter
         setTunnelNetworkSettings(routedSettings) { [weak self] error in
-            guard let self else { completionHandler(Self.makeError(6, "Подключение отменено")); return }
-            self.stateQueue.async {
-                guard self.adapter === configuringAdapter,
-                      self.phase == .starting || self.phase == .connected else {
-                    completionHandler(Self.makeError(6, "Подключение отменено"))
-                    return
-                }
-                if let error {
-                    self.logger.log("setTunnelNetworkSettings failed: \(error.localizedDescription)")
-                } else {
-                    self.packetBridge.setIPv6SinkEnabled(sinkIPv6)
-                    self.probeDNS = (routedSettings.dnsSettings?.servers ?? []).filter {
-                        $0 != self.serverIP && (!sinkIPv6 || Self.isIPv4Literal($0))
-                    }
-                    self.logger.log("network settings installed; probe DNS count=\(self.probeDNS.count)")
-                }
-                completionHandler(error)
+            if let error {
+                self?.logger.log("setTunnelNetworkSettings failed: \(error.localizedDescription)")
+            } else {
+                self?.packetBridge.setIPv6SinkEnabled(sinkIPv6)
             }
+            completionHandler(error)
         }
     }
 
@@ -723,7 +537,6 @@ extension PacketTunnelProvider: OpenVPNAdapterDelegate {
         // в файле тогда совпадает с порядком обработки.
         let line = "event: \(eventName(event))" + (message.map { " — \($0)" } ?? "")
         stateQueue.async {
-            guard self.adapter === openVPNAdapter else { return }
             self.logger.log(line)
             self.handle(event)
         }
@@ -731,18 +544,33 @@ extension PacketTunnelProvider: OpenVPNAdapterDelegate {
 
     /// Только на stateQueue.
     private func handle(_ event: OpenVPNAdapterEvent) {
-        guard phase == .starting || phase == .connected || phase == .stopping else { return }
         switch event {
         case .connected:
-            guard phase != .stopping else { return }
-            logger.logMemory("adapter connected; verifying traffic")
-            perform(recovery.connected())
+            // При переподключении (phase уже .connected) сюда приходим повторно:
+            // completion старта давно вызван (finishStart одноразовый), остаётся
+            // снять reasserting — приложение снова покажет «Подключено».
+            reasserting = false
+            lastAdapterError = nil
+            if phase == .starting {
+                // Успешный старт: очищаем прошлую ошибку, чтобы приложение её не показывало.
+                if let url = SharedPaths.lastErrorURL { try? FileManager.default.removeItem(at: url) }
+                logger.logMemory("connected")
+                finishStart(nil)
+            } else if phase == .connected {
+                logger.logMemory("reconnected (#\(reconnectCount))")
+            }
 
         case .disconnected:
-            adapterHasDisconnected = true
             switch phase {
-            case .starting, .connected:
-                perform(recovery.disconnected())
+            case .starting:
+                // Клиент завершился, не дойдя до .connected — не ждём 30 секунд.
+                let error = lastAdapterError
+                    ?? Self.makeError(7, refusalReason ?? "Соединение разорвано до установления")
+                finishStart(error)
+            case .connected:
+                logger.log("unexpected disconnect — cancelling tunnel")
+                phase = .stopped
+                cancelTunnelWithError(lastAdapterError)
             case .stopping:
                 finishStop()
             case .idle, .stopped:
@@ -753,11 +581,10 @@ extension PacketTunnelProvider: OpenVPNAdapterDelegate {
             // Ядро начало новую сессию (new_client): tun разберётся и соберётся
             // заново, настройки придут свежие из PUSH_REPLY. Пока идёт
             // рукопожатие, приложение показывает «Переподключение…».
-            guard phase != .stopping else { return }
             reconnectCount += 1
+            reasserting = true
             logger.log("reconnect #\(reconnectCount): \(packetBridge.summary())")
             packetBridge.reset()
-            perform(recovery.reconnecting())
 
         default:
             break
@@ -772,15 +599,12 @@ extension PacketTunnelProvider: OpenVPNAdapterDelegate {
         let packets = packetBridge.summary()
 
         stateQueue.async {
-            guard self.adapter === openVPNAdapter else { return }
             self.lastAdapterError = error
             // Фатальная ошибка обрывает сессию, только пока сессия есть. Во время
             // остановки по команде пользователя (и после неё) адаптер всё равно
             // отдаст .disconnected, а last_error.txt показал бы под кнопкой
             // «ошибку» там, где человек сам нажал «Отключить».
-            let terminatesSession = (self.phase == .starting || self.phase == .connected)
-                && self.recovery.state != .stoppingAdapter
-                && !self.adapterHasDisconnected
+            let terminatesSession = self.phase == .starting || self.phase == .connected
             let tag = fatal && !terminatesSession ? "fatal=true, ignored: \(self.phase)" : "fatal=\(fatal)"
             self.logger.log("error(\(tag)): \(self.describe(error))")
             self.logger.log("packets at error: \(packets)")
@@ -789,8 +613,6 @@ extension PacketTunnelProvider: OpenVPNAdapterDelegate {
             // Если туннель отказались поднимать мы сами, наш текст понятнее.
             let reported: Error = self.refusalReason.map { Self.makeError(4, $0) } ?? error
             self.writeLastError(self.refusalReason ?? self.describe(error))
-            self.stopRecoveryTracking()
-            self.adapter.disconnect()
 
             if self.phase == .starting {
                 self.finishStart(reported)

@@ -17,7 +17,8 @@ set -euo pipefail
 #   - коммит адаптера 8bb3da5 — тот, из которого собран релиз v1.0.42; его подмодуль
 #     OpenVPN3 (e901077, «3.8.5») — последняя линия форка, где есть транспорт Cloak.
 #     HEAD ветки master-amnezia НЕ годится: там OpenVPN3 без Cloak;
-#   - Cloak пересобирается из того же коммита и Go 1.22.2 с патчем lifetime.
+#   - Cloak подключается готовой Go-библиотекой из их репозитория
+#     (Lib/ios/arm64/ck-ovpn-plugin.a) — её мы не пересобираем.
 # SPM у форка сломан (OpenVPN3 — сабмодуль), podspec указывает на чужой upstream —
 # поэтому только клон + их .xcodeproj.
 
@@ -47,20 +48,17 @@ if [[ "$ACTUAL_OPENVPN3" != "$OPENVPN3_COMMIT" ]]; then
     echo "FAIL: подмодуль OpenVPN3 на коммите $ACTUAL_OPENVPN3, ожидали $OPENVPN3_COMMIT"
     exit 1
 fi
-# Build Cloak from the exact source used by the old prebuilt archive, with
-# synchronized ownership and cancellable I/O. Never substitute the old binary.
-"$ROOT/scripts/build-cloak-source.sh"
+if [[ "$(shasum -a 256 Lib/ios/arm64/ck-ovpn-plugin.a | awk '{print $1}')" != \
+      "$(grep -o -E '[0-9a-f]{64}' Lib/ios/arm64/ck-ovpn-plugin.a.sha256 | head -1)" ]]; then
+    echo "FAIL: ck-ovpn-plugin.a не совпадает со своим .sha256 из репозитория"
+    exit 1
+fi
 
 # ── 2. Наше исправление ──
 git -C Sources/OpenVPN3 checkout -q -- .                  # чистое дерево перед патчем
 git -C Sources/OpenVPN3 apply --check "$PATCH"
 git -C Sources/OpenVPN3 apply "$PATCH"
-git -C Sources/OpenVPN3 apply "$ROOT/patches/openvpn3-cloak-async-io.patch"
 echo "PASS патч применён: ${PATCH#"$ROOT"/}"
-
-cp Lib/ios/arm64/ck-ovpn-plugin.h Sources/OpenVPN3/openvpn/transport/client/pluggable/ck-ovpn-plugin.h
-
-"$ROOT/scripts/test-cloak-native.sh"
 
 # ── 3. Сборка ──
 echo "Сборка фреймворка… (полный лог: ${BUILD_LOG#"$ROOT"/})"
@@ -85,5 +83,5 @@ mkdir -p "$DEST"
 cp -R "$FW_PATH" "$DEST/"
 "$ROOT/scripts/framework-privacy-manifest.sh"   # своего манифеста у фреймворка нет
 python3 "$ROOT/scripts/framework-provenance.py" record --framework "$DEST/OpenVPNAdapter.framework" --source "$SRC"
-echo "OK: ${DEST#"$ROOT"/}/OpenVPNAdapter.framework (из исходников, с исправлениями GCM и Cloak)"
+echo "OK: ${DEST#"$ROOT"/}/OpenVPNAdapter.framework (из исходников, с исправлением метки GCM)"
 echo "Дальше обязательно: make verify"

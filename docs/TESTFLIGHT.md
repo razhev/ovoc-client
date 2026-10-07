@@ -17,6 +17,31 @@
 
 ---
 
+## Сборка 0.1.0 (8) — 2026-10-07
+
+Исправлены повторные reconnect при колебаниях сетевого монитора и блокирующая отправка
+Cloak. Сохранены изменения сборки 7. Исходники архива — `d596a89`; номер 8 выбран после
+проверки уже опубликованной сборки 7 из соседней задачи.
+
+`xcodebuild` подтвердил `ARCHIVE SUCCEEDED`, `Upload succeeded`, `EXPORT SUCCEEDED`.
+App Store Connect: `processingState=VALID`, `internalBuildState=IN_BETA_TESTING`;
+сборка присутствует в Internal Testing Group. Build ID:
+`a9590ecd-8b4c-43d0-abc4-1eaa57b331ef`. Инструкции ru/en-GB записаны и прочитаны обратно.
+Внешний статус `READY_FOR_BETA_SUBMISSION`; внешнее ревью не запускалось.
+
+Проверки: 120 тестов проекта, 700 сценариев C++ с ASan/UBSan, 2 Go race tests,
+Release-проверка, подпись архива, одинаковые номера приложения/расширения,
+совпадение UUID встроенного framework с проверенным бинарником. UUID:
+`078E06D7-9BFF-3162-9AB8-5D7456C11C4E`. Предупреждение об отсутствии dSYM framework
+остаётся, Apple приняла сборку. Артефакты: `build/testflight/OVoCClient-build8.xcarchive`,
+`build/testflight/build8-release-receipt.json`, `build/logs/build8-{archive,export}.log`.
+
+На физическом iPhone новая версия не проверена: телефон остался заблокированным,
+установка диагностической версии не началась. Через TestFlight проверить 15–20 минут
+на одной сети, простой, блокировку экрана, Wi-Fi ↔ сотовая сеть и ручное отключение.
+
+---
+
 ## Сборка 0.1.0 (7) — 2026-10-06
 
 Перед загрузкой пройдены 112 тестов (45 ConfigKit, 58 Shared/Tunnel runtime, 9 Python),

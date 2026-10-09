@@ -1,0 +1,14 @@
+diff --git a/openvpn/transport/client/pluggable/pt.hpp b/openvpn/transport/client/pluggable/pt.hpp
+--- a/openvpn/transport/client/pluggable/pt.hpp
++++ b/openvpn/transport/client/pluggable/pt.hpp
+@@ -31,7 +31,9 @@
+ 
+ namespace openvpn {
+   namespace PluggableTransports {
+-    struct Connection : public RC<thread_unsafe_refcount>
++    // ptlink.hpp shares Connection references between the VPN io_context and
++    // the background receive worker. Both threads copy and release references.
++    struct Connection : public RC<thread_safe_refcount>
+     {
+       typedef RCPtr<Connection> Ptr;
+ 

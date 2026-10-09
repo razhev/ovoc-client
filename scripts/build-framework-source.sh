@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # ОСНОВНОЙ способ получить OpenVPNAdapter.framework: сборка из исходников форка
-# Amnezia с нашим исправлением — `make framework`.
+# Amnezia с нашими исправлениями — `make framework`.
 #
 # Почему не готовый бинарь (scripts/fetch-framework.sh, релиз v1.0.42): в нём дефект,
 # из-за которого VPN не работает вообще. Клиент шифрует пакеты данных правильно, но
@@ -12,6 +12,8 @@ set -euo pipefail
 # amnezia-client#2072). Разбор — docs/DEVICE-TESTING.md, «Итог первой попытки M3».
 # Исправление — patches/openvpn3-aead-auth-tag.patch (заодно включает проверку метки
 # у ВХОДЯЩИХ пакетов, которой в форке не было совсем).
+# Патч openvpn3-cloak-connection-refcount.patch делает счётчик ссылок Connection
+# атомарным: объект используется одновременно в цикле OpenVPN и фоновом чтении.
 #
 # Что фиксируем:
 #   - коммит адаптера 8bb3da5 — тот, из которого собран релиз v1.0.42; его подмодуль
@@ -31,6 +33,7 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 SRC="$ROOT/build/OpenVPNAdapter-src"
 DERIVED="$ROOT/build/DerivedData-OpenVPNAdapter"
 PATCH="$ROOT/patches/openvpn3-aead-auth-tag.patch"
+CONNECTION_REFCOUNT_PATCH="$ROOT/patches/openvpn3-cloak-connection-refcount.patch"
 DEST="$ROOT/Frameworks"
 BUILD_LOG="$ROOT/build/framework-build.log"
 mkdir -p "$ROOT/build"
@@ -54,11 +57,13 @@ if [[ "$(shasum -a 256 Lib/ios/arm64/ck-ovpn-plugin.a | awk '{print $1}')" != \
     exit 1
 fi
 
-# ── 2. Наше исправление ──
+# ── 2. Наши исправления ──
 git -C Sources/OpenVPN3 checkout -q -- .                  # чистое дерево перед патчем
-git -C Sources/OpenVPN3 apply --check "$PATCH"
-git -C Sources/OpenVPN3 apply "$PATCH"
-echo "PASS патч применён: ${PATCH#"$ROOT"/}"
+for source_patch in "$PATCH" "$CONNECTION_REFCOUNT_PATCH"; do
+    git -C Sources/OpenVPN3 apply --check "$source_patch"
+    git -C Sources/OpenVPN3 apply "$source_patch"
+    echo "PASS патч применён: ${source_patch#"$ROOT"/}"
+done
 
 # ── 3. Сборка ──
 echo "Сборка фреймворка… (полный лог: ${BUILD_LOG#"$ROOT"/})"
@@ -83,5 +88,5 @@ mkdir -p "$DEST"
 cp -R "$FW_PATH" "$DEST/"
 "$ROOT/scripts/framework-privacy-manifest.sh"   # своего манифеста у фреймворка нет
 python3 "$ROOT/scripts/framework-provenance.py" record --framework "$DEST/OpenVPNAdapter.framework" --source "$SRC"
-echo "OK: ${DEST#"$ROOT"/}/OpenVPNAdapter.framework (из исходников, с исправлением метки GCM)"
+echo "OK: ${DEST#"$ROOT"/}/OpenVPNAdapter.framework (из исходников, с исправлениями метки GCM и Connection refcount)"
 echo "Дальше обязательно: make verify"

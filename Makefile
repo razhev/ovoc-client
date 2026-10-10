@@ -25,6 +25,11 @@ test:
 test-cloak-refcount:
 	./scripts/test-cloak-refcount.sh
 
+## Регрессия зависшей записи Cloak: реальный C++ транспорт под ASan/UBSan
+.PHONY: test-cloak-send
+test-cloak-send:
+	./scripts/test-cloak-send.sh
+
 ## Собрать OpenVPNAdapter.framework из исходников Amnezia с нашим исправлением
 ## (patches/openvpn3-aead-auth-tag.patch). ОСНОВНОЙ способ получить фреймворк.
 framework:

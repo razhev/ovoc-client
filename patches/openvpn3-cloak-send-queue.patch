@@ -1,0 +1,101 @@
+diff --git a/openvpn/transport/client/pluggable/fw.hpp b/openvpn/transport/client/pluggable/fw.hpp
+index 3abd339..3651c51 100644
+--- a/openvpn/transport/client/pluggable/fw.hpp
++++ b/openvpn/transport/client/pluggable/fw.hpp
+@@ -27,6 +27,7 @@
+ #ifdef OPENVPN_PLUGGABLE_TRANSPORTS
+ #include <openvpn/transport/client/pluggable/pt.hpp>
+ #include <string>
++#include <atomic>
+ 
+ #include "ck-ovpn-plugin.h"
+ 
+@@ -117,7 +118,7 @@ class CloakTransport : public PluggableTransports::Connection, public PluggableT
+ 
+  private:
+   GoInt client_id;
+-  bool inited = false;
++  std::atomic<bool> inited{false};
+   int ret_out;
+ };
+ 
+diff --git a/openvpn/transport/ptlink.hpp b/openvpn/transport/ptlink.hpp
+index 992c756..e12f3c1 100644
+--- a/openvpn/transport/ptlink.hpp
++++ b/openvpn/transport/ptlink.hpp
+@@ -67,7 +67,7 @@ namespace openvpn {
+     };
+ 
+     template <typename ReadHandler>
+-    class LinkImpl : public RC<thread_unsafe_refcount>
++    class LinkImpl : public RC<thread_safe_refcount>
+     {
+       typedef std::deque<BufferPtr> Queue;
+ 
+@@ -236,8 +236,9 @@ namespace openvpn {
+     // capture io_context and connection to avoid capturing self. This assumes that completion captures a reference-counted version of self.
+     openvpn_io::io_context& io_context = this->io_context;
+     auto connection = this->connection;
++    auto work = openvpn_io::make_work_guard(io_context);
+     // post to do an async recv, then post ot come back to the "main" thread.
+-    openvpn_io::post([&io_context, connection, mut_buf, completion=std::move(completion)]() mutable {
++    openvpn_io::post([&io_context, connection, mut_buf, work=std::move(work), completion=std::move(completion)]() mutable {
+       
+       Error::Type error_code = Error::SUCCESS;
+       size_t bytes_recvd = 0;
+@@ -268,13 +269,17 @@ namespace openvpn {
+ 	    // capture io_context and connection to avoid capturing self. This assumes that completion captures a reference-counted version of self.
+ 	    openvpn_io::io_context& io_context = this->io_context;
+ 	    auto connection = this->connection;
++            auto work = openvpn_io::make_work_guard(io_context);
+ 	    // post to do an async send, then post ot come back to the "main" thread.
+-	    openvpn_io::post([&io_context, connection, buf, completion=std::move(completion)]() {
++	    openvpn_io::post([&io_context, connection, buf, work=std::move(work), completion=std::move(completion)]() mutable {
+ 	      Error::Type error_code = Error::SUCCESS;
+ 	      size_t bytes_sent = 0;
+ 	      try
+ 	      {
+ 		bytes_sent = connection->send(buf);
++                // Cloak returns -1 through size_t; zero must not spin forever.
++                if (bytes_sent == 0 || bytes_sent > buf.size())
++                  error_code = Error::NETWORK_SEND_ERROR;
+ 	      }
+ 	      catch (const std::exception& e)
+ 	      {
+@@ -292,29 +297,13 @@ namespace openvpn {
+ 
+       void queue_send_buffer(BufferPtr& buf)
+       {
+-	    OPENVPN_ASYNC_HANDLER; 
+-	    auto connection = this->connection;
+-	    BufferAllocated& aBuf = *buf;
+-	    size_t bytes_sent = 0;
+-	    try
+-	    {
+-		bytes_sent = connection->send(aBuf.const_buffer_clamp());
+-	    }
+-	    catch (const std::exception& e)
+-	    {
+-		stats->error(Error::PT_OVERFLOW);
+-		read_handler->pt_error_handler("PT_OVENETWORK_SEND_ERRORRFLOW"); // error sent more bytes than we asked for
+-		stop();
+-	    }
+-	    
+-            if (bytes_sent < buf->size()) {
+-	         buf->advance(bytes_sent);
+-	         queue_send_buffer(buf);
+-            }
+-	      
+-	    //queue.push_back(std::move(buf));
+-	    //if (queue.size() == 1) // send operation not currently active?
+-	    //  queue_send();
++        // Cloak_write can block indefinitely when the network stops accepting
++        // data. Keep it off the VPN event loop so keepalive/reconnect/stop run.
++        // Only one writer is active, and queue.front() owns its buffer until
++        // the completion returns. Link and Connection references cross threads.
++        queue.push_back(std::move(buf));
++        if (queue.size() == 1)
++          queue_send();
+       }
+ 
+       void queue_send()

@@ -111,6 +111,17 @@
         }
       }
     },
+    "«Исключить все» включает все сервисы из списка. Выбранные сервисы работают напрямую, с IP вашей сети. Выбор сохраняется автоматически.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "“Exclude all” enables every service in the list. Selected services connect directly using your network’s IP address. Your selection is saved automatically."
+          }
+        }
+      }
+    },
     "Без VPN": {
       "extractionState": "manual",
       "localizations": {
@@ -129,6 +140,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "Outside VPN: %@"
+          }
+        }
+      }
+    },
+    "Без VPN: все сервисы из списка": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Without VPN: all listed services"
+          }
+        }
+      }
+    },
+    "Без VPN: сервисов — %lld": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Without VPN: services — %lld"
           }
         }
       }
@@ -188,17 +221,6 @@
         }
       }
     },
-    "Включить все": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Enable all"
-          }
-        }
-      }
-    },
     "Внутри ключа не JSON-конфигурация Amnezia (%@)": {
       "extractionState": "manual",
       "localizations": {
@@ -221,12 +243,24 @@
         }
       }
     },
-    "Выбранные сервисы работают напрямую, с IP вашей сети. Выбор сохраняется автоматически.": {
+    "Выбрано: %lld из %lld": {
+      "extractionState": "manual",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Selected services connect directly using your network’s IP address. Choices are saved automatically."
+            "value": "Selected: %1$lld of %2$lld"
+          }
+        }
+      }
+    },
+    "Выбрать сервисы": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Choose services"
           }
         }
       }
@@ -242,17 +276,6 @@
         }
       }
     },
-    "Выключить все": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Disable all"
-          }
-        }
-      }
-    },
     "Гасим печь…": {
       "extractionState": "manual",
       "localizations": {
@@ -260,6 +283,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Banking the fire…"
+          }
+        }
+      }
+    },
+    "Госуслуги": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gosuslugi"
           }
         }
       }
@@ -380,6 +414,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Exceptions saved. They will apply the next time you connect."
+          }
+        }
+      }
+    },
+    "Исключить все": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Exclude all"
           }
         }
       }
@@ -545,6 +590,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Logs"
+          }
+        }
+      }
+    },
+    "Мосэнергосбыт": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mosenergosbyt"
           }
         }
       }
@@ -1094,6 +1150,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Russian services"
+          }
+        }
+      }
+    },
+    "СДЭК": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "CDEK"
           }
         }
       }

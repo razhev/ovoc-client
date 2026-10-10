@@ -73,6 +73,12 @@ struct ContentView: View {
 
     private var bypassSummary: String? {
         guard let selected = tunnel.serviceBypassPolicy?.services, !selected.isEmpty else { return nil }
+        if selected == Set(BypassService.allCases) {
+            return String(localized: "Без VPN: все сервисы из списка")
+        }
+        if selected.count > 3 {
+            return String(localized: "Без VPN: сервисов — \(selected.count)")
+        }
         let names = BypassService.allCases.filter { selected.contains($0) }.map(\.displayName).joined(separator: ", ")
         return String(localized: "Без VPN: \(names)")
     }

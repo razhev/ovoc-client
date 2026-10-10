@@ -6,6 +6,11 @@ extension BypassService {
         case .ozon: return "Ozon"
         case .wildberries: return "Wildberries"
         case .yandex: return String(localized: "Яндекс, включая Go")
+        case .max: return "MAX"
+        case .cdek: return String(localized: "СДЭК")
+        case .gosuslugi: return String(localized: "Госуслуги")
+        case .mosru: return "mos.ru"
+        case .mosenergosbyt: return String(localized: "Мосэнергосбыт")
         }
     }
 }
@@ -15,6 +20,7 @@ struct ServiceBypassView: View {
     @Environment(\.dismiss) private var dismiss
     @StateObject private var preferences = ServiceBypassSelectionModel()
     @State private var isReady = false
+    @State private var showsServices = false
 
     private var canEdit: Bool {
         isReady && !preferences.isSaving && tunnel.canEditServiceBypass
@@ -30,23 +36,34 @@ struct ServiceBypassView: View {
         NavigationStack {
             Form {
                 Section {
-                    ForEach(BypassService.allCases, id: \.self) { service in
-                        Toggle(isOn: Binding(
-                            get: { preferences.selection.contains(service) },
-                            set: { enabled in
-                                var selection = preferences.selection
-                                if enabled { selection.insert(service) }
-                                else { selection.remove(service) }
-                                select(selection)
+                    Toggle("Исключить все", isOn: Binding(
+                        get: { preferences.selection == Set(BypassService.allCases) },
+                        set: { select($0 ? Set(BypassService.allCases) : []) }
+                    ))
+                    .disabled(!canEdit)
+
+                    DisclosureGroup(isExpanded: $showsServices) {
+                        ForEach(BypassService.allCases, id: \.self) { service in
+                            Toggle(isOn: Binding(
+                                get: { preferences.selection.contains(service) },
+                                set: { enabled in
+                                    var selection = preferences.selection
+                                    if enabled { selection.insert(service) }
+                                    else { selection.remove(service) }
+                                    select(selection)
+                                }
+                            )) {
+                                Text(verbatim: service.displayName)
                             }
-                        )) {
-                            Text(verbatim: service.displayName)
+                            .disabled(!canEdit)
                         }
-                    }
-                    if preferences.selection.count == BypassService.allCases.count {
-                        Button("Выключить все") { select([]) }
-                    } else {
-                        Button("Включить все") { select(Set(BypassService.allCases)) }
+                    } label: {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Выбрать сервисы")
+                            Text("Выбрано: \(preferences.selection.count) из \(BypassService.allCases.count)")
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                        }
                     }
                 } header: {
                     Text("Российские сервисы")
@@ -59,10 +76,9 @@ struct ServiceBypassView: View {
                     } else if !tunnel.canEditServiceBypass {
                         Text("Для изменения исключений отключите VPN и дождитесь завершения текущей операции.")
                     } else {
-                        Text("Выбранные сервисы работают напрямую, с IP вашей сети. Выбор сохраняется автоматически.")
+                        Text("«Исключить все» включает все сервисы из списка. Выбранные сервисы работают напрямую, с IP вашей сети. Выбор сохраняется автоматически.")
                     }
                 }
-                .disabled(!canEdit)
 
                 if preferences.isSaving {
                     ProgressView("Сохранение…")

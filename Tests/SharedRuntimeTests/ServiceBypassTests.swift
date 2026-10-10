@@ -5,7 +5,7 @@ final class ServiceBypassTests: XCTestCase {
     func testLegacyProfilesAndAllSelectionsRoundTripAsPropertyLists() throws {
         XCTAssertEqual(try ServiceBypassPolicy(configuration: nil).services, [])
         XCTAssertEqual(try ServiceBypassPolicy(configuration: [:]).services, [])
-        for mask in 0..<8 {
+        for mask in 0..<(1 << BypassService.allCases.count) {
             let services = Set(BypassService.allCases.enumerated().compactMap { i, item in
                 mask & (1 << i) == 0 ? nil : item
             })
@@ -31,6 +31,15 @@ final class ServiceBypassTests: XCTestCase {
         for value in invalid {
             XCTAssertThrowsError(try ServiceBypassPolicy(configuration: [ServiceBypassPolicy.configurationKey: value]))
         }
+    }
+
+    func testExistingThreeServiceChoiceDoesNotEnableNewServicesOnUpgrade() throws {
+        let saved: [String: Any] = [ServiceBypassPolicy.configurationKey: [
+            "schemaVersion": 1, "services": ["ozon", "wildberries", "yandex"],
+        ]]
+        let policy = try ServiceBypassPolicy(configuration: saved)
+        XCTAssertEqual(policy.services, [.ozon, .wildberries, .yandex])
+        XCTAssertNotEqual(policy.services, Set(BypassService.allCases))
     }
 
     func testCIDRBoundariesAndCanonicalization() throws {
@@ -81,15 +90,56 @@ final class ServiceBypassTests: XCTestCase {
         XCTAssertFalse(ozon.contains { $0.contains(address: "185.62.202.2") })
     }
 
+    func testOzonRegionalImagesAndFinanceAreCoveredWithoutExcludingCDNProviders() throws {
+        let catalog = try ServiceBypassCatalog.loadBundled()
+        let networks = try catalog.networks(for: ServiceBypassPolicy(services: [.ozon]))
+        // Observed A records on 2026-10-10, outside the original three /24s.
+        for address in ["5.101.71.73", "185.40.155.13", "212.164.51.50", "212.164.51.51",
+                        "85.173.175.100", "85.173.175.101", "176.208.118.244", "176.208.118.245",
+                        "194.9.211.128", "31.130.143.131"] {
+            XCTAssertTrue(networks.contains { $0.contains(address: address) }, address)
+        }
+        // Adjacent hosting/CDN addresses are not part of the observed service.
+        for address in ["5.101.71.74", "185.40.155.14", "212.164.51.52", "85.173.175.102",
+                        "176.208.118.246", "194.9.210.1", "31.130.142.1"] {
+            XCTAssertFalse(networks.contains { $0.contains(address: address) }, address)
+        }
+    }
+
+    func testNewServicesCoverTheirEndpointsWithoutExcludingSharedProviderNetworks() throws {
+        let catalog = try ServiceBypassCatalog.loadBundled()
+        let cases: [(BypassService, [String], [String])] = [
+            (.max, ["155.212.204.140", "155.212.204.150", "155.212.204.70", "155.212.205.225",
+                    "217.20.147.23", "217.20.155.82"], ["155.212.204.1", "217.20.147.1"]),
+            (.cdek, ["91.206.127.236", "155.212.234.130", "109.238.90.137", "155.212.234.5"],
+                    ["91.206.127.1", "155.212.234.1", "109.238.90.1"]),
+            (.gosuslugi, ["213.59.253.7", "213.59.254.8", "213.59.253.6", "212.193.153.34",
+                         "46.235.184.101"], ["213.59.253.1", "212.193.153.1", "46.235.184.1"]),
+            (.mosru, ["94.79.51.135", "94.79.51.136", "212.11.155.134", "212.45.30.1",
+                      "212.11.155.165", "212.11.152.248"], ["94.79.51.1", "212.11.155.1", "212.45.30.4"]),
+            (.mosenergosbyt, ["195.82.140.164", "195.82.140.228", "195.82.140.218"], ["195.82.141.1"]),
+        ]
+        for (service, included, excluded) in cases {
+            let networks = try catalog.networks(for: ServiceBypassPolicy(services: [service]))
+            for address in included {
+                XCTAssertTrue(networks.contains { $0.contains(address: address) }, "\(service): \(address)")
+            }
+            for address in excluded + ["1.1.1.1", "8.8.8.8", "185.73.193.68"] {
+                XCTAssertFalse(networks.contains { $0.contains(address: address) }, "\(service): \(address)")
+            }
+        }
+    }
+
     func testCatalogRejectsMissingGroupsBadNetworksAndExcessiveInput() throws {
-        func data(_ routes: [String], ids: [String] = ["ozon", "wildberries", "yandex"]) throws -> Data {
+        func data(_ routes: [String], ids: [String]? = nil) throws -> Data {
             try JSONSerialization.data(withJSONObject: [
                 "schemaVersion": 1, "catalogVersion": "test", "reviewedAt": "2026-10-06",
-                "services": ids.map { id in ["id": id, "routes": routes.map {
+                "services": (ids ?? BypassService.allCases.map(\.rawValue)).map { id in ["id": id, "routes": routes.map {
                     ["cidr": $0, "source": "fixture", "domains": ["example.test"]]
                 }] },
             ])
         }
+        XCTAssertNoThrow(try ServiceBypassCatalog.decode(data(["185.73.193.0/24"])))
         XCTAssertThrowsError(try ServiceBypassCatalog.decode(data(["0.0.0.0/0"])))
         XCTAssertThrowsError(try ServiceBypassCatalog.decode(data([])))
         XCTAssertThrowsError(try ServiceBypassCatalog.decode(data(["185.73.193.0/24"], ids: ["ozon"])))
@@ -182,6 +232,24 @@ final class ServiceBypassProfileTests: XCTestCase {
 }
 
 final class ServiceBypassSelectionTests: XCTestCase {
+    @MainActor func testSelectAllFromPartialChoiceThenClearAllPersistsAcrossReopening() async throws {
+        let store = FakeProfileStore()
+        try await ServiceBypassProfileUpdate.apply(ServiceBypassPolicy(services: [.max, .cdek]), to: store)
+        let screen = ServiceBypassSelectionModel()
+        screen.synchronize(try ServiceBypassPolicy(configuration: store.configuration))
+        for choice: Set<BypassService> in [Set(BypassService.allCases), []] {
+            let write = try XCTUnwrap(screen.updateSelection(choice, save: {
+                try await ServiceBypassProfileUpdate.apply($0, to: store)
+            }, readSaved: { try? ServiceBypassPolicy(configuration: store.configuration) }))
+            await write.value
+            XCTAssertNil(screen.saveError)
+            try await store.reload()
+            let reopened = ServiceBypassSelectionModel()
+            reopened.synchronize(try ServiceBypassPolicy(configuration: store.configuration))
+            XCTAssertEqual(reopened.selection, choice)
+        }
+    }
+
     @MainActor func testSwitchesPersistBeforeDismissAndSurviveConnectReload() async throws {
         let store = FakeProfileStore()
         let screen = ServiceBypassSelectionModel()

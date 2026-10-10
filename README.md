@@ -133,17 +133,20 @@ App ID и App Group, импорт ключа вставкой → «Подклю
 ## Команды
 
 Требуются: Xcode 26+, [XcodeGen](https://github.com/yonaskolb/XcodeGen) (`brew install xcodegen`).
+Для `make framework` нужен также `go` в `PATH` с поддержкой выбора toolchain:
+скрипт закрепляет `GOTOOLCHAIN=go1.22.2`. Первая сборка требует сети для загрузки
+исходников, Go 1.22.2 и модулей. Cloak собирается из исходников вместе с адаптером.
 
 ```bash
 make gen        # сгенерировать OVoCClient.xcodeproj из project.yml
 make build      # собрать оба таргета БЕЗ подписи — быстрая проверка компиляции
 make test       # ConfigKit, reconnect, IPv6, UTF-8 логов и происхождение framework — на Mac
 make test-cloak-refcount # после make framework: гонка ссылок Connection под ThreadSanitizer
-make test-cloak-send # очередь Cloak: зависшая запись, порядок, ошибки и остановка
-make framework  # собрать OpenVPNAdapter.framework из исходников Amnezia + наш патч (основной способ)
+make test-cloak-send # после make framework: очередь Cloak, ошибки и остановка под ASan/UBSan
+make framework  # исходники OpenVPNAdapter + Cloak, наши патчи, Go race tests и C++ send-тест
 make framework-manifest # положить privacy manifest в уже собранный фреймворк (make framework делает сам)
 make fetch      # готовый бинарь v1.0.42 — НЕРАБОЧИЙ (дефект метки GCM), только для сравнения
-make verify     # arm64, Cloak, API + связь бинарника с исходниками и AEAD-патчем
+make verify     # arm64, Cloak, API + квитанция исходников, всех патчей и архива Cloak
 
 make devices    # какие iPhone видит Mac и готовы ли они к установке
 make ddi        # смонтировать на телефон образ разработчика (VPN на Mac выключить)
@@ -161,6 +164,11 @@ make crashlogs  # то же + отчёты о падениях расширен�
 `OVoCClient.xcodeproj` пересоздаётся каждым `make gen` — все настройки подписи живут в
 `project.yml`, в интерфейсе Xcode ничего не настраиваем.
 
+`make framework` запускает Go-тесты реестра соединений с `-race` и C++-тест очереди
+отправки; `make test-cloak-refcount` запускается отдельно. Эти нативные проверки
+не входят в `make test`. Версии исходников и состав квитанции описаны в
+[docs/FRAMEWORK-API.md](docs/FRAMEWORK-API.md#происхождение-бинаря).
+
 Разобрать ключ Amnezia в читаемый JSON (вывод сохранять только в `Secrets/`):
 
 ```bash
@@ -177,11 +185,13 @@ python3 scripts/decode-vpnkey.py --schema Secrets/my.vpnkey
 
 - SwiftUI-приложение + одно расширение `NEPacketTunnelProvider`. Device-only
   (VPN не работает в симуляторе), deployment target iOS 16.0.
-- `OpenVPNAdapter.framework` от Amnezia, **собранный из исходников с нашим патчем**
+- `OpenVPNAdapter.framework` от Amnezia, **собранный из исходников с нашими патчами**
   (`make framework`, `patches/`): в их готовом бинаре клиент не записывает метку
   подлинности GCM, и сервер отбрасывает каждый пакет. Cloak скомпилирован
-  внутрь OpenVPN3 как транспорт. Со стороны Swift: `setPTCloak()` + блок
-  `<cloak>` в тексте профиля.
+  внутрь OpenVPN3 как транспорт; его Go-библиотека тоже пересобирается с защитой
+  реестра соединений. Исправления C++ защищают счётчики ссылок и выносят отправку
+  из цикла OpenVPN в последовательную фоновую очередь. Со стороны Swift:
+  `setPTCloak()` + блок `<cloak>` в тексте профиля.
 - **ConfigKit** — локальный SPM-пакет со всей логикой разбора ключа `vpn://…`
   (zlib-распаковка, двойной разбор `last_config`, типы Cloak-полей, сборка
   профиля). Тестируется на Mac: `make test`.

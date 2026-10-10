@@ -16,9 +16,20 @@
 | Символы Cloak | `Cloak_dial`, `Initialize_cloak_c_client` — присутствуют (`nm -gU`) |
 
 Эта таблица описывает исходный бинарник, по которому исследовался API. В приложении
-используется сборка из исходников с исправлением AEAD (`make framework`).
-`make verify` проверяет arm64, символы Cloak, API и квитанцию
-`Frameworks/OpenVPNAdapter.build.json`: коммиты, хэш текущего патча и хэш бинарника.
+используется сборка из исходников (`make framework`): OpenVPNAdapter `8bb3da50`,
+OpenVPN3 `e901077a` и Cloak `884ac4fa`. Go закреплён на версии 1.22.2; для сборки
+нужен `go` в `PATH`, скрипт выбирает toolchain через `GOTOOLCHAIN=go1.22.2`.
+Патчи в `patches/` исправляют AEAD, счётчик ссылок Connection, очередь отправки
+Cloak и реестр соединений Go. Готовый архив Cloak заменяется пересобранным для iOS arm64.
+
+`make framework` запускает Go `test -race` для реестра и C++-тест отправки под
+ASan/UBSan. После сборки C++-тест можно повторить командой `make test-cloak-send`;
+счётчик ссылок проверяется отдельно командой `make test-cloak-refcount` под ThreadSanitizer.
+
+`make verify` проверяет arm64, символы Cloak, API и квитанцию схемы 4
+`Frameworks/OpenVPNAdapter.build.json`: три коммита, версию Go, хэши четырёх патчей,
+архива Cloak и бинарника фреймворка. Для проверки сохраните архив
+`build/OpenVPNAdapter-src/Lib/ios/arm64/ck-ovpn-plugin.a`, с которым собран фреймворк.
 Без квитанции или при несовпадении требуется пересборка. Готовый `v1.0.42` проверку не проходит;
 `make fetch` сохраняет его только в `build/cache/prebuilt-v1.0.42` для сравнения.
 

@@ -17,6 +17,41 @@
 
 ---
 
+## Сборка 0.1.0 (11) — 2026-10-10, активный VPN без трафика
+
+Выпуск исправляет блокирующую отправку Cloak: запись выполняется через
+последовательную очередь, поэтому OpenVPN продолжает обрабатывать keepalive,
+штатное восстановление и остановку. Реестр соединений Go синхронизирован для
+безопасного пересечения close с I/O. Поведение приложения и «Без VPN» сохранены.
+
+Исходники архива: `cedc59c` (исправление `ebb68a7`, база — выпущенная сборка 10).
+Пройдены 94 теста проекта, 700 C++ send-сценариев под ASan/UBSan и ThreadSanitizer,
+три Go race tests, Connection refcount под ThreadSanitizer, Release-проверка и
+129 строк локализации. Старый send-тест зависает; старый Go late-write тест падает.
+Проверка на физическом iPhone не состоялась из-за блокировки устройства;
+пользователь разрешил выпуск после автоматических проверок.
+
+Загрузка успешно завершилась **10 октября в 11:23 МСК**. Apple обработала сборку
+(`VALID`) и одобрила внешнее тестирование (`betaReviewState=APPROVED`). Повторное
+чтение API подтвердило `internalBuildState=IN_BETA_TESTING`,
+`externalBuildState=IN_BETA_TESTING` и назначение группам **Internal Testing Group**
+и **External Testing Group**. Автоматическое уведомление тестировщиков включено
+(`autoNotifyEnabled=true`). Заметки ru/en-GB записаны и проверены повторным чтением.
+
+- Build ID: `315f839c-36f5-4179-92e3-566a4c83eef3`.
+- Внешняя группа: `7f4a8bdc-f245-483d-ada5-c76cd725f8ae`.
+- Истечение TestFlight: **2027-01-08**.
+- Подтверждение API: `build/testflight/build11-final-state.json` и
+  `build/testflight/build11-final-review.json`.
+
+- Архив: `build/testflight/OVoCClient-build11.xcarchive`.
+- Квитанция: `build/testflight/build11-release-receipt.json`.
+- UUID framework: `E091CD9B-DFF4-31B5-8527-D2C6D92A2744`.
+- SHA и исходники всех компонентов: `build/testflight/build11-framework-receipt.json`.
+- Символы framework с совпадающим UUID добавлены в локальную копию архива для
+  разбора возможных падений. Предупреждение Apple об отсутствии этих символов
+  в загруженном пакете не блокирует распространение.
+
 ## Сборка 0.1.0 (10) — 2026-10-09, исправление гонки Cloak
 
 Счётчик ссылок `Connection` в Cloak заменён на потокобезопасный. Исходники архива:

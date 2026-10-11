@@ -4,6 +4,7 @@ import CoreFoundation
 public enum BypassService: String, CaseIterable, Codable, Hashable {
     case ozon, wildberries, yandex
     case max, cdek, gosuslugi, mosru, mosenergosbyt
+    case tbank, sber
 }
 
 public enum ServiceBypassError: String, Error, LocalizedError, CaseIterable {

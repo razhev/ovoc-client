@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
-  "catalogVersion": "2026-10-10.1",
-  "reviewedAt": "2026-10-10",
+  "catalogVersion": "2026-10-11.1",
+  "reviewedAt": "2026-10-11",
   "compatibility": "experimental-device-validation-pending",
   "services": [
     {
@@ -1010,6 +1010,122 @@
             "www.mosenergosbyt.ru"
           ],
           "scope": "registered-or-announced-service-network"
+        }
+      ]
+    },
+    {
+      "id": "tbank",
+      "routes": [
+        {
+          "cidr": "178.130.128.0/24",
+          "source": "https://rdap.db.ripe.net/ip/178.130.128.21",
+          "registryName": "RU-TINKOFF-MOBILE-LIR-20100315",
+          "domains": [
+            "api-common-gw.tbank.ru",
+            "api-common-gw.tinkoff.ru",
+            "api-common.tbank.ru",
+            "api.tbank.ru",
+            "api.tinkoff.ru",
+            "id.tbank.ru",
+            "id.tinkoff.ru",
+            "mobile.tbank.ru",
+            "my.tbank.ru",
+            "secure.tbank.ru",
+            "secure2.tbank.ru",
+            "securepay.tinkoff.ru",
+            "tbank.ru",
+            "tcsbank.ru",
+            "tinkoff.ru",
+            "tmsg.tbank.ru",
+            "tmsg.tinkoff.ru",
+            "www.tbank.ru",
+            "www.tinkoff.ru"
+          ]
+        },
+        {
+          "cidr": "178.130.129.0/24",
+          "source": "https://rdap.db.ripe.net/ip/178.130.129.23",
+          "registryName": "RU-TINKOFF-MOBILE-LIR-20100315",
+          "domains": [
+            "mobile.tbank.ru",
+            "securepay.tbank.ru",
+            "sso.tbank.ru"
+          ]
+        },
+        {
+          "cidr": "193.17.93.194/32",
+          "source": "https://rdap.db.ripe.net/ip/193.17.93.194",
+          "registryName": "RU-EDGECENTER-20210914",
+          "domains": [
+            "acdn.tinkoff.ru",
+            "cdn.tbank.ru",
+            "pay.tbank.ru"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "sber",
+      "routes": [
+        {
+          "cidr": "84.252.149.0/24",
+          "source": "https://rdap.db.ripe.net/ip/84.252.149.51",
+          "registryName": "SBER-public-services-network-7",
+          "domains": [
+            "cms-res.online.sberbank.ru",
+            "id.sber.ru",
+            "mobile-node1.online.sberbank.ru",
+            "mobile-node2.online.sberbank.ru",
+            "mobile-node3.online.sberbank.ru",
+            "mobile-node4.online.sberbank.ru",
+            "mobile-node5.online.sberbank.ru",
+            "mobile-node6.online.sberbank.ru",
+            "mobile-node7.online.sberbank.ru",
+            "mobile-node8.online.sberbank.ru",
+            "oauth.sber.ru",
+            "online.sber.ru",
+            "online.sberbank.ru",
+            "sber.ru",
+            "sberbank.com",
+            "sberbank.ru",
+            "web-standin2.online.sberbank.ru",
+            "www.sber.ru",
+            "www.sberbank.com",
+            "www.sberbank.ru"
+          ]
+        },
+        {
+          "cidr": "194.54.14.0/24",
+          "source": "https://rdap.db.ripe.net/ip/194.54.14.141",
+          "registryName": "PVBSBRF-NET",
+          "domains": [
+            "node1.online.sberbank.ru",
+            "node2.online.sberbank.ru"
+          ]
+        },
+        {
+          "cidr": "62.76.205.3/32",
+          "source": "https://rdap.db.ripe.net/ip/62.76.205.110",
+          "registryName": "RBS",
+          "domains": [
+            "securepayments.sberbank.ru"
+          ]
+        },
+        {
+          "cidr": "62.76.205.110/32",
+          "source": "https://rdap.db.ripe.net/ip/62.76.205.110",
+          "registryName": "RBS",
+          "domains": [
+            "3dsec.sberbank.ru"
+          ]
+        },
+        {
+          "cidr": "62.76.205.134/32",
+          "source": "https://rdap.db.ripe.net/ip/62.76.205.110",
+          "registryName": "RBS",
+          "domains": [
+            "securepayments.sberbank.ru"
+          ]
         }
       ]
     }

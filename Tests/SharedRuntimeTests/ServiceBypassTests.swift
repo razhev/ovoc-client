@@ -57,6 +57,23 @@ final class ServiceBypassTests: XCTestCase {
         XCTAssertTrue(try IPNetwork("2a02:6b8::115/128").contains(address: "2a02:6b8::115"))
     }
 
+    func testExistingEightServiceChoiceDoesNotEnableBanksOnUpgrade() throws {
+        let previous: Set<BypassService> = [.ozon, .wildberries, .yandex, .max,
+                                            .cdek, .gosuslugi, .mosru, .mosenergosbyt]
+        let saved: [String: Any] = [ServiceBypassPolicy.configurationKey: [
+            "schemaVersion": 1,
+            "services": ["ozon", "wildberries", "yandex", "max", "cdek",
+                         "gosuslugi", "mosru", "mosenergosbyt"],
+        ]]
+        let policy = try ServiceBypassPolicy(configuration: saved)
+        XCTAssertEqual(policy.services, previous)
+        let catalog = try ServiceBypassCatalog.loadBundled()
+        let networks = try catalog.networks(for: policy)
+        for address in ["178.130.128.21", "193.17.93.194", "84.252.149.51", "62.76.205.3"] {
+            XCTAssertFalse(networks.contains { $0.contains(address: address) }, address)
+        }
+    }
+
     func testMalformedCIDRsAndNonPublicNetworks() throws {
         for text in ["foo/24", "1.2.3.4/33", "::/129", "1.2.3.4/-1", "1.2.3.4/", "1.2.3.4", "1.2.3.4/24/1", "fe80::1%en0/64", "1.2.3.4\0/32"] {
             XCTAssertThrowsError(try IPNetwork(text), text)
@@ -125,6 +142,30 @@ final class ServiceBypassTests: XCTestCase {
                 XCTAssertTrue(networks.contains { $0.contains(address: address) }, "\(service): \(address)")
             }
             for address in excluded + ["1.1.1.1", "8.8.8.8", "185.73.193.68"] {
+                XCTAssertFalse(networks.contains { $0.contains(address: address) }, "\(service): \(address)")
+            }
+        }
+    }
+
+    func testBankAPIAuthAndAssetsAreCoveredWithIndependentNarrowExceptions() throws {
+        let catalog = try ServiceBypassCatalog.loadBundled()
+        let cases: [(BypassService, [String], [String])] = [
+            (.tbank, ["178.130.128.21", "178.130.128.214", "178.130.128.26",
+                      "178.130.128.27", "178.130.129.23", "178.130.129.253", "193.17.93.194"],
+                     ["178.130.127.255", "178.130.130.1", "193.17.93.193", "193.17.93.195",
+                      "84.252.149.51", "62.76.205.3"]),
+            (.sber, ["84.252.149.51", "84.252.149.147", "84.252.149.138", "84.252.149.220",
+                     "84.252.149.16", "84.252.149.60", "194.54.14.141", "194.54.14.142",
+                     "62.76.205.3", "62.76.205.110", "62.76.205.134"],
+                    ["84.252.148.255", "84.252.150.1", "194.54.13.255", "194.54.15.1",
+                     "62.76.205.4", "62.76.205.111", "62.76.205.135", "178.130.128.21"]),
+        ]
+        for (service, included, excluded) in cases {
+            let networks = try catalog.networks(for: ServiceBypassPolicy(services: [service]))
+            for address in included {
+                XCTAssertTrue(networks.contains { $0.contains(address: address) }, "\(service): \(address)")
+            }
+            for address in excluded + ["1.1.1.1", "8.8.8.8", "77.88.8.8"] {
                 XCTAssertFalse(networks.contains { $0.contains(address: address) }, "\(service): \(address)")
             }
         }

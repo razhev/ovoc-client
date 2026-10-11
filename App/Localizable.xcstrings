@@ -1165,6 +1165,17 @@
         }
       }
     },
+    "Сбер": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sber"
+          }
+        }
+      }
+    },
     "Сеть изменилась — соединение восстанавливается, ничего нажимать не нужно.": {
       "extractionState": "manual",
       "localizations": {
@@ -1270,6 +1281,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Saving…"
+          }
+        }
+      }
+    },
+    "Т-Банк (Тинькофф)": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "T-Bank (Tinkoff)"
           }
         }
       }

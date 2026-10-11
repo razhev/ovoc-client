@@ -11,6 +11,8 @@ extension BypassService {
         case .gosuslugi: return String(localized: "Госуслуги")
         case .mosru: return "mos.ru"
         case .mosenergosbyt: return String(localized: "Мосэнергосбыт")
+        case .tbank: return String(localized: "Т-Банк (Тинькофф)")
+        case .sber: return String(localized: "Сбер")
         }
     }
 }

@@ -1,0 +1,736 @@
+{
+  "reviewedAt": "2026-10-11",
+  "resolver": "https://cloudflare-dns.com/dns-query",
+  "recordTypes": [
+    "A",
+    "AAAA"
+  ],
+  "environment": "Mac; not an iPhone traffic capture; answers may vary by network/resolver",
+  "observations": [
+    {
+      "service": "tbank",
+      "domain": "api-common-gw.tbank.ru",
+      "addresses": [
+        "178.130.128.214"
+      ],
+      "dnsStatus": {
+        "A": 0,
+        "AAAA": 0
+      },
+      "aliases": []
+    },
+    {
+      "service": "tbank",
+      "domain": "api-common-gw.tinkoff.ru",
+      "addresses": [
+        "178.130.128.214"
+      ],
+      "dnsStatus": {
+        "A": 0,
+        "AAAA": 0
+      },
+      "aliases": []
+    },
+    {
+      "service": "tbank",
+      "domain": "api-common.tbank.ru",
+      "addresses": [
+        "178.130.128.179"
+      ],
+      "dnsStatus": {
+        "A": 0,
+        "AAAA": 0
+      },
+      "aliases": []
+    },
+    {
+      "service": "tbank",
+      "domain": "api-mobile.tbank.ru",
+      "addresses": [],
+      "dnsStatus": {
+        "A": 3,
+        "AAAA": 3
+      },
+      "aliases": []
+    },
+    {
+      "service": "tbank",
+      "domain": "mobile.tbank.ru",
+      "addresses": [
+        "178.130.128.46",
+        "178.130.129.253"
+      ],
+      "dnsStatus": {
+        "A": 0,
+        "AAAA": 0
+      },
+      "aliases": []
+    },
+    {
+      "service": "tbank",
+      "domain": "my.tbank.ru",
+      "addresses": [
+        "178.130.128.18"
+      ],
+      "dnsStatus": {
+        "A": 0,
+        "AAAA": 0
+      },
+      "aliases": []
+    },
+    {
+      "service": "tbank",
+      "domain": "secure.tbank.ru",
+      "addresses": [
+        "178.130.128.36"
+      ],
+      "dnsStatus": {
+        "A": 0,
+        "AAAA": 0
+      },
+      "aliases": []
+    },
+    {
+      "service": "tbank",
+      "domain": "secure2.tbank.ru",
+      "addresses": [
+        "178.130.128.36"
+      ],
+      "dnsStatus": {
+        "A": 0,
+        "AAAA": 0
+      },
+      "aliases": []
+    },
+    {
+      "service": "tbank",
+      "domain": "tbank.ru",
+      "addresses": [
+        "178.130.128.27"
+      ],
+      "dnsStatus": {
+        "A": 0,
+        "AAAA": 0
+      },
+      "aliases": []
+    },
+    {
+      "service": "tbank",
+      "domain": "www.tbank.ru",
+      "addresses": [
+        "178.130.128.27"
+      ],
+      "dnsStatus": {
+        "A": 0,
+        "AAAA": 0
+      },
+      "aliases": []
+    },
+    {
+      "service": "tbank",
+      "domain": "tinkoff.ru",
+      "addresses": [
+        "178.130.128.27"
+      ],
+      "dnsStatus": {
+        "A": 0,
+        "AAAA": 0
+      },
+      "aliases": []
+    },
+    {
+      "service": "tbank",
+      "domain": "www.tinkoff.ru",
+      "addresses": [
+        "178.130.128.27"
+      ],
+      "dnsStatus": {
+        "A": 0,
+        "AAAA": 0
+      },
+      "aliases": []
+    },
+    {
+      "service": "tbank",
+      "domain": "tcsbank.ru",
+      "addresses": [
+        "178.130.128.27"
+      ],
+      "dnsStatus": {
+        "A": 0,
+        "AAAA": 0
+      },
+      "aliases": []
+    },
+    {
+      "service": "tbank",
+      "domain": "api.tbank.ru",
+      "addresses": [
+        "178.130.128.21"
+      ],
+      "dnsStatus": {
+        "A": 0,
+        "AAAA": 0
+      },
+      "aliases": []
+    },
+    {
+      "service": "tbank",
+      "domain": "api.tinkoff.ru",
+      "addresses": [
+        "178.130.128.21"
+      ],
+      "dnsStatus": {
+        "A": 0,
+        "AAAA": 0
+      },
+      "aliases": []
+    },
+    {
+      "service": "tbank",
+      "domain": "id.tbank.ru",
+      "addresses": [
+        "178.130.128.26"
+      ],
+      "dnsStatus": {
+        "A": 0,
+        "AAAA": 0
+      },
+      "aliases": []
+    },
+    {
+      "service": "tbank",
+      "domain": "id.tinkoff.ru",
+      "addresses": [
+        "178.130.128.26"
+      ],
+      "dnsStatus": {
+        "A": 0,
+        "AAAA": 0
+      },
+      "aliases": []
+    },
+    {
+      "service": "tbank",
+      "domain": "sso.tbank.ru",
+      "addresses": [
+        "178.130.129.72"
+      ],
+      "dnsStatus": {
+        "A": 0,
+        "AAAA": 0
+      },
+      "aliases": []
+    },
+    {
+      "service": "tbank",
+      "domain": "sso.tinkoff.ru",
+      "addresses": [],
+      "dnsStatus": {
+        "A": 3,
+        "AAAA": 3
+      },
+      "aliases": []
+    },
+    {
+      "service": "tbank",
+      "domain": "cdn.tbank.ru",
+      "addresses": [
+        "193.17.93.194"
+      ],
+      "dnsStatus": {
+        "A": 0,
+        "AAAA": 0
+      },
+      "aliases": [
+        "acdn.tinkoff.ru.",
+        "cl-ead2c819.edgecdn.ru."
+      ]
+    },
+    {
+      "service": "tbank",
+      "domain": "acdn.tbank.ru",
+      "addresses": [],
+      "dnsStatus": {
+        "A": 3,
+        "AAAA": 3
+      },
+      "aliases": []
+    },
+    {
+      "service": "tbank",
+      "domain": "cdn.tinkoff.ru",
+      "addresses": [],
+      "dnsStatus": {
+        "A": 0,
+        "AAAA": 0
+      },
+      "aliases": []
+    },
+    {
+      "service": "tbank",
+      "domain": "acdn.tinkoff.ru",
+      "addresses": [
+        "193.17.93.194"
+      ],
+      "dnsStatus": {
+        "A": 0,
+        "AAAA": 0
+      },
+      "aliases": [
+        "cl-ead2c819.edgecdn.ru."
+      ]
+    },
+    {
+      "service": "tbank",
+      "domain": "tmsg.tbank.ru",
+      "addresses": [
+        "178.130.128.30"
+      ],
+      "dnsStatus": {
+        "A": 0,
+        "AAAA": 0
+      },
+      "aliases": []
+    },
+    {
+      "service": "tbank",
+      "domain": "tmsg.tinkoff.ru",
+      "addresses": [
+        "178.130.128.30"
+      ],
+      "dnsStatus": {
+        "A": 0,
+        "AAAA": 0
+      },
+      "aliases": []
+    },
+    {
+      "service": "tbank",
+      "domain": "pay.tbank.ru",
+      "addresses": [
+        "193.17.93.194"
+      ],
+      "dnsStatus": {
+        "A": 0,
+        "AAAA": 0
+      },
+      "aliases": [
+        "cl-ead2c819.edgecdn.ru."
+      ]
+    },
+    {
+      "service": "tbank",
+      "domain": "securepay.tbank.ru",
+      "addresses": [
+        "178.130.129.23"
+      ],
+      "dnsStatus": {
+        "A": 0,
+        "AAAA": 0
+      },
+      "aliases": []
+    },
+    {
+      "service": "tbank",
+      "domain": "securepay.tinkoff.ru",
+      "addresses": [
+        "178.130.128.34"
+      ],
+      "dnsStatus": {
+        "A": 0,
+        "AAAA": 0
+      },
+      "aliases": []
+    },
+    {
+      "service": "sber",
+      "domain": "oauth.sber.ru",
+      "addresses": [
+        "84.252.149.138"
+      ],
+      "dnsStatus": {
+        "A": 0,
+        "AAAA": 0
+      },
+      "aliases": []
+    },
+    {
+      "service": "sber",
+      "domain": "api.sberbank.ru",
+      "addresses": [],
+      "dnsStatus": {
+        "A": 0,
+        "AAAA": 0
+      },
+      "aliases": []
+    },
+    {
+      "service": "sber",
+      "domain": "mobile-node5.online.sberbank.ru",
+      "addresses": [
+        "84.252.149.18"
+      ],
+      "dnsStatus": {
+        "A": 0,
+        "AAAA": 0
+      },
+      "aliases": []
+    },
+    {
+      "service": "sber",
+      "domain": "mobile-node6.online.sberbank.ru",
+      "addresses": [
+        "84.252.149.16"
+      ],
+      "dnsStatus": {
+        "A": 0,
+        "AAAA": 0
+      },
+      "aliases": []
+    },
+    {
+      "service": "sber",
+      "domain": "mobile-node7.online.sberbank.ru",
+      "addresses": [
+        "84.252.149.222"
+      ],
+      "dnsStatus": {
+        "A": 0,
+        "AAAA": 0
+      },
+      "aliases": []
+    },
+    {
+      "service": "sber",
+      "domain": "mobile-node8.online.sberbank.ru",
+      "addresses": [
+        "84.252.149.24"
+      ],
+      "dnsStatus": {
+        "A": 0,
+        "AAAA": 0
+      },
+      "aliases": []
+    },
+    {
+      "service": "sber",
+      "domain": "web-standin.online.sberbank.ru",
+      "addresses": [],
+      "dnsStatus": {
+        "A": 3,
+        "AAAA": 3
+      },
+      "aliases": []
+    },
+    {
+      "service": "sber",
+      "domain": "web-standin2.online.sberbank.ru",
+      "addresses": [
+        "84.252.149.21"
+      ],
+      "dnsStatus": {
+        "A": 0,
+        "AAAA": 0
+      },
+      "aliases": []
+    },
+    {
+      "service": "sber",
+      "domain": "sberbank.ru",
+      "addresses": [
+        "84.252.149.206"
+      ],
+      "dnsStatus": {
+        "A": 0,
+        "AAAA": 0
+      },
+      "aliases": []
+    },
+    {
+      "service": "sber",
+      "domain": "www.sberbank.ru",
+      "addresses": [
+        "84.252.149.206"
+      ],
+      "dnsStatus": {
+        "A": 0,
+        "AAAA": 0
+      },
+      "aliases": [
+        "sberbank.ru."
+      ]
+    },
+    {
+      "service": "sber",
+      "domain": "sber.ru",
+      "addresses": [
+        "84.252.149.198"
+      ],
+      "dnsStatus": {
+        "A": 0,
+        "AAAA": 0
+      },
+      "aliases": []
+    },
+    {
+      "service": "sber",
+      "domain": "www.sber.ru",
+      "addresses": [
+        "84.252.149.198"
+      ],
+      "dnsStatus": {
+        "A": 0,
+        "AAAA": 0
+      },
+      "aliases": []
+    },
+    {
+      "service": "sber",
+      "domain": "online.sberbank.ru",
+      "addresses": [
+        "84.252.149.51"
+      ],
+      "dnsStatus": {
+        "A": 0,
+        "AAAA": 0
+      },
+      "aliases": []
+    },
+    {
+      "service": "sber",
+      "domain": "online.sber.ru",
+      "addresses": [
+        "84.252.149.51"
+      ],
+      "dnsStatus": {
+        "A": 0,
+        "AAAA": 0
+      },
+      "aliases": []
+    },
+    {
+      "service": "sber",
+      "domain": "mobile-node1.online.sberbank.ru",
+      "addresses": [
+        "84.252.149.220"
+      ],
+      "dnsStatus": {
+        "A": 0,
+        "AAAA": 0
+      },
+      "aliases": []
+    },
+    {
+      "service": "sber",
+      "domain": "mobile-node2.online.sberbank.ru",
+      "addresses": [
+        "84.252.149.19"
+      ],
+      "dnsStatus": {
+        "A": 0,
+        "AAAA": 0
+      },
+      "aliases": []
+    },
+    {
+      "service": "sber",
+      "domain": "mobile-node3.online.sberbank.ru",
+      "addresses": [
+        "84.252.149.219"
+      ],
+      "dnsStatus": {
+        "A": 0,
+        "AAAA": 0
+      },
+      "aliases": []
+    },
+    {
+      "service": "sber",
+      "domain": "mobile-node4.online.sberbank.ru",
+      "addresses": [
+        "84.252.149.221"
+      ],
+      "dnsStatus": {
+        "A": 0,
+        "AAAA": 0
+      },
+      "aliases": []
+    },
+    {
+      "service": "sber",
+      "domain": "node1.online.sberbank.ru",
+      "addresses": [
+        "194.54.14.141"
+      ],
+      "dnsStatus": {
+        "A": 0,
+        "AAAA": 0
+      },
+      "aliases": []
+    },
+    {
+      "service": "sber",
+      "domain": "node2.online.sberbank.ru",
+      "addresses": [
+        "194.54.14.142"
+      ],
+      "dnsStatus": {
+        "A": 0,
+        "AAAA": 0
+      },
+      "aliases": []
+    },
+    {
+      "service": "sber",
+      "domain": "id.sber.ru",
+      "addresses": [
+        "84.252.149.147"
+      ],
+      "dnsStatus": {
+        "A": 0,
+        "AAAA": 0
+      },
+      "aliases": []
+    },
+    {
+      "service": "sber",
+      "domain": "id.sberbank.ru",
+      "addresses": [],
+      "dnsStatus": {
+        "A": 3,
+        "AAAA": 3
+      },
+      "aliases": []
+    },
+    {
+      "service": "sber",
+      "domain": "cms-res.online.sberbank.ru",
+      "addresses": [
+        "84.252.149.60"
+      ],
+      "dnsStatus": {
+        "A": 0,
+        "AAAA": 0
+      },
+      "aliases": []
+    },
+    {
+      "service": "sber",
+      "domain": "3dsec.sberbank.ru",
+      "addresses": [
+        "62.76.205.110"
+      ],
+      "dnsStatus": {
+        "A": 0,
+        "AAAA": 0
+      },
+      "aliases": []
+    },
+    {
+      "service": "sber",
+      "domain": "securepayments.sberbank.ru",
+      "addresses": [
+        "62.76.205.134",
+        "62.76.205.3"
+      ],
+      "dnsStatus": {
+        "A": 0,
+        "AAAA": 0
+      },
+      "aliases": []
+    },
+    {
+      "service": "sber",
+      "domain": "sberbank.com",
+      "addresses": [
+        "84.252.149.206"
+      ],
+      "dnsStatus": {
+        "A": 0,
+        "AAAA": 0
+      },
+      "aliases": []
+    },
+    {
+      "service": "sber",
+      "domain": "www.sberbank.com",
+      "addresses": [
+        "84.252.149.206"
+      ],
+      "dnsStatus": {
+        "A": 0,
+        "AAAA": 0
+      },
+      "aliases": []
+    }
+  ],
+  "networkRegistries": [
+    {
+      "queryIP": "178.130.128.21",
+      "source": "https://rdap.db.ripe.net/ip/178.130.128.21",
+      "name": "RU-TINKOFF-MOBILE-LIR-20100315",
+      "startAddress": "178.130.128.0",
+      "endAddress": "178.130.129.255",
+      "announcedPrefix": "178.130.128.0/24",
+      "asns": [
+        "43399"
+      ]
+    },
+    {
+      "queryIP": "178.130.129.23",
+      "source": "https://rdap.db.ripe.net/ip/178.130.129.23",
+      "name": "RU-TINKOFF-MOBILE-LIR-20100315",
+      "startAddress": "178.130.128.0",
+      "endAddress": "178.130.129.255",
+      "announcedPrefix": "178.130.129.0/24",
+      "asns": [
+        "43399"
+      ]
+    },
+    {
+      "queryIP": "193.17.93.194",
+      "source": "https://rdap.db.ripe.net/ip/193.17.93.194",
+      "name": "RU-EDGECENTER-20210914",
+      "startAddress": "193.17.93.0",
+      "endAddress": "193.17.93.255",
+      "announcedPrefix": "193.17.93.0/24",
+      "asns": [
+        "210756"
+      ]
+    },
+    {
+      "queryIP": "84.252.149.51",
+      "source": "https://rdap.db.ripe.net/ip/84.252.149.51",
+      "name": "SBER-public-services-network-7",
+      "startAddress": "84.252.149.0",
+      "endAddress": "84.252.149.255",
+      "announcedPrefix": "84.252.149.0/24",
+      "asns": [
+        "35237"
+      ]
+    },
+    {
+      "queryIP": "194.54.14.141",
+      "source": "https://rdap.db.ripe.net/ip/194.54.14.141",
+      "name": "PVBSBRF-NET",
+      "startAddress": "194.54.12.0",
+      "endAddress": "194.54.15.255",
+      "announcedPrefix": "194.54.14.0/24",
+      "asns": [
+        "35237"
+      ]
+    },
+    {
+      "queryIP": "62.76.205.110",
+      "source": "https://rdap.db.ripe.net/ip/62.76.205.110",
+      "name": "RBS",
+      "startAddress": "62.76.205.0",
+      "endAddress": "62.76.205.255",
+      "announcedPrefix": "62.76.205.0/24",
+      "asns": [
+        "60544"
+      ]
+    }
+  ]
+}

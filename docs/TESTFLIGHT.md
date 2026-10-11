@@ -37,7 +37,12 @@ race detector. Отдельный ревьюер проверил владени
 под race detector, 700 C++ send-сценариев под ASan/UBSan, Connection refcount под
 ThreadSanitizer, проверка происхождения framework, Debug/Release и 135 строк локализации.
 UUID framework: `29E25FF1-70DE-3D43-8992-E872BD861031`.
-Сборка готовится к загрузке в обе существующие группы TestFlight.
+Архив `build/testflight/OVoCClient.xcarchive` собран из `486a5df`; версии обоих
+таргетов — 0.1.0 (13), dSYM framework с совпадающим UUID сохранён в архиве.
+На 11 октября загрузка не завершена: в Xcode нет Apple Account, а настроенный
+API-ключ не имеет прав на облачную distribution-подпись. App Store Connect пока
+показывает сборку 11 последней. После входа в аккаунт разработчика нужно повторить
+экспорт готового архива, затем назначить обе существующие группы TestFlight.
 
 ## Сборка 0.1.0 (11) — 2026-10-10, активный VPN без трафика
 

@@ -1,6 +1,7 @@
 # OVoC Client — политика конфиденциальности / Privacy Policy
 
-Действует с 28 сентября 2026 г. · Effective September 28, 2026
+Редакция от 6 октября 2026 г., начиная со сборки 0.1.0 (4).
+Effective October 6, 2026, starting with build 0.1.0 (4).
 
 *English version below.*
 
@@ -17,15 +18,16 @@ OVoC Client — клиент OpenVPN over Cloak для **вашего собст
 Что приложение обрабатывает, чтобы работать:
 
 - **Ключ подключения** (профиль с сертификатами), который вы вставляете сами. Хранится только на телефоне, в настройках VPN iOS. Используется только для подключения к серверу из этого ключа.
-- **Ваш трафик**, пока VPN включён. Идёт только на сервер, указанный в ключе (ключ выдаёт владелец сервера). Что происходит с трафиком на сервере, определяет его владелец. Как любой клиент OpenVPN, приложение сообщает этому серверу свою версию и платформу.
+- **Ваш трафик**, пока VPN включён, следует маршрутам профиля VPN. На экране «Без VPN» вы можете дополнительно включить прямое подключение для сетей Ozon, Wildberries и Яндекса. Эти соединения используют обычную сеть телефона, а сервисы видят её IP-адрес. Правила действуют по IP: сторонний сервис на том же адресе тоже может подключаться напрямую. Остальной трафик сохраняет маршрутизацию профиля. Что происходит с трафиком на VPN-сервере, определяет его владелец. Как любой клиент OpenVPN, приложение сообщает этому серверу свою версию и платформу.
+- **Выбор исключений** сохраняется только в профиле VPN на телефоне. По умолчанию новые исключения выключены. Встроенный каталог поставляется вместе с приложением; приложение не загружает удалённые списки и не собирает историю посещений для его обновления.
 - **DNS-запросы.** Идут через туннель к DNS-серверам из ключа. Если в ключе их нет — к публичному DNS Cloudflare (1.1.1.1, 1.0.0.1), тоже через туннель. Если в ключе указано имя сервера, а не адрес, при импорте приложение один раз узнаёт адрес сервера через обычный DNS телефона.
 - **Логи работы** (`tunnel.log`, `app.log`). Остаются на телефоне; в них есть адрес сервера и технические сообщения OpenVPN, но нет ключа. Те же сообщения пишутся в системный журнал iOS на телефоне. Логи уходят с телефона, только если вы сами нажмёте «Поделиться» на экране «Логи», — туда, куда вы их отправите.
 
 ### Третьи стороны
 
-Приложение **не продаёт, не использует и не передаёт третьим лицам никакие данные ни для каких целей**.
+Приложение не собирает данные для разработчика, аналитики или рекламы и не продаёт их. Сетевые соединения доставляют ваши запросы адресатам через VPN или напрямую согласно выбранным исключениям.
 
-Единственная третья сторона, до которой могут дойти ваши данные, — публичный DNS Cloudflare, если в ключе нет своих DNS-серверов. Запросы приходят к нему с адреса вашего VPN-сервера, а не телефона. Cloudflare обязуется не продавать и не передавать эти данные и удалять IP-адреса в течение 25 часов: <https://developers.cloudflare.com/1.1.1.1/privacy/public-dns-resolver/>.
+Если в ключе нет своих DNS-серверов, системные DNS-запросы идут к публичному DNS Cloudflare через VPN. Сведения Cloudflare об обработке этих запросов: <https://developers.cloudflare.com/1.1.1.1/privacy/public-dns-resolver/>. Исключения не переключают системный DNS на обычную сеть. Приложения со своим DNS-протоколом создают обычные сетевые соединения, к которым применяются IP-маршруты.
 
 **TestFlight.** Если вы получили приложение через TestFlight, Apple собирает данные о тестировании по своей политике (<https://www.apple.com/legal/privacy/>). Разработчику из них доступны: имя и email, с которыми вас пригласили (при публичной ссылке — анонимно), число запусков, отчёты о сбоях, модель устройства и версия iOS, а также отзывы и снимки экрана, которые вы отправите сами.
 
@@ -33,6 +35,7 @@ OVoC Client — клиент OpenVPN over Cloak для **вашего собст
 
 - Логи: не больше 256 КБ на файл, старые строки затираются. Лежат на телефоне, пока установлено приложение.
 - Ключ: лежит в настройках VPN, пока вы не удалите профиль или приложение.
+- Выбор исключений: хранится вместе с профилем; его можно сбросить на экране «Без VPN» при отключённом соединении.
 - **Удалить всё:** удалите приложение — iOS удалит его профиль VPN и логи. Только ключ: Настройки → Основные → VPN и управление устройством → VPN → профиль OVoC Client → удалить.
 - У разработчика ваших данных нет, удалять на его стороне нечего. Данные TestFlight удаляются по правилам Apple; чтобы выйти из тестирования — TestFlight → OVoC Client → «Прекратить тестирование».
 
@@ -57,15 +60,16 @@ OVoC Client is an OpenVPN over Cloak client for **your own** server. The app has
 What the app processes in order to work:
 
 - **The connection key** (a profile with certificates) that you paste in yourself. Stored only on the phone, in iOS VPN settings. Used only to connect to the server named in that key.
-- **Your traffic** while the VPN is on. It goes only to the server named in your key (the key is issued by the server owner). What happens to the traffic on that server is up to its owner. Like any OpenVPN client, the app tells that server its version and platform.
+- **Your traffic** while the VPN is on follows your VPN profile's routes. In Outside VPN, you can additionally enable direct connections to Ozon, Wildberries and Yandex networks. Those connections use the phone's regular network, and the services see that network's IP address. Rules apply to IP addresses: an unrelated service sharing the same address may also connect directly. Other traffic keeps the profile's routing policy. What happens to traffic on the VPN server is up to its owner. Like any OpenVPN client, the app tells that server its version and platform.
+- **Your exception selection** is stored only in the VPN profile on your phone. New exceptions are off by default. The catalog ships with the app; the app does not download remote lists or collect browsing history to update it.
 - **DNS queries.** They go through the tunnel to the DNS servers from the key; if the key has none, to Cloudflare's public DNS (1.1.1.1, 1.0.0.1), also through the tunnel. If the key names the server by hostname rather than address, the app looks the address up once through the phone's regular DNS when the key is imported.
 - **Activity logs** (`tunnel.log`, `app.log`). They stay on the phone; they contain the server address and OpenVPN technical messages, but not the key. The same messages are written to the iOS system log on the phone. Logs leave the phone only if you tap Share on the Logs screen yourself — and go wherever you send them.
 
 ### Third parties
 
-The app **does not sell, use or disclose any data to third parties for any purpose**.
+The app does not collect data for the developer, analytics or advertising, and does not sell it. Network connections deliver your requests to their destinations through the VPN or directly according to your selected exceptions.
 
-The only third party your data may reach is Cloudflare's public DNS, if the key has no DNS servers of its own. Queries reach it from your VPN server's address, not your phone's. Cloudflare commits not to sell or share this data and to delete IP addresses within 25 hours: <https://developers.cloudflare.com/1.1.1.1/privacy/public-dns-resolver/>.
+If your key has no DNS servers of its own, system DNS queries go to Cloudflare's public DNS through the VPN. Cloudflare describes its processing here: <https://developers.cloudflare.com/1.1.1.1/privacy/public-dns-resolver/>. Exceptions do not move system DNS to the regular network. Apps using their own DNS protocols create network connections that follow the IP routing rules.
 
 **TestFlight.** If you got the app through TestFlight, Apple collects testing data under its own policy (<https://www.apple.com/legal/privacy/>). Of that data, the developer can see: the name and email you were invited with (anonymous for a public link), the number of sessions, crash reports, device model and iOS version, and any feedback and screenshots you choose to send.
 
@@ -73,6 +77,7 @@ The only third party your data may reach is Cloudflare's public DNS, if the key 
 
 - Logs: at most 256 KB per file, oldest lines overwritten. They stay on the phone while the app is installed.
 - Key: stays in VPN settings until you delete the profile or the app.
+- Exception selection: stays with the profile; you can reset it in Outside VPN while disconnected.
 - **Delete everything:** delete the app, and iOS removes its VPN profile and logs. The key only: Settings → General → VPN & Device Management → VPN → OVoC Client profile → delete.
 - The developer holds none of your data, so there is nothing to delete on the developer's side. TestFlight data is deleted under Apple's rules; to leave the beta — TestFlight → OVoC Client → Stop Testing.
 

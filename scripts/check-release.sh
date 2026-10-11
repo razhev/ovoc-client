@@ -123,6 +123,16 @@ else
     FAILED=1
 fi
 
+# Both processes must use the same catalog as the tested source resource.
+for bundle in "" "PlugIns/PacketTunnel.appex/"; do
+    if cmp -s "$ROOT/Shared/Resources/ServiceBypassCatalog.json" "${APP}/${bundle}ServiceBypassCatalog.json"; then
+        echo "PASS каталог исключений: ${bundle:-app}"
+    else
+        echo "FAIL каталог исключений отсутствует или отличается: ${bundle:-app}"
+        FAILED=1
+    fi
+done
+
 # Тексты лицензий для экрана «О приложении» (App/Licenses + OFL шрифтов).
 LICENSES="OVoCClient-GPL-3.0 OpenVPNAdapter-AGPL-3.0 OpenVPNAdapter-NOTICE OpenVPN3-LICENSE Go-LICENSE Cloak-Go-modules OFL-marmelad OFL-rubik OFL-ptmono"
 MISSING_LICENSES=""

@@ -1,0 +1,75 @@
+diff --git a/cmd/ck-ovpn-plugin/ck-ovpn-plugin.go b/cmd/ck-ovpn-plugin/ck-ovpn-plugin.go
+index 895e935..178c324 100644
+--- a/cmd/ck-ovpn-plugin/ck-ovpn-plugin.go
++++ b/cmd/ck-ovpn-plugin/ck-ovpn-plugin.go
+@@ -13,6 +13,7 @@ import (
+ 	"encoding/base64"
+ 	"net"
+ 	"reflect"
++	"sync"
+ 	"unsafe"
+ 
+ 	"github.com/cbeuw/Cloak/internal/common"
+@@ -58,6 +59,13 @@ func generateClientConfigs(rawConfig client.RawConfig, state common.WorldState)
+ var singleplexTCPConfig client.RawConfig
+ var CloakConnections = map[int]net.Conn{}
+ var nextID = 0
++var connectionsMu sync.RWMutex
++
++func lookupConnection(id int) net.Conn {
++	connectionsMu.RLock()
++	defer connectionsMu.RUnlock()
++	return CloakConnections[id]
++}
+ 
+ //export Initialize_cloak_c_client
+ func Initialize_cloak_c_client(base64Config *C.char) (clientKey int) {
+@@ -135,6 +143,8 @@ func Cloak_dial() (clientKey int) {
+ 		return -1
+ 	}
+ 
++	connectionsMu.Lock()
++	defer connectionsMu.Unlock()
+ 	CloakConnections[nextID] = clientConn
+ 
+ 	// This is the return value
+@@ -146,7 +156,10 @@ func Cloak_dial() (clientKey int) {
+ 
+ //export Cloak_write
+ func Cloak_write(client_id int, buffer unsafe.Pointer, buffer_length C.int) int {
+-	var connection = CloakConnections[client_id]
++	var connection = lookupConnection(client_id)
++	if connection == nil {
++		return -1
++	}
+ 	var bytesBuffer = C.GoBytes(buffer, buffer_length)
+ 	numberOfBytesWritten, error := connection.Write(bytesBuffer)
+ 
+@@ -160,7 +173,7 @@ func Cloak_write(client_id int, buffer unsafe.Pointer, buffer_length C.int) int
+ //export Cloak_read
+ func Cloak_read(client_id int, buffer unsafe.Pointer, buffer_length int) int {
+ 
+-	var connection = CloakConnections[client_id]
++	var connection = lookupConnection(client_id)
+ 	if connection == nil {
+ 		return -1
+ 	}
+@@ -178,10 +191,17 @@ func Cloak_read(client_id int, buffer unsafe.Pointer, buffer_length int) int {
+ 
+ //export Cloak_close_connection
+ func Cloak_close_connection(client_id int) {
++	// Retain the connection before removing it from the registry. Never hold
++	// the registry lock during I/O: Close must unblock concurrent Read/Write.
++	connectionsMu.Lock()
+ 	var connection = CloakConnections[client_id]
++	delete(CloakConnections, client_id)
++	connectionsMu.Unlock()
++	if connection == nil {
++		return
++	}
+ 	connection.Close()
+ 	syscall.Close(int(fd))
+-	delete(CloakConnections, client_id)
+ }
+ 
+ func main() {}

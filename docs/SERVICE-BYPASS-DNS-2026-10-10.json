@@ -1,0 +1,687 @@
+{
+  "reviewedAt": "2026-10-10",
+  "resolver": "https://cloudflare-dns.com/dns-query",
+  "recordTypes": [
+    "A",
+    "AAAA"
+  ],
+  "environment": "Mac; not an iPhone traffic capture; DNS answers may differ by network and resolver",
+  "observations": [
+    {
+      "service": "ozon",
+      "domain": "ozon.ru",
+      "addresses": [
+        "185.73.193.68",
+        "185.73.194.82"
+      ],
+      "dnsStatus": {
+        "A": 0,
+        "AAAA": 0
+      }
+    },
+    {
+      "service": "ozon",
+      "domain": "www.ozon.ru",
+      "addresses": [
+        "185.73.193.68",
+        "185.73.194.82"
+      ],
+      "dnsStatus": {
+        "A": 0,
+        "AAAA": 0
+      }
+    },
+    {
+      "service": "ozon",
+      "domain": "api.ozon.ru",
+      "addresses": [
+        "185.73.193.69",
+        "185.73.195.136"
+      ],
+      "dnsStatus": {
+        "A": 0,
+        "AAAA": 0
+      }
+    },
+    {
+      "service": "ozon",
+      "domain": "xapi.ozon.ru",
+      "addresses": [
+        "185.73.194.77",
+        "185.73.195.108"
+      ],
+      "dnsStatus": {
+        "A": 0,
+        "AAAA": 0
+      }
+    },
+    {
+      "service": "ozon",
+      "domain": "m.ozon.ru",
+      "addresses": [
+        "185.73.194.77",
+        "185.73.195.108"
+      ],
+      "dnsStatus": {
+        "A": 0,
+        "AAAA": 0
+      }
+    },
+    {
+      "service": "ozon",
+      "domain": "ozon.com",
+      "addresses": [
+        "185.73.193.68",
+        "185.73.194.82"
+      ],
+      "dnsStatus": {
+        "A": 0,
+        "AAAA": 0
+      }
+    },
+    {
+      "service": "ozon",
+      "domain": "www.ozon.com",
+      "addresses": [
+        "185.73.193.68",
+        "185.73.194.82"
+      ],
+      "dnsStatus": {
+        "A": 0,
+        "AAAA": 0
+      }
+    },
+    {
+      "service": "ozon",
+      "domain": "s.ozon.ru",
+      "addresses": [
+        "185.73.194.77",
+        "185.73.195.108"
+      ],
+      "dnsStatus": {
+        "A": 0,
+        "AAAA": 0
+      }
+    },
+    {
+      "service": "ozon",
+      "domain": "id.ozon.ru",
+      "addresses": [
+        "185.73.193.68",
+        "185.73.194.82"
+      ],
+      "dnsStatus": {
+        "A": 0,
+        "AAAA": 0
+      }
+    },
+    {
+      "service": "ozon",
+      "domain": "cdn1.ozone.ru",
+      "addresses": [
+        "185.73.193.119",
+        "185.73.195.116"
+      ],
+      "dnsStatus": {
+        "A": 0,
+        "AAAA": 0
+      }
+    },
+    {
+      "service": "ozon",
+      "domain": "ir.ozone.ru",
+      "addresses": [
+        "185.73.193.119",
+        "185.73.195.116"
+      ],
+      "dnsStatus": {
+        "A": 0,
+        "AAAA": 0
+      }
+    },
+    {
+      "service": "ozon",
+      "domain": "ir-2.ozone.ru",
+      "addresses": [
+        "185.73.193.119",
+        "185.73.195.116"
+      ],
+      "dnsStatus": {
+        "A": 0,
+        "AAAA": 0
+      }
+    },
+    {
+      "service": "ozon",
+      "domain": "ir-3.ozone.ru",
+      "addresses": [
+        "5.101.71.73"
+      ],
+      "dnsStatus": {
+        "A": 0,
+        "AAAA": 0
+      }
+    },
+    {
+      "service": "ozon",
+      "domain": "ir-4.ozone.ru",
+      "addresses": [
+        "185.40.155.13"
+      ],
+      "dnsStatus": {
+        "A": 0,
+        "AAAA": 0
+      }
+    },
+    {
+      "service": "ozon",
+      "domain": "ir-5.ozone.ru",
+      "addresses": [
+        "212.164.51.50",
+        "212.164.51.51"
+      ],
+      "dnsStatus": {
+        "A": 0,
+        "AAAA": 0
+      }
+    },
+    {
+      "service": "ozon",
+      "domain": "ir-7.ozone.ru",
+      "addresses": [
+        "185.73.193.119",
+        "185.73.195.116"
+      ],
+      "dnsStatus": {
+        "A": 0,
+        "AAAA": 0
+      }
+    },
+    {
+      "service": "ozon",
+      "domain": "ir-8.ozone.ru",
+      "addresses": [
+        "185.73.193.119",
+        "185.73.195.116"
+      ],
+      "dnsStatus": {
+        "A": 0,
+        "AAAA": 0
+      }
+    },
+    {
+      "service": "ozon",
+      "domain": "ir-9.ozone.ru",
+      "addresses": [
+        "85.173.175.100",
+        "85.173.175.101"
+      ],
+      "dnsStatus": {
+        "A": 0,
+        "AAAA": 0
+      }
+    },
+    {
+      "service": "ozon",
+      "domain": "ir-10.ozone.ru",
+      "addresses": [
+        "176.208.118.244",
+        "176.208.118.245"
+      ],
+      "dnsStatus": {
+        "A": 0,
+        "AAAA": 0
+      }
+    },
+    {
+      "service": "ozon",
+      "domain": "st.ozone.ru",
+      "addresses": [
+        "185.73.193.120",
+        "185.73.195.117"
+      ],
+      "dnsStatus": {
+        "A": 0,
+        "AAAA": 0
+      }
+    },
+    {
+      "service": "ozon",
+      "domain": "v.ozone.ru",
+      "addresses": [
+        "185.73.193.117",
+        "185.73.194.117"
+      ],
+      "dnsStatus": {
+        "A": 0,
+        "AAAA": 0
+      }
+    },
+    {
+      "service": "ozon",
+      "domain": "finance.ozon.ru",
+      "addresses": [
+        "194.9.211.128",
+        "194.9.211.64",
+        "194.9.211.96",
+        "31.130.143.131",
+        "31.130.143.3",
+        "31.130.143.67"
+      ],
+      "dnsStatus": {
+        "A": 0,
+        "AAAA": 0
+      }
+    },
+    {
+      "service": "max",
+      "domain": "max.ru",
+      "addresses": [
+        "155.212.204.140",
+        "155.212.204.5",
+        "155.212.204.74"
+      ],
+      "dnsStatus": {
+        "A": 0,
+        "AAAA": 0
+      }
+    },
+    {
+      "service": "max",
+      "domain": "web.max.ru",
+      "addresses": [
+        "155.212.204.143",
+        "155.212.204.193",
+        "155.212.204.78"
+      ],
+      "dnsStatus": {
+        "A": 0,
+        "AAAA": 0
+      }
+    },
+    {
+      "service": "max",
+      "domain": "st.max.ru",
+      "addresses": [
+        "155.212.204.143",
+        "155.212.204.193",
+        "155.212.204.78"
+      ],
+      "dnsStatus": {
+        "A": 0,
+        "AAAA": 0
+      }
+    },
+    {
+      "service": "max",
+      "domain": "api.max.ru",
+      "addresses": [
+        "155.212.204.140",
+        "155.212.204.5",
+        "155.212.204.74"
+      ],
+      "dnsStatus": {
+        "A": 0,
+        "AAAA": 0
+      }
+    },
+    {
+      "service": "max",
+      "domain": "api.oneme.ru",
+      "addresses": [
+        "155.212.204.150",
+        "155.212.204.194",
+        "155.212.204.90"
+      ],
+      "dnsStatus": {
+        "A": 0,
+        "AAAA": 0
+      }
+    },
+    {
+      "service": "max",
+      "domain": "ws-api.oneme.ru",
+      "addresses": [
+        "155.212.204.133",
+        "155.212.204.70"
+      ],
+      "dnsStatus": {
+        "A": 0,
+        "AAAA": 0
+      }
+    },
+    {
+      "service": "max",
+      "domain": "ws-api.max.ru",
+      "addresses": [
+        "155.212.204.133",
+        "155.212.204.70"
+      ],
+      "dnsStatus": {
+        "A": 0,
+        "AAAA": 0
+      }
+    },
+    {
+      "service": "max",
+      "domain": "go.max.ru",
+      "addresses": [
+        "155.212.204.140",
+        "155.212.204.5",
+        "155.212.204.74"
+      ],
+      "dnsStatus": {
+        "A": 0,
+        "AAAA": 0
+      }
+    },
+    {
+      "service": "max",
+      "domain": "calls.okcdn.ru",
+      "addresses": [
+        "155.212.204.12",
+        "155.212.204.136",
+        "155.212.204.195",
+        "155.212.205.225"
+      ],
+      "dnsStatus": {
+        "A": 0,
+        "AAAA": 0
+      }
+    },
+    {
+      "service": "max",
+      "domain": "api.mycdn.me",
+      "addresses": [
+        "217.20.147.23",
+        "217.20.155.24",
+        "217.20.156.18"
+      ],
+      "dnsStatus": {
+        "A": 0,
+        "AAAA": 0
+      }
+    },
+    {
+      "service": "max",
+      "domain": "st.mycdn.me",
+      "addresses": [
+        "217.20.147.7",
+        "217.20.152.226",
+        "217.20.155.82",
+        "217.20.156.72"
+      ],
+      "dnsStatus": {
+        "A": 0,
+        "AAAA": 0
+      }
+    },
+    {
+      "service": "max",
+      "domain": "api.ok.ru",
+      "addresses": [
+        "178.22.89.169",
+        "5.61.21.120"
+      ],
+      "dnsStatus": {
+        "A": 0,
+        "AAAA": 0
+      }
+    },
+    {
+      "service": "cdek",
+      "domain": "cdek.ru",
+      "addresses": [
+        "91.206.127.236"
+      ],
+      "dnsStatus": {
+        "A": 0,
+        "AAAA": 0
+      }
+    },
+    {
+      "service": "cdek",
+      "domain": "www.cdek.ru",
+      "addresses": [
+        "91.206.127.236"
+      ],
+      "dnsStatus": {
+        "A": 0,
+        "AAAA": 0
+      }
+    },
+    {
+      "service": "cdek",
+      "domain": "lk.cdek.ru",
+      "addresses": [
+        "155.212.234.130"
+      ],
+      "dnsStatus": {
+        "A": 0,
+        "AAAA": 0
+      }
+    },
+    {
+      "service": "cdek",
+      "domain": "api.cdek.ru",
+      "addresses": [
+        "109.238.90.137"
+      ],
+      "dnsStatus": {
+        "A": 0,
+        "AAAA": 0
+      }
+    },
+    {
+      "service": "cdek",
+      "domain": "servicepipe.tech",
+      "addresses": [
+        "155.212.234.5"
+      ],
+      "dnsStatus": {
+        "A": 0,
+        "AAAA": 0
+      }
+    },
+    {
+      "service": "gosuslugi",
+      "domain": "gosuslugi.ru",
+      "addresses": [
+        "213.59.253.7",
+        "213.59.254.7"
+      ],
+      "dnsStatus": {
+        "A": 0,
+        "AAAA": 0
+      }
+    },
+    {
+      "service": "gosuslugi",
+      "domain": "www.gosuslugi.ru",
+      "addresses": [
+        "213.59.253.7",
+        "213.59.254.7"
+      ],
+      "dnsStatus": {
+        "A": 0,
+        "AAAA": 0
+      }
+    },
+    {
+      "service": "gosuslugi",
+      "domain": "esia.gosuslugi.ru",
+      "addresses": [
+        "213.59.253.8",
+        "213.59.254.8"
+      ],
+      "dnsStatus": {
+        "A": 0,
+        "AAAA": 0
+      }
+    },
+    {
+      "service": "gosuslugi",
+      "domain": "lk.gosuslugi.ru",
+      "addresses": [
+        "213.59.253.6",
+        "213.59.254.6"
+      ],
+      "dnsStatus": {
+        "A": 0,
+        "AAAA": 0
+      }
+    },
+    {
+      "service": "gosuslugi",
+      "domain": "goskey.gosuslugi.ru",
+      "addresses": [
+        "213.59.253.7",
+        "213.59.254.7"
+      ],
+      "dnsStatus": {
+        "A": 0,
+        "AAAA": 0
+      }
+    },
+    {
+      "service": "gosuslugi",
+      "domain": "gu-st.ru",
+      "addresses": [
+        "212.193.153.34",
+        "212.193.153.45",
+        "212.193.156.251",
+        "212.193.157.189",
+        "212.193.157.40",
+        "46.235.184.101",
+        "46.235.184.152",
+        "46.235.184.195",
+        "46.235.184.89",
+        "46.235.184.95",
+        "46.235.185.88",
+        "46.235.188.129",
+        "46.235.188.152",
+        "46.235.188.172",
+        "46.235.188.251",
+        "46.235.189.79"
+      ],
+      "dnsStatus": {
+        "A": 0,
+        "AAAA": 0
+      }
+    },
+    {
+      "service": "mosru",
+      "domain": "mos.ru",
+      "addresses": [
+        "94.79.51.135"
+      ],
+      "dnsStatus": {
+        "A": 0,
+        "AAAA": 0
+      }
+    },
+    {
+      "service": "mosru",
+      "domain": "www.mos.ru",
+      "addresses": [
+        "212.11.155.134"
+      ],
+      "dnsStatus": {
+        "A": 0,
+        "AAAA": 0
+      }
+    },
+    {
+      "service": "mosru",
+      "domain": "login.mos.ru",
+      "addresses": [
+        "94.79.51.136"
+      ],
+      "dnsStatus": {
+        "A": 0,
+        "AAAA": 0
+      }
+    },
+    {
+      "service": "mosru",
+      "domain": "my.mos.ru",
+      "addresses": [
+        "212.45.30.1",
+        "212.45.30.2",
+        "212.45.30.3"
+      ],
+      "dnsStatus": {
+        "A": 0,
+        "AAAA": 0
+      }
+    },
+    {
+      "service": "mosru",
+      "domain": "pgu.mos.ru",
+      "addresses": [
+        "212.11.155.165",
+        "212.11.155.166",
+        "212.11.155.167"
+      ],
+      "dnsStatus": {
+        "A": 0,
+        "AAAA": 0
+      }
+    },
+    {
+      "service": "mosru",
+      "domain": "oauth.mos.ru",
+      "addresses": [
+        "212.11.152.248"
+      ],
+      "dnsStatus": {
+        "A": 0,
+        "AAAA": 0
+      }
+    },
+    {
+      "service": "mosenergosbyt",
+      "domain": "mosenergosbyt.ru",
+      "addresses": [
+        "195.82.140.164"
+      ],
+      "dnsStatus": {
+        "A": 0,
+        "AAAA": 0
+      }
+    },
+    {
+      "service": "mosenergosbyt",
+      "domain": "www.mosenergosbyt.ru",
+      "addresses": [
+        "195.82.140.164"
+      ],
+      "dnsStatus": {
+        "A": 0,
+        "AAAA": 0
+      }
+    },
+    {
+      "service": "mosenergosbyt",
+      "domain": "my.mosenergosbyt.ru",
+      "addresses": [
+        "195.82.140.228"
+      ],
+      "dnsStatus": {
+        "A": 0,
+        "AAAA": 0
+      }
+    },
+    {
+      "service": "mosenergosbyt",
+      "domain": "lkkbyt.mosenergosbyt.ru",
+      "addresses": [
+        "195.82.140.218"
+      ],
+      "dnsStatus": {
+        "A": 0,
+        "AAAA": 0
+      }
+    }
+  ]
+}

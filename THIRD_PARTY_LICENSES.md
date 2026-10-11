@@ -21,11 +21,11 @@ TestFlight), доступен полный исходный код этой сб
 |---|---|---|---|
 | OVoC Client (этот репозиторий) | — | GPL-3.0 | `OVoCClient-GPL-3.0.txt` |
 | [OpenVPNAdapter](https://github.com/amnezia-vpn/OpenVPNAdapter), форк Amnezia | `8bb3da5` (ветка `master-amnezia`) | AGPL-3.0 | `OpenVPNAdapter-AGPL-3.0.txt` |
-| [OpenVPN 3](https://github.com/amnezia-vpn/openvpn3), форк Amnezia | `e901077` («3.8.5») + наш патч | AGPL-3.0 с разрешением линковки с OpenSSL | `OpenVPN3-LICENSE.txt`, `OpenVPNAdapter-NOTICE.txt` |
+| [OpenVPN 3](https://github.com/amnezia-vpn/openvpn3), форк Amnezia | `e901077` («3.8.5») + патчи AEAD, Connection refcount и очереди отправки | AGPL-3.0 с разрешением линковки с OpenSSL | `OpenVPN3-LICENSE.txt`, `OpenVPNAdapter-NOTICE.txt` |
 | mbed TLS | 2.7.12 (в составе OpenVPNAdapter) | Apache-2.0 | `OpenVPNAdapter-NOTICE.txt` |
 | asio | 1.16.0 (в составе OpenVPNAdapter) | BSL-1.0 | `OpenVPNAdapter-NOTICE.txt` |
 | LZ4 (`lib/`) | 1.8.3 (в составе OpenVPNAdapter) | BSD-2-Clause | `OpenVPNAdapter-NOTICE.txt` |
-| [Cloak](https://github.com/cbeuw/Cloak), форк [amnezia-vpn/Cloak](https://github.com/amnezia-vpn/Cloak) | плагин `ck-ovpn-plugin.a` из OpenVPNAdapter `8bb3da5`, собран Amnezia (go1.22.2) | GPL-3.0 | `OVoCClient-GPL-3.0.txt` |
+| [Cloak](https://github.com/cbeuw/Cloak), форк [amnezia-vpn/Cloak](https://github.com/amnezia-vpn/Cloak) | `884ac4f` + патч реестра соединений, собран из исходников Go 1.22.2 | GPL-3.0 | `OVoCClient-GPL-3.0.txt` |
 | Go (рантайм и стандартная библиотека плагина) | go1.22.2 | BSD-3-Clause | `Go-LICENSE.txt` |
 | andybalholm/brotli | v1.0.6 | MIT | `Cloak-Go-modules.txt` |
 | cbeuw/connutil | v0.0.0-20200411215123-966bfaa51ee3 | Apache-2.0 | `Cloak-Go-modules.txt` |

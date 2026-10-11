@@ -3,7 +3,7 @@
 PROJECT := OVoCClient.xcodeproj
 SCHEME  := OVoCClient
 
-.PHONY: scene gen build test framework framework-manifest fetch verify devices ddi install push-key connect disconnect dummy release-check strings-check icon testflight logs crashlogs clean
+.PHONY: scene gen build test test-cloak-refcount framework framework-manifest fetch verify devices ddi install push-key connect disconnect dummy release-check strings-check icon testflight logs crashlogs clean
 
 ## Сгенерировать OVoCClient.xcodeproj из project.yml
 gen:
@@ -20,6 +20,15 @@ test:
 	cd ConfigKit && swift test
 	swift test
 	python3 -B -m unittest discover -s Tests -p 'test_*.py'
+
+## Гонка ссылок Cloak — реальные заголовки фреймворка, ThreadSanitizer на Mac
+test-cloak-refcount:
+	./scripts/test-cloak-refcount.sh
+
+## Регрессия зависшей записи Cloak: реальный C++ транспорт под ASan/UBSan
+.PHONY: test-cloak-send
+test-cloak-send:
+	./scripts/test-cloak-send.sh
 
 ## Собрать OpenVPNAdapter.framework из исходников Amnezia с нашим исправлением
 ## (patches/openvpn3-aead-auth-tag.patch). ОСНОВНОЙ способ получить фреймворк.

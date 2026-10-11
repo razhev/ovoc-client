@@ -57,24 +57,13 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
     private var serverIP: String?
     private var fallbackDNS: [String] = []
     private var ovpnText = ""
+    /// Immutable for a session, including adapter reconnects.
+    private var serviceBypassNetworks: [IPNetwork] = []
 
     /// Сколько раз ядро переподключалось за эту сессию (событие .reconnecting).
     private var reconnectCount = 0
     /// Момент ухода в сон — чтобы на wake написать, сколько спали.
     private var sleptAt: Date?
-
-    /// Смена сети (Wi-Fi ↔ LTE). Ядро OpenVPN3 на iOS не имеет объекта
-    /// lifecycle (он есть только на macOS — MacLifeCycle), то есть само о смене
-    /// интерфейса не узнаёт: замечает только ошибку транспорта либо тишину
-    /// по ping-restart (сервер шлёт `ping 10` / `ping-restart 120`, то есть до
-    /// двух минут). Хуже того, при переходе LTE → Wi-Fi старый TCP-сокет Cloak
-    /// живёт дальше через сотовую сеть, и трафик идёт по ней. Поэтому следим за
-    /// достижимостью сами (класс фреймворка OpenVPNReachability, SCNetworkReachability
-    /// на главном run loop) и при смене сети просим ядро переподключиться —
-    /// как в README адаптера. `reconnect` → new_client() → событие .reconnecting
-    /// → tun_builder_new → наш configureTunnel(nil) → новые настройки → .connected.
-    private var reachability: OpenVPNReachability?
-    private var lastReachability: OpenVPNReachabilityStatus?
 
     /// Адрес-«раковина» для IPv6 (см. configureTunnel). ULA-префикс fd00::/8,
     /// 6f76:6f63 — «ovoc»; в реальной сети такого адреса нет.
@@ -109,6 +98,22 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
             providerConfig?[TunnelConfigKeys.dns1] as? String,
             providerConfig?[TunnelConfigKeys.dns2] as? String,
         ].compactMap { $0 }
+
+        do {
+            let policy = try ServiceBypassPolicy(configuration: providerConfig)
+            serviceBypassNetworks = []
+            if !policy.services.isEmpty {
+                let catalog = try ServiceBypassCatalog.load(bundle: .main)
+                serviceBypassNetworks = try catalog.networks(for: policy)
+                logger.log("service bypass: catalog=\(catalog.catalogVersion) services=\(policy.services.map(\.rawValue).sorted().joined(separator: ",")) routes=\(serviceBypassNetworks.count)")
+            }
+        } catch {
+            let failure = (error as? ServiceBypassError) ?? .invalidCatalog
+            writeLastError(failure.localizedDescription)
+            logger.log("service bypass REFUSED: \(failure.rawValue)")
+            completionHandler(failure)
+            return
+        }
 
         logger.log("real tunnel: serverIP=\(serverIP ?? "nil") profile=\(ovpn.utf8.count) bytes")
 
@@ -176,54 +181,9 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
         packetBridge.serverAddress = serverIP.split(separator: ".").compactMap { UInt8($0) }
         packetBridge.reset()
         logger.heartbeatExtra = { [weak self] in self?.packetBridge.summary() ?? "" }
-        startReachabilityTracking()
+        // Rollback: network changes and health checks do not request reconnects.
+        // The core retains its normal handling of protocol/transport errors.
         adapter.connect(using: packetBridge)
-    }
-
-    /// Только на stateQueue. Колбэк приходит с главного run loop — заходим на
-    /// stateQueue через async, как и всё остальное.
-    private func startReachabilityTracking() {
-        let reachability = OpenVPNReachability()
-        self.reachability = reachability
-        lastReachability = reachability.reachabilityStatus
-        logger.log("reachability: \(Self.reachabilityName(reachability.reachabilityStatus)) (tracking)")
-        reachability.startTracking { [weak self] status in
-            self?.stateQueue.async { self?.reachabilityChanged(status) }
-        }
-    }
-
-    /// Только на stateQueue.
-    private func reachabilityChanged(_ status: OpenVPNReachabilityStatus) {
-        let previous = lastReachability
-        lastReachability = status
-        let transition = "\(previous.map(Self.reachabilityName) ?? "?") → \(Self.reachabilityName(status))"
-
-        // Сеть пропала: переподключаться некуда, ядро само уйдёт в цикл
-        // рестартов по ошибке транспорта, а вернувшуюся сеть мы поймаем ниже.
-        guard status != .notReachable else {
-            logger.log("reachability: \(transition)")
-            return
-        }
-        // Ложные срабатывания (тот же статус) и всё, что вне живой сессии, —
-        // только в лог: во время старта ядро ещё рукопожимается, трогать нельзя.
-        guard status != previous, phase == .connected else {
-            logger.log("reachability: \(transition) (ignored: phase=\(phase))")
-            return
-        }
-        // 2 секунды — дать новому интерфейсу получить адрес; reconnect ядра
-        // безопасен, даже если оно уже само переподключается по ошибке сокета:
-        // new_client() просто начнёт заново с той же генерации.
-        logger.log("reachability: \(transition) — reconnecting in 2s")
-        adapter.reconnect(afterTimeInterval: 2)
-    }
-
-    private static func reachabilityName(_ status: OpenVPNReachabilityStatus) -> String {
-        switch status {
-        case .notReachable: return "none"
-        case .reachableViaWiFi: return "wifi"
-        case .reachableViaWWAN: return "cellular"
-        @unknown default: return "status#\(status.rawValue)"
-        }
     }
 
     private func startDummyTunnel(completionHandler: @escaping (Error?) -> Void) {
@@ -282,7 +242,6 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
 
             self.phase = .stopping
             self.stopCompletion = completionHandler
-            self.stopReachabilityTracking()
 
             let watchdog = DispatchSource.makeTimerSource(queue: self.stateQueue)
             watchdog.schedule(deadline: .now() + 5)
@@ -316,13 +275,6 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
         stopWatchdog = nil
         phase = .stopped
         completion()
-    }
-
-    /// Только на stateQueue.
-    private func stopReachabilityTracking() {
-        guard let reachability, reachability.isTracking else { return }
-        reachability.stopTracking()
-        self.reachability = nil
     }
 
     // MARK: - Sleep/wake — намеренно простой проброс
@@ -459,7 +411,7 @@ extension PacketTunnelProvider: OpenVPNAdapterDelegate {
 
     /// Только на stateQueue.
     private func configureTunnel(
-        _ settings: NEPacketTunnelNetworkSettings,
+        _ adapterSettings: NEPacketTunnelNetworkSettings,
         completionHandler: @escaping (Error?) -> Void
     ) {
         // Запоздавший PUSH_REPLY после stop/watchdog не должен снова ставить
@@ -475,6 +427,12 @@ extension PacketTunnelProvider: OpenVPNAdapterDelegate {
             writeLastError(message)
             completionHandler(Self.makeError(4, message))
         }
+
+        // Never give our synthetic IPv6 settings back to the adapter's baseline:
+        // a reused callback object must not be mistaken for server IPv6 on reconnect.
+        let settings: NEPacketTunnelNetworkSettings
+        do { settings = try ServiceBypassRoutes.copyOf(adapterSettings) }
+        catch { refuse(ServiceBypassError.missingNetworkSettings.localizedDescription); return }
 
         // ── DNS: весь — в туннель (иначе часть запросов уйдёт мимо VPN) ──
         let adapterDNS = (settings.dnsSettings?.servers ?? []).filter(Self.isIPLiteral)
@@ -549,15 +507,22 @@ extension PacketTunnelProvider: OpenVPNAdapterDelegate {
             settings.mtu = 1400
         }
 
-        let included = settings.ipv4Settings?.includedRoutes?.count ?? 0
-        let excluded = settings.ipv4Settings?.excludedRoutes?.count ?? 0
+        let routedSettings: NEPacketTunnelNetworkSettings
+        do {
+            routedSettings = try ServiceBypassRoutes.applying(serviceBypassNetworks, to: settings)
+        } catch {
+            refuse(((error as? ServiceBypassError) ?? .invalidCatalog).localizedDescription)
+            return
+        }
+        let included = routedSettings.ipv4Settings?.includedRoutes?.count ?? 0
+        let excluded = routedSettings.ipv4Settings?.excludedRoutes?.count ?? 0
         logger.log("configureTunnel: remote=\(settings.tunnelRemoteAddress) "
                    + "routes incl=\(included) excl=\(excluded) serverExcluded=\(alreadyExcluded ? "by-profile" : "added") "
                    + "ipv6=\(ipv6Mode) "
                    + "dns=\(settings.dnsSettings?.servers.joined(separator: ",") ?? "none") "
                    + "mtu=\(settings.mtu?.stringValue ?? "default")")
 
-        setTunnelNetworkSettings(settings) { [weak self] error in
+        setTunnelNetworkSettings(routedSettings) { [weak self] error in
             if let error {
                 self?.logger.log("setTunnelNetworkSettings failed: \(error.localizedDescription)")
             } else {

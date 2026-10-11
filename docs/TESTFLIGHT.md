@@ -17,7 +17,7 @@
 
 ---
 
-## Сборка 0.1.0 (13) — 2026-10-10, закрытие соединений Cloak
+## Сборка 0.1.0 (13) — 2026-10-11, закрытие соединений Cloak
 
 Закрытие старого соединения больше не закрывает глобальный файловый дескриптор:
 к этому моменту он мог принадлежать новому подключению. Каждое соединение владеет
@@ -37,12 +37,23 @@ race detector. Отдельный ревьюер проверил владени
 под race detector, 700 C++ send-сценариев под ASan/UBSan, Connection refcount под
 ThreadSanitizer, проверка происхождения framework, Debug/Release и 135 строк локализации.
 UUID framework: `29E25FF1-70DE-3D43-8992-E872BD861031`.
-Архив `build/testflight/OVoCClient.xcarchive` собран из `486a5df`; версии обоих
+Архив `build/testflight/OVoCClient-build13.xcarchive` собран из `486a5df`; версии обоих
 таргетов — 0.1.0 (13), dSYM framework с совпадающим UUID сохранён в архиве.
-На 11 октября загрузка не завершена: в Xcode нет Apple Account, а настроенный
-API-ключ не имеет прав на облачную distribution-подпись. App Store Connect пока
-показывает сборку 11 последней. После входа в аккаунт разработчика нужно повторить
-экспорт готового архива, затем назначить обе существующие группы TestFlight.
+Загрузка успешно завершилась **11 октября в 17:52 МСК** после входа в аккаунт
+разработчика в Xcode. Apple обработала пакет (`VALID`) и одобрила внешнее
+тестирование (`betaReviewState=APPROVED`). Повторное чтение API подтвердило
+назначение **Internal Testing Group** и **External Testing Group** и оба состояния
+`IN_BETA_TESTING`. Автоматические уведомления включены (`autoNotifyEnabled=true`),
+инструкции ru/en-GB записаны и проверены повторным чтением.
+
+- Build ID: `045c69d7-6e67-494f-9dd0-dbc99c4421ae`.
+- Истечение TestFlight: **2027-01-09**.
+- Подтверждение API: `build/testflight/build13-final-state.json`.
+- Квитанции: `build/testflight/build13-release-receipt.json` и
+  `build/testflight/build13-framework-receipt.json`.
+- Лог загрузки: `build/logs/build13-export-account-resumed.log`.
+- dSYM framework включён в отправленный архив; загрузка прошла без предупреждений
+  о недостающих символах.
 
 ## Сборка 0.1.0 (11) — 2026-10-10, активный VPN без трафика
 

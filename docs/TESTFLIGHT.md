@@ -17,7 +17,7 @@
 
 ---
 
-## Сборка 0.1.0 (14) — подготовка выпуска 2026-10-11
+## Сборка 0.1.0 (14) — доступна в TestFlight с 2026-10-11
 
 По просьбе пользователя подготовлен выпуск с исключениями «Т-Банк (Тинькофф)»
 и «Сбер». Каталог `2026-10-11.1` содержит десять групп и 104 нормализованных
@@ -26,6 +26,33 @@
 на физическом iPhone ещё не выполнена; исправление нестабильной работы Ozon
 не подтверждено. Номер 14 выбран после повторного чтения App Store Connect:
 последняя загруженная сборка — 13 (`build/testflight/pre-build14-state.json`).
+
+Исходники архива: `e579267`. Повторная проверка Debug/Release и 137 строк
+локализации пройдена после смены номера. Подписанный архив проверен:
+приложение и расширение имеют версию 0.1.0 (14), каталоги совпадают с исходником.
+В архив до экспорта добавлен dSYM OpenVPNAdapter с UUID
+`E091CD9B-DFF4-31B5-8527-D2C6D92A2744`.
+
+Загрузка через авторизованный Apple Account завершилась **11 октября в 18:31 МСК**:
+`Upload succeeded`, `EXPORT SUCCEEDED`, предупреждений о загрузке символов нет.
+Apple обработала сборку (`VALID`) и одобрила внешнее тестирование
+(`betaReviewState=APPROVED`). Повторное чтение API подтвердило
+`internalBuildState=IN_BETA_TESTING`, `externalBuildState=IN_BETA_TESTING`
+и назначение обеим существующим группам. Заметки ru/en-GB проверены точным
+сравнением с подготовленным текстом; `autoNotifyEnabled=true`.
+
+- Build ID: `9677f173-4f35-48d3-b04a-a4574f62f467`.
+- Внешняя группа: `7f4a8bdc-f245-483d-ada5-c76cd725f8ae`.
+- Внутренняя группа: `454bc105-f1da-44ae-bd65-7312f5a436d9`.
+- Истечение TestFlight: **2027-01-09**.
+- Подтверждение API: `build/testflight/build14-final-state.json`,
+  `build/testflight/build14-final-review.json` и
+  `build/testflight/build14-final-localizations.json`.
+
+- Архив: `build/testflight/OVoCClient-build14.xcarchive`.
+- Квитанция: `build/testflight/build14-release-receipt.json`.
+- Логи: `build/logs/build14-archive.log`, `build/logs/build14-export-account.log`.
+- Заметки: `build/testflight/build14-testing-notes.json`.
 
 ## Сборка 13 — выпуск пользователя, подтверждён 2026-10-11
 

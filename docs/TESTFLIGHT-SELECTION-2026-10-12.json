@@ -1,0 +1,75 @@
+{
+  "appId": "6816941869",
+  "selectedBuildId": "042268cc-1e71-42a5-95c1-f0cd5da03a97",
+  "selectedVersion": "0.1.0",
+  "selectedBuild": "2",
+  "expiredBuilds": [
+    {
+      "id": "9677f173-4f35-48d3-b04a-a4574f62f467",
+      "build": "14"
+    },
+    {
+      "id": "045c69d7-6e67-494f-9dd0-dbc99c4421ae",
+      "build": "13"
+    },
+    {
+      "id": "315f839c-36f5-4179-92e3-566a4c83eef3",
+      "build": "11"
+    },
+    {
+      "id": "d89743fb-85ca-4cf1-bbc1-26f25d7137a7",
+      "build": "10"
+    },
+    {
+      "id": "2d1e6a72-ff1a-4dc6-baa2-284ed582df25",
+      "build": "9"
+    },
+    {
+      "id": "a9590ecd-8b4c-43d0-abc4-1eaa57b331ef",
+      "build": "8"
+    },
+    {
+      "id": "9b51bd0e-6998-401c-ab4f-02730d9430a8",
+      "build": "7"
+    },
+    {
+      "id": "d259f11b-bc18-45c6-b531-4f54b2122565",
+      "build": "6"
+    },
+    {
+      "id": "78fcca4a-8b57-4d2a-ad34-e5c4cb3cb6f1",
+      "build": "5"
+    },
+    {
+      "id": "8c989c84-1494-4bc4-8f58-3bfd83a162bd",
+      "build": "4"
+    },
+    {
+      "id": "aad0afbc-32cd-4ce1-80b5-489cdb6bd860",
+      "build": "3"
+    },
+    {
+      "id": "82ef74ff-105d-429e-86ce-a45347e8d127",
+      "build": "1"
+    }
+  ],
+  "verifiedAtUTC": "2026-10-11T21:40:07Z",
+  "groupIds": [
+    "454bc105-f1da-44ae-bd65-7312f5a436d9",
+    "7f4a8bdc-f245-483d-ada5-c76cd725f8ae"
+  ],
+  "onlySelectedBuildUnexpired": true,
+  "selectedState": {
+    "processingState": "VALID",
+    "expired": false,
+    "expirationDate": "2026-12-27T05:34:18-08:00",
+    "internalBuildState": "IN_BETA_TESTING",
+    "externalBuildState": "IN_BETA_TESTING"
+  },
+  "sourcePolicy": {
+    "main": "Latest source from build 14; no code rollback",
+    "build14ArchiveCommit": "e5792676c8b7ae8af067d1b25547b4c0695eaf61",
+    "build14Tag": "v0.1.0-build14",
+    "build13Branch": "codex/fix-cloak-cancellation"
+  }
+}

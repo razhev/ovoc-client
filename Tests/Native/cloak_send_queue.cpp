@@ -1,8 +1,9 @@
-// Exercise the actual OpenVPN transport header with deterministic failed writes.
+// Exercise the real transport and core mutex with idle reads and failed writes.
 #define USE_ASIO
 #define ASIO_STANDALONE
-#define OPENVPN_ASYNC_HANDLER
 #define OPENVPN_LOG(x) do {} while (false)
+#include <openvpn/common/bigmutex.hpp>
+#include <atomic>
 #include <cassert>
 #include <condition_variable>
 #include <functional>
@@ -19,6 +20,7 @@ struct FakeConnection : Connection {
     std::mutex mutex;
     std::condition_variable cv;
     bool entered = false, closed = false;
+    bool blockRead = false, readEntered = false;
     std::function<void()> onBlockedWrite;
     std::vector<unsigned char> sent;
     explicit FakeConnection(Mode m) : mode(m) {}
@@ -42,17 +44,24 @@ struct FakeConnection : Connection {
         sent.insert(sent.end(), bytes, bytes+n);
         return n;
     }
-    size_t receive(const asio::mutable_buffer&) override { return size_t(-1); }
+    size_t receive(const asio::mutable_buffer&) override {
+        std::unique_lock<std::mutex> lock(mutex);
+        readEntered = true;
+        cv.notify_all();
+        if (blockRead) cv.wait(lock, [&] { return closed; });
+        return size_t(-1);
+    }
     void close() override { std::lock_guard<std::mutex> lock(mutex); closed = true; cv.notify_all(); }
     int native_handle() override { return -1; }
     int get_ret_out_int() override { return 0; }
 };
 struct Reader {
     int errors = 0, drained = 0;
+    std::function<void()> onDrained;
     void pt_error_handler(const char*) { ++errors; }
     void pt_eof_handler() { assert(false); }
     bool pt_read_handler(BufferAllocated&) { return true; }
-    void pt_write_queue_needs_send() { ++drained; }
+    void pt_write_queue_needs_send() { ++drained; if (onDrained) onDrained(); }
 };
 using Link = LinkImpl<Reader*>;
 const Frame::Context frame(32, 2048, 32, 0, 8, 0);
@@ -108,7 +117,52 @@ void stopBlockedWriter(bool overflow) {
     io.run();
     assert(connection->entered && commandExecuted && reader.errors == (overflow ? 1 : 0));
 }
+// The real iOS macro takes OpenVPN's global mutex. Replacing it with an empty
+// macro hid a deadlock: an idle Cloak_read held it until the server's next ping,
+// preventing TUN reads, timers and user stop from running on the core loop.
+void idleReadDoesNotBlockCore(bool sendBeforeStop) {
+    asio::io_context io;
+    Reader reader;
+    RCPtr<FakeConnection> connection = new FakeConnection(FakeConnection::partial);
+    connection->blockRead = true;
+    Link::Ptr link = new Link(io, &reader, connection, 64, 4, frame, new SessionStats());
+    link->start();
+    {
+        std::unique_lock<std::mutex> lock(connection->mutex);
+        assert(connection->cv.wait_for(lock, std::chrono::seconds(2), [&] { return connection->readEntered; }));
+    }
+    std::atomic<bool> rescued{false};
+    // Always release the blocked read, including on the broken implementation,
+    // so a regression reports a failure rather than hanging the test runner.
+    std::thread watchdog([&] {
+        std::unique_lock<std::mutex> lock(connection->mutex);
+        if (!connection->cv.wait_for(lock, std::chrono::seconds(1), [&] { return connection->closed; })) {
+            rescued = true;
+            lock.unlock();
+            connection->close();
+        }
+    });
+    auto stop = [&] {
+        OPENVPN_ASYNC_HANDLER;
+        link->stop();
+        connection->close();
+    };
+    reader.onDrained = stop;
+    asio::post(io, [&] {
+        OPENVPN_ASYNC_HANDLER;
+        if (sendBeforeStop) assert(sendPacket(*link, 42));
+        else stop();
+    });
+    io.run();
+    watchdog.join();
+    if (rescued) throw std::runtime_error("idle Cloak receive blocked the core mutex (send/stop required a remote packet)");
+    assert(reader.errors == 0);
+    assert(reader.drained == (sendBeforeStop ? 1 : 0));
+    assert(connection->sent.size() == (sendBeforeStop ? 18 : 0));
+}
 int main(int argc, char**) {
+    idleReadDoesNotBlockCore(true);
+    idleReadDoesNotBlockCore(false);
     if (argc > 1) {
         stopBlockedWriter(false);
         std::cout << "PASS: event loop remains responsive during a blocked write\n";
@@ -123,5 +177,5 @@ int main(int argc, char**) {
         stopBlockedWriter(false);
         stopBlockedWriter(true);
     }
-    std::cout << "PASS: 700 native send cases (ordering/partial/error/stop/backpressure/lifetime)\n";
+    std::cout << "PASS: idle receive permits send and stop with the real core mutex; 700 native send cases (ordering/partial/error/stop/backpressure/lifetime)\n";
 }

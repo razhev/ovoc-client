@@ -1,0 +1,53 @@
+{
+  "version": "0.1.0",
+  "build": "15",
+  "sourceCommit": "30c5206cde81e0155ec178610f676c86f863dd47",
+  "preparedAt": "2026-10-17T16:17:12.612322+00:00",
+  "framework": {
+    "schema": 4,
+    "adapterCommit": "8bb3da50ae2ad07c76a815bc670e9e70e0e3e3ad",
+    "openvpn3Commit": "e901077a05a5e3d018260d0955acb1a21e05578d",
+    "aeadPatchSHA256": "e608ed629cbc3a84fad0970b79c8ff658a731d7df1ffa9bc4b8a6b3aea744fcf",
+    "connectionRefcountPatchSHA256": "268c12455651c16acf55c84ae6af91566498024f93afe3b64741f4a2108d914e",
+    "sendQueuePatchSHA256": "222406428e3dbf4621d3f89280bb025023d1501e07e446fb95f854c83d93d0ca",
+    "cloakCommit": "884ac4fa0d4a8e014e18ca1dc4a40b18bc9e4291",
+    "cloakGoVersion": "go1.22.2",
+    "cloakRegistryPatchSHA256": "992502d785e940bd9b0ab63b393c001bfe1d1ade98309b8af432a3d180e8e2ff",
+    "cloakArchiveSHA256": "bf462aeff37b874211d57b92cb21b3301f3c907dee976d803f3f42a9822ac87c",
+    "binarySHA256": "cba3dc645c89b8865d5414d2c46b41195fe6f5f4d40efa7467f93f4a1fd5527d"
+  },
+  "frameworkUUID": "6BE97552-7AA3-39E8-A04E-E6B1E6E2D68C",
+  "catalogSHA256": "7287fe1020e689ce316272b72d7526bd510bea47be484ca9b4ed872677c74037",
+  "archive": "build/testflight/OVoCClient-build15.xcarchive",
+  "archiveVerified": true,
+  "frameworkDSYM": "build/testflight/OVoCClient-build15.xcarchive/dSYMs/OpenVPNAdapter.framework.dSYM",
+  "uploadSucceeded": true,
+  "deviceValidation": "docs/VPN-FIX-VALIDATION-2026-10-17.json",
+  "uploadTimeMoscow": "2026-10-17 19:18:34",
+  "uploadSymbolsWarning": false,
+  "appId": "6816941869",
+  "buildId": "67d5ce9c-caff-4adb-8aed-a4fbc04dc989",
+  "processingState": "VALID",
+  "expirationDate": "2027-01-15T08:19:16-08:00",
+  "beta": {
+    "autoNotifyEnabled": true,
+    "internalBuildState": "IN_BETA_TESTING",
+    "externalBuildState": "IN_BETA_TESTING"
+  },
+  "betaReviewState": "APPROVED",
+  "internalGroupId": "454bc105-f1da-44ae-bd65-7312f5a436d9",
+  "externalGroupId": "7f4a8bdc-f245-483d-ada5-c76cd725f8ae",
+  "verifiedAt": "2026-10-17T16:22:35.330375+00:00",
+  "groupAssignmentVerified": {
+    "internal": true,
+    "external": true
+  },
+  "testingNotesVerified": [
+    "ru",
+    "en-GB"
+  ],
+  "activeBuilds": [
+    "15",
+    "2"
+  ]
+}

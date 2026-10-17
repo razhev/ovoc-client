@@ -20,7 +20,7 @@ index 3abd339..3651c51 100644
  };
  
 diff --git a/openvpn/transport/ptlink.hpp b/openvpn/transport/ptlink.hpp
-index 992c756..e12f3c1 100644
+index 992c756..1d3eb17 100644
 --- a/openvpn/transport/ptlink.hpp
 +++ b/openvpn/transport/ptlink.hpp
 @@ -67,7 +67,7 @@ namespace openvpn {
@@ -32,7 +32,7 @@ index 992c756..e12f3c1 100644
      {
        typedef std::deque<BufferPtr> Queue;
  
-@@ -236,8 +236,9 @@ namespace openvpn {
+@@ -236,20 +236,23 @@ namespace openvpn {
      // capture io_context and connection to avoid capturing self. This assumes that completion captures a reference-counted version of self.
      openvpn_io::io_context& io_context = this->io_context;
      auto connection = this->connection;
@@ -43,7 +43,23 @@ index 992c756..e12f3c1 100644
        
        Error::Type error_code = Error::SUCCESS;
        size_t bytes_recvd = 0;
-@@ -268,13 +269,17 @@ namespace openvpn {
+       try
+       {
+       
+-        OPENVPN_ASYNC_HANDLER;
++        // This worker owns only its retained Connection and receive buffer.
++        // Never take the core's bigmutex across blocking I/O: an idle server
++        // would prevent TUN reads, timers and stop until its next packet.
++        // queue_recv's completion takes the mutex back on the core loop.
+         bytes_recvd = connection->receive(mut_buf);
+       }
+       catch (const std::exception& e)
+       {
+-          OPENVPN_ASYNC_HANDLER;
+           error_code = Error::NETWORK_RECV_ERROR;
+           const ExceptionCode *ec = dynamic_cast<const ExceptionCode *>(&e);
+           if (ec && ec->code_defined())
+@@ -268,13 +271,17 @@ namespace openvpn {
  	    // capture io_context and connection to avoid capturing self. This assumes that completion captures a reference-counted version of self.
  	    openvpn_io::io_context& io_context = this->io_context;
  	    auto connection = this->connection;
@@ -62,7 +78,7 @@ index 992c756..e12f3c1 100644
  	      }
  	      catch (const std::exception& e)
  	      {
-@@ -292,29 +297,13 @@ namespace openvpn {
+@@ -292,29 +299,13 @@ namespace openvpn {
  
        void queue_send_buffer(BufferPtr& buf)
        {

@@ -1,0 +1,80 @@
+{
+  "date": "2026-10-17",
+  "status": "passed",
+  "distribution": "Local Debug build with the fixed framework, before preparing TestFlight build 15; release status in TESTFLIGHT.md.",
+  "rootCause": "Cloak async_recv held the real OpenVPN global mutex during blocking receive; idle peer blocked TUN packets, timers and stop until a remote packet arrived.",
+  "fix": "Remove the core mutex from background receive and its local exception handler. Preserve locking in the completion on the core event loop. Restore per-connection cancellation and lifetime fix missing from build 14.",
+  "regression": {
+    "before": "New test failed: idle Cloak receive blocked the core mutex",
+    "after": "Passed with the real bigmutex.hpp, ASan/UBSan and ThreadSanitizer"
+  },
+  "sourceAndArtifact": {
+    "schema": 4,
+    "adapterCommit": "8bb3da50ae2ad07c76a815bc670e9e70e0e3e3ad",
+    "openvpn3Commit": "e901077a05a5e3d018260d0955acb1a21e05578d",
+    "aeadPatchSHA256": "e608ed629cbc3a84fad0970b79c8ff658a731d7df1ffa9bc4b8a6b3aea744fcf",
+    "connectionRefcountPatchSHA256": "268c12455651c16acf55c84ae6af91566498024f93afe3b64741f4a2108d914e",
+    "sendQueuePatchSHA256": "222406428e3dbf4621d3f89280bb025023d1501e07e446fb95f854c83d93d0ca",
+    "cloakCommit": "884ac4fa0d4a8e014e18ca1dc4a40b18bc9e4291",
+    "cloakGoVersion": "go1.22.2",
+    "cloakRegistryPatchSHA256": "992502d785e940bd9b0ab63b393c001bfe1d1ade98309b8af432a3d180e8e2ff",
+    "cloakArchiveSHA256": "bf462aeff37b874211d57b92cb21b3301f3c907dee976d803f3f42a9822ac87c",
+    "binarySHA256": "cba3dc645c89b8865d5414d2c46b41195fe6f5f4d40efa7467f93f4a1fd5527d",
+    "frameworkUUID": "6BE97552-7AA3-39E8-A04E-E6B1E6E2D68C"
+  },
+  "features": "All app functions retained; all ten selected bypass services and 104 normalized routes preserved.",
+  "automaticTests": {
+    "projectTests": 100,
+    "nativeSendCases": 700,
+    "idleReadRegressions": 2,
+    "goRaceTests": "passed",
+    "nativeThreadSanitizer": "passed",
+    "releaseGate": "passed",
+    "frameworkProvenance": "passed",
+    "localizationStrings": 137
+  },
+  "device": {
+    "model": "iPhone 16 Pro",
+    "os": "26.6.2",
+    "debuggerAttached": false,
+    "vpnHTTPSPassed": 42,
+    "vpnHTTPSFailed": 0,
+    "freshReconnects": 5,
+    "idleIntervalsSeconds": [
+      45,
+      45,
+      45
+    ],
+    "backgroundHTTPS": "4/4 passed",
+    "egressMatchesVPN": true,
+    "downloadSizesVerified": true,
+    "connectSecondsFromSecondResolutionLogs": [
+      1.0,
+      2.0,
+      0.0,
+      0.0,
+      1.0,
+      1.0
+    ],
+    "stopSecondsFromSecondResolutionLogs": [
+      1.0,
+      1.0,
+      0.0,
+      1.0,
+      1.0,
+      1.0
+    ],
+    "watchdogStops": 0,
+    "vpn8MiBMbps": [
+      77.79,
+      76.63
+    ],
+    "off8MiBMbps": [
+      124.59
+    ],
+    "smallHTTPSMedianSeconds": 0.303
+  },
+  "limitations": [
+    "Tested on the connected iPhone network; Wi-Fi/cellular handover and an hour-long session were not exercised."
+  ]
+}

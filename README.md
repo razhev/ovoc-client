@@ -1,290 +1,89 @@
+<p align="center">
+  <img src="App/Assets.xcassets/AppIcon.appiconset/AppIcon.png" width="96" alt="OVoC Client icon">
+</p>
+
 # OVoC Client
 
-**OVoC Client** (OpenVPN over Cloak Client) — минимальный нативный iOS-клиент для личного сервера
-**AmneziaVPN** (протокол **OpenVPN over Cloak**).
-Для установки себе и нескольким родственникам через **TestFlight**. В App Store не публикуется:
-правило 5.4 допускает VPN-приложения только от организаций, а российская витрина удаляет такие
-клиенты по требованию Роскомнадзора (разбор — [PLAN.md](PLAN.md), «На будущее: App Store»).
+English · [Русский](README.ru.md)
 
-Репозиторий открыт: [github.com/razhev/ovoc-client](https://github.com/razhev/ovoc-client), вся
-история разработки с 2026-08-19. До 2026-11-04 он был приватным и назывался `personal-ios-client`;
-при открытии адреса авторов в истории заменены на noreply-адрес GitHub. До 2026-09-24 приложение
-называлось PersonalVPN.
+A small native iOS app that connects an iPhone to your own OpenVPN over Cloak server, for example
+one set up with [AmneziaVPN](https://amnezia.org). The app has no servers, accounts or analytics
+of its own. You add your key; it gives you a Connect button.
 
-## Что где
+Cloak wraps OpenVPN traffic in what looks like an ordinary HTTPS session, so the connection is
+hard to tell apart from a visit to a regular website.
 
-- **[CHANGELOG.md](CHANGELOG.md)** — изменения по версиям и оставшиеся проверки текущего релиза.
-- **[PLAN.md](PLAN.md)** — полный план разработки: архитектура, этапы (M0–M6) с проверками, риски.
-- **[docs/RU-SERVICES-BYPASS-PLAN.md](docs/RU-SERVICES-BYPASS-PLAN.md)** — план и ревью исключений для Ozon, Wildberries и Яндекса при включённом VPN; этапы проверки и реализации.
-- **[docs/IMPLEMENTATION.md](docs/IMPLEMENTATION.md)** — детальный план имплементации по шагам (Фаза 0 → M6), тест-стратегия, план коммитов, открытые вопросы.
-- **[docs/DEVICE-TESTING.md](docs/DEVICE-TESTING.md)** — инструкция по тестированию на iPhone: подготовка аккаунта и телефона, чек-лист первого запуска, каналы отладки, таблица «симптом → что делать».
-- **[docs/TESTFLIGHT.md](docs/TESTFLIGHT.md)** — раздача через TestFlight по шагам: запись приложения и API-ключ в App Store Connect, `make testflight`, внешняя группа с публичной ссылкой, текст для Beta App Review, сообщение родственникам, памятка «90 дней».
-- **[THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md)** — лицензия приложения (GPL-3.0) и сторонних компонентов; тексты — в `App/Licenses`, в приложении — экран «О приложении».
-- **[PRIVACY.md](PRIVACY.md)** — политика конфиденциальности (ru + en) — её URL нужен для внешнего тестирования в TestFlight.
-- **[docs/FRAMEWORK-API.md](docs/FRAMEWORK-API.md)** — зафиксированный API `OpenVPNAdapter.framework`, выписанный из реальных заголовков. По нему пишется код провайдера.
-- **[IMPLEMENTATION_PROMPT.md](IMPLEMENTATION_PROMPT.md)** — исторический промпт первого планирования; актуальные команды и устройство проекта описаны здесь и в PLAN.md.
+## What it does
 
-## Статус
+- Imports an Amnezia `vpn://…` key, pasted or opened as a file. The key stays on the phone,
+  inside the iOS VPN configuration.
+- Connects and disconnects with one button and describes each state in plain words.
+- Can keep selected Russian services (banks, marketplaces, government portals) outside the
+  tunnel. All exceptions are off until you turn them on.
+- Shows the tunnel log on its own screen and shares it in one tap.
+- Has a Russian and an English interface.
 
-**Актуальная сборка TestFlight — 0.1.0 (15), выпущена 2026-10-17.** Apple одобрила
-её для внутренней и внешней групп; срок действия — **2027-01-15**.
-[Установить через TestFlight](https://testflight.apple.com/join/KMXkHFyz),
-[подтверждение выпуска](docs/TESTFLIGHT.md#актуальная-сборка-testflight--010-15).
-Сборка 2 также остаётся доступна среди предыдущих; остальные прежние сборки истекли.
+## Install
 
-Исправлена причина зависания трафика сразу после подключения: блокирующее чтение
-Cloak больше не удерживает глобальную блокировку OpenVPN. Восстановлена отмена
-старых соединений. Сохранены все функции версии 14, десять сервисов «Без VPN»,
-выбор пользователя и каталог `2026-10-11.1` с 104 нормализованными маршрутами.
+The app is distributed through TestFlight: [join the beta](https://testflight.apple.com/join/KMXkHFyz).
+It needs an iPhone with iOS 16 or newer and the TestFlight app. The current build is 0.1.0 (15)
+from 2026-10-17; [CHANGELOG.md](CHANGELOG.md) lists what changed in each build.
 
-На iPhone 16 Pro пройдены 42/42 HTTPS-проверки, пять переподключений, простой
-и фоновый трафик. Две загрузки по 8 МиБ через VPN — 77,79 и 76,63 Мбит/с.
-Часовой сеанс, смена сети и полная совместимость банковских приложений ещё не
-проверены. [Разбор и проверки](docs/DEVICE-TESTING.md#задержка-трафика-сразу-после-подключения--исправление-2026-10-17).
+It is not in the App Store. Apple's guideline 5.4 accepts VPN apps only from organizations, and
+the Russian storefront removes such clients on request.
 
-Исходник архива — `14d3909`, тег
-[`v0.1.0-build15`](https://github.com/razhev/ovoc-client/tree/v0.1.0-build15).
-Пройдены проектные, native и Go race tests, проверки Debug/Release,
-происхождения framework и 137 строк локализации.
+You also need a server. Any OpenVPN over Cloak server will do; the simplest route is a
+self-hosted AmneziaVPN with a key exported for the "OpenVPN over Cloak" protocol.
 
-Ниже приведена история разработки и доступности сборок на даты их выпуска.
-Текущее состояние TestFlight указано выше.
+## Build from source
 
-**Сборка 0.1.0 (11), 2026-10-10 доступна в TestFlight:** исправлена блокирующая отправка
-Cloak, из-за которой VPN оставался активным без входящего трафика и не обрабатывал
-остановку. Добавлена защита закрытия соединения; прежние функции сборки 10 сохранены.
-Apple одобрила сборку для внутренней и внешней групп. Пройдены автоматические
-проверки; проверка на iPhone остаётся отдельным шагом. [Разбор](docs/DEVICE-TESTING.md),
-[изменения](CHANGELOG.md).
-
-**Сборка 0.1.0 (10), 2026-10-09 доступна в TestFlight:** исправлена гонка счётчика ссылок соединения Cloak.
-Изменение проверено ThreadSanitizer на реальном заголовке библиотеки. Debug-сборка установлена
-на iPhone: непрерывный сеанс 10 минут 29 секунд без ошибок, штатное отключение и повторное
-подключение пройдены; пользователь подтвердил работу приложений. Часовой прогон ещё предстоит.
-Apple одобрила сборку; она доступна внешней группе External Testing Group и внутренним
-тестировщикам. Подробности — в [CHANGELOG.md](CHANGELOG.md) и [статусе выпуска](docs/TESTFLIGHT.md).
-
-**Сборка 0.1.0 (9), 2026-10-07 доступна в TestFlight — откат переподключения:** убрана автоматика
-восстановления и возвращён прежний OpenVPN/Cloak. «Без VPN» и автосохранение выбора
-сохранены. После смены сети при зависании соединения требуется ручное отключение
-и подключение. Работа Telegram на iPhone после отката пока не проверена.
-[Статус выпуска](docs/TESTFLIGHT.md).
-
-**Подготовлено в исходниках, 2026-10-10:** каталог «Без VPN» расширен группами MAX,
-СДЭК, Госуслуги, mos.ru и Мосэнергосбыт. Для Ozon добавлены найденные адреса
-региональных CDN и финансовой части. Общий переключатель «Исключить все» выбирает
-восемь групп; отдельные сервисы находятся в раскрывающемся списке. Прежний выбор
-сохраняется, новые группы сами не включаются. Исправление сбоя всего приложения Ozon
-на iPhone пока не подтверждено. [Источники и ограничения](docs/SERVICE-BYPASS-CATALOG.md).
-
-**Эксперимент 0.1.0 (7), 2026-10-06:** добавлен экран «Без VPN» с группами Ozon,
-Wildberries и Яндекс, включая Go. По умолчанию исключения выключены; настройка
-сохраняется автоматически при отключённом соединении. Сервисы из выбранных IP-сетей используют
-обычное подключение телефона. Проверки реальных приложений и маршрутов на iPhone
-ещё предстоят — это не гарантия полной совместимости. Происхождение адресов и
-пробелы покрытия: [каталог](docs/SERVICE-BYPASS-CATALOG.md); сценарии проверки —
-[DEVICE-TESTING](docs/DEVICE-TESTING.md#проверка-исключений-российских-сервисов).
-Сборка 7 доступна внутренней группе TestFlight (`IN_BETA_TESTING`); в ней исправлено
-автосохранение выбора и сохранены изменения запуска/восстановления сборки 6.
-
-Фазы 0 и 0.5 (всё, что не требует подписи и устройства): каркас проекта, ConfigKit с тестами,
-скрипты фреймворка, полный `PacketTunnelProvider` — **готово**.
-
-**M1 + M2 пройдены 2026-09-20** (iPhone 16 Pro, iOS 26.6.2): подписанная сборка ставится на
-телефон командой `make install`, пустышка-туннель поднимается, App Group работает из обоих
-процессов, `OpenVPNAdapter.framework` загружается в процессе расширения (4 МБ памяти при лимите
-~50 МБ), обычный интернет при этом работает, отключение и повторное подключение — тоже.
-
-**M3 пройден по основным проверкам 2026-09-20**: реальное соединение OpenVPN over Cloak
-работает — сайт-определитель показывает IP сервера, сайты открываются, соединение держалось
-11+ минут без единой ошибки и переподключения, память расширения до 18 МБ при лимите ~50 МБ,
-на сервере 0 ошибок расшифровки. Для этого пришлось найти и исправить дефект готового
-фреймворка Amnezia (разбор — в [docs/DEVICE-TESTING.md](docs/DEVICE-TESTING.md)); фреймворк
-теперь собирается из исходников: `make framework`.
-
-**M4 сделан 2026-09-24**: ключ добавляется в самом приложении — экран «Добавить ключ»
-(вставка из буфера или файл из «Файлов»; можно вставить сообщение с ключом целиком). Без ключа
-приложение предлагает импорт, а не подключение; ключ меняется кнопкой-ключом в тулбаре (поднятый
-VPN при этом сначала отключается). Клиент раздаётся **пустым**: вшитого ключа нет, каждый добавляет
-свой. Отладочный `make push-key` оставлен — он идёт через тот же код импорта, что и экран, и
-вырезан из Release (`make release-check` это проверяет).
-
-**Переименование 2026-09-24**: PersonalVPN → **OVoC Client**. Проект, таргет и схема — `OVoCClient`;
-bundle ID — `com.razhev.ovocclient` (расширение `com.razhev.ovocclient.tunnel`, App Group
-`group.com.razhev.ovocclient`). Для iOS это новое приложение: старое PersonalVPN удаляется с
-телефона руками, ключ импортируется заново ([docs/DEVICE-TESTING.md](docs/DEVICE-TESTING.md),
-«Переход с PersonalVPN»). Проверено на телефоне в тот же день: `make install` сам завёл новые
-App ID и App Group, импорт ключа вставкой → «Подключено», в логах `connected`, heartbeat с
-трафиком в обе стороны, ни одного `Transport error`.
-
-Отключение кнопкой разобрано 2026-09-24: ложная фатальная ошибка #20 адаптера при `stopTunnel`
-и двоичный мусор в `tunnel.log` (сырой `close` в Go-плагине Cloak) — причины и что сделано в
-провайдере описаны в [docs/DEVICE-TESTING.md](docs/DEVICE-TESTING.md).
-
-**M5 сделан 2026-09-26** (на Mac; проверка на телефоне — по сценарию в
-[docs/DEVICE-TESTING.md](docs/DEVICE-TESTING.md), «Этап F»): интерфейс на русском и английском
-(`App/Localizable.xcstrings`, русский — базовый), понятный текст для всех состояний VPN с
-пояснением под статусом, ошибка под кнопкой — подсказка + сырой код в квадратных скобках,
-«Поделиться» на экране «Логи» отдаёт сразу `tunnel.log` + `app.log` (+ `last_error.txt`),
-иконка (`make icon`). Авто-подключение не делали — почему, см. docs/IMPLEMENTATION.md, M5.
-
-**M6 подготовлен 2026-09-26**: `make testflight` (архив Release → загрузка в App Store Connect
-через API-ключ, без fastlane/altool), `Config/ExportOptions.plist`, инструкция для ручных шагов
-и тексты для ревью/родственников — [docs/TESTFLIGHT.md](docs/TESTFLIGHT.md). Сама загрузка ещё
-не выполнялась: нужны запись приложения и API-ключ в App Store Connect (шаг 6.1, делается руками).
-
-**Подготовка к первой загрузке 2026-09-27**:
-- privacy manifest у приложения, расширения и фреймворка — без него App Store Connect отвергает загрузку;
-- экран «О приложении» (нажать на название на главном экране): версия, уведомление GPL,
-  исходники, компоненты и полные тексты лицензий;
-- карточка «Что с данными» на экране импорта ключа (правило App Store 5.4);
-- политика [PRIVACY.md](PRIVACY.md) и лицензия [LICENSE](LICENSE);
-- `make release-check` проверяет manifest и лицензии.
-
-Флаг `ITSAppUsesNonExemptEncryption=false` перепроверен по таблице Apple — он верен. Что сделать
-руками, по шагам, — [docs/TESTFLIGHT.md](docs/TESTFLIGHT.md), «Первая загрузка».
-
-**Первая загрузка в TestFlight 2026-09-28**: сборка 0.1.0 (1) загружена и обработана Apple
-(действует до 2026-12-27). Подпись для распространения прошла через Apple ID из Xcode: ключу с
-ролью App Manager Apple её не разрешает, `make testflight` теперь повторяет экспорт сам. В тот же
-день сборка установлена через TestFlight и работает. Дальше — внутренние тестеры для близких
-(без ревью) и внешняя группа с публичной ссылкой (docs/TESTFLIGHT.md, шаги 7–12).
-
-**Внешнее тестирование 2026-09-28**: политика конфиденциальности (по правилам App Store 5.1.1(i) и
-5.4) и тестовый ключ для ревьюера выложены секретными Gist, Test Information заполнена,
-сборка 0.1.0 (2) — со ссылкой на политику внутри приложения — отправлена на Beta App Review.
-
-**Проверка TestFlight 2026-10-02:** App Store Connect API подтверждает для сборки 0.1.0 (2)
-`processingState=VALID`, внутреннее и внешнее состояния — `IN_BETA_TESTING`.
-Точная дата одобрения не установлена. Изменения подготовленной сборки 0.1.0 (3) —
-в [CHANGELOG.md](CHANGELOG.md); проверка P1 на физическом iPhone ещё предстоит.
-
-**Хвост гейта M3 (2026-09-26)**: закрыта утечка IPv6 — при отсутствии IPv6
-от сервера расширение ставит IPv6-настройки с ULA-адресом и default-маршрутом в туннель, а мост
-отбрасывает такие пакеты (`ipv6=sink(…)` в логе, `ipv6-sunk N` в heartbeat). С 2026-10-07
-после отката в сборке 9 приложение не следит за сменой сети и не инициирует reconnect.
-Проверки DNS и дополнительные попытки восстановления удалены. При зависании соединения
-его нужно отключить и подключить вручную. Прежние маршруты и DNS сохраняются при внутренних
-событиях ядра, как до эксперимента с переподключением.
-
-## Команды
-
-Требуются: Xcode 26+, [XcodeGen](https://github.com/yonaskolb/XcodeGen) (`brew install xcodegen`).
-Для `make framework` нужен также `go` в `PATH` с поддержкой выбора toolchain:
-скрипт закрепляет `GOTOOLCHAIN=go1.22.2`. Первая сборка требует сети для загрузки
-исходников, Go 1.22.2 и модулей. Cloak собирается из исходников вместе с адаптером.
+You need a Mac with Xcode 26, [XcodeGen](https://github.com/yonaskolb/XcodeGen), Go (the build
+pins version 1.22.2 itself) and an Apple Developer account for the Network Extension entitlement.
+VPN does not work in the Simulator, so an iPhone on a cable is required.
 
 ```bash
-make gen        # сгенерировать OVoCClient.xcodeproj из project.yml
-make build      # собрать оба таргета БЕЗ подписи — быстрая проверка компиляции
-make test       # ConfigKit, reconnect, IPv6, UTF-8 логов и происхождение framework — на Mac
-make test-cloak-refcount # после make framework: гонка ссылок Connection под ThreadSanitizer
-make test-cloak-send # после make framework: очередь Cloak, ошибки и остановка под ASan/UBSan
-make framework  # исходники OpenVPNAdapter + Cloak, наши патчи, Go race tests и C++ send-тест
-make framework-manifest # положить privacy manifest в уже собранный фреймворк (make framework делает сам)
-make fetch      # готовый бинарь v1.0.42 — НЕРАБОЧИЙ (дефект метки GCM), только для сравнения
-make verify     # arm64, Cloak, API + квитанция исходников, всех патчей и архива Cloak
-
-make devices    # какие iPhone видит Mac и готовы ли они к установке
-make ddi        # смонтировать на телефон образ разработчика (VPN на Mac выключить)
-make install    # подписанная сборка → установка на подключённый iPhone → запуск
-make push-key   # DEBUG: доставить Secrets/my.vpnkey в приложение тем же кодом, что экран импорта
-make release-check # ворота Release: нет DEBUG-моста и файлов ключа; privacy manifest и лицензии на месте
-make strings-check # каталог строк ru/en сходится с кодом (App/Localizable.xcstrings)
-make icon       # перерисовать иконку 1024×1024 скриптом (scripts/make-app-icon.swift)
-make scene      # пересобрать сцену главного экрана App/Scene/scene.html (нужен Node.js)
-make testflight # Release-архив → загрузка в TestFlight (API-ключ в Secrets/asc.env, см. docs/TESTFLIGHT.md)
-make logs       # забрать логи с телефона в build/logs/latest/
-make crashlogs  # то же + отчёты о падениях расширения/приложения
+make framework   # build OpenVPNAdapter and Cloak from source with the project's patches
+make test        # unit tests on the Mac
+make install     # signed build onto the connected iPhone
 ```
 
-`OVoCClient.xcodeproj` пересоздаётся каждым `make gen` — все настройки подписи живут в
-`project.yml`, в интерфейсе Xcode ничего не настраиваем.
+The full list of commands, architecture notes and on-device debugging are in
+[docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) (in Russian).
 
-`make framework` запускает Go-тесты реестра соединений с `-race` и C++-тест очереди
-отправки; `make test-cloak-refcount` запускается отдельно. Эти нативные проверки
-не входят в `make test`. Версии исходников и состав квитанции описаны в
-[docs/FRAMEWORK-API.md](docs/FRAMEWORK-API.md#происхождение-бинаря).
+## How it works
 
-Разобрать ключ Amnezia в читаемый JSON (вывод сохранять только в `Secrets/`):
+A SwiftUI app and one Network Extension. The extension runs Amnezia's fork of OpenVPNAdapter
+with Cloak compiled in as the transport. The framework is built from source here, with a few
+patches: the published binary did not write the GCM authentication tag, and the server dropped
+every packet.
 
-```bash
-python3 scripts/decode-vpnkey.py Secrets/my.vpnkey > Secrets/my-decoded.json
-```
+Key parsing lives in a local Swift package, `ConfigKit`. The app turns the key into a ready
+OpenVPN profile and hands it to the extension through the VPN configuration; the extension
+parses nothing itself.
 
-Только структура ключа, без секретов (можно показывать в чате):
+## Documentation
 
-```bash
-python3 scripts/decode-vpnkey.py --schema Secrets/my.vpnkey
-```
+Most documents are in Russian.
 
-## Архитектура (коротко)
+- [CHANGELOG.md](CHANGELOG.md) — changes by build.
+- [PRIVACY.md](PRIVACY.md) — privacy policy, Russian and English.
+- [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) — commands, architecture, debugging on the device.
+- [docs/DEVICE-TESTING.md](docs/DEVICE-TESTING.md) — testing on an iPhone, symptoms and what to do.
+- [docs/TESTFLIGHT.md](docs/TESTFLIGHT.md) — how a build gets to TestFlight.
+- [docs/SERVICE-BYPASS-CATALOG.md](docs/SERVICE-BYPASS-CATALOG.md) — where the "Outside VPN" addresses come from.
+- [PLAN.md](PLAN.md) — the original plan and how it actually went.
 
-- SwiftUI-приложение + одно расширение `NEPacketTunnelProvider`. Device-only
-  (VPN не работает в симуляторе), deployment target iOS 16.0.
-- `OpenVPNAdapter.framework` от Amnezia, **собранный из исходников с нашими патчами**
-  (`make framework`, `patches/`): в их готовом бинаре клиент не записывает метку
-  подлинности GCM, и сервер отбрасывает каждый пакет. Cloak скомпилирован
-  внутрь OpenVPN3 как транспорт; его Go-библиотека тоже пересобирается с защитой
-  реестра соединений. Исправления C++ защищают счётчики ссылок и выносят отправку
-  из цикла OpenVPN в последовательную фоновую очередь. Со стороны Swift:
-  `setPTCloak()` + блок `<cloak>` в тексте профиля.
-- **ConfigKit** — локальный SPM-пакет со всей логикой разбора ключа `vpn://…`
-  (zlib-распаковка, двойной разбор `last_config`, типы Cloak-полей, сборка
-  профиля). Тестируется на Mac: `make test`.
-- Маршруты и DNS остаются на месте при resetTun/reconnect; старые настройки заменяются
-  новыми без промежуточного снятия. При окончательном отключении их снимает iOS.
-  Автотесты этой границы находятся в `Tests/TunnelRuntimeTests`, проверка отсутствия утечки
-  на телефоне — [«Регрессия P1»](docs/DEVICE-TESTING.md).
-- Импорт выбирает фактический endpoint Cloak (`remote` → `RemoteHost` → `hostName`) и
-  фиксирует один IPv4 в транспорте и маршруте исключения. После смены IP домена ключ нужно
-  импортировать заново. Профили, сохранённые до этого исправления с доменом или отдельным
-  адресом Cloak, тоже нужно переимпортировать.
-- Расширение ничего не парсит: приложение при импорте собирает готовый текст
-  `.ovpn` и передаёт его через `providerConfiguration` — это единственное место,
-  где лежит профиль с приватным ключом. App Group — только для логов.
+## Feedback
 
-## Отладка на устройстве (M1+)
+If something does not connect, open an [issue](https://github.com/razhev/ovoc-client/issues)
+and attach the files from the Logs screen. They contain the server address but never the key;
+remove the address if you prefer. Pull requests are welcome too.
 
-К процессу расширения **нельзя подключать отладчик Xcode** — Go-код Cloak под
-отладчиком деградирует до ~5 fps и выглядит зависшим (golang/go#57651). Поэтому
-на телефон ставим только через `make install`, не кнопкой Run. Каналы отладки:
+## License
 
-- экран «Логи» в приложении: `tunnel.log` (расширение) и `app.log` (приложение)
-  из App Group; «Поделиться» отдаёт оба файла сразу (и `last_error.txt`, если есть);
-- `make logs` / `make crashlogs` — те же файлы и отчёты о падениях на Mac, без sudo;
-- Console.app с фильтром по subsystem `com.razhev.ovocclient`;
-- `sudo log collect --device-name "<iPhone>" --last 10m` по кабелю.
+GPL-3.0, see [LICENSE](LICENSE). The app includes AGPL-3.0 code from OpenVPNAdapter and
+OpenVPN 3 and GPL-3.0 code from Cloak; the full list of components is in
+[THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md).
 
-Подробности и разбор типовых ошибок — [docs/DEVICE-TESTING.md](docs/DEVICE-TESTING.md).
-
-## Секреты
-
-`Secrets/`, `*.vpnkey`, `*.ovpn` — в `.gitignore`. Реальные ключи не коммитятся
-и не попадают в код/тесты (тесты синтезируют ключи сами).
-
-## Дизайн «Печка»
-
-Мультяшная дизайн-система в духе советских мультфильмов 60-х: вместо замков,
-ключей и щитов — изба, русская печь, ушат с тестом и колобок. Источник правды —
-холст Design «Печка — мультяшный OVoC Client» (экраны, цвета, шрифты, голос,
-компоненты, иконки, движение, иконка приложения).
-
-- `App/Pechka.swift` — цвета, шрифты, кнопки, плашки, карточки, край панели;
-  `App/PechkaIcons.swift` — иконки (те же SVG-пути, что на холсте).
-- Сцена главного экрана — `App/Scene/scene.html` в `WKWebView` (`App/SceneView.swift`):
-  SVG + CSS-анимации, собранные `make scene` из `scripts/pechka/scene.mjs` —
-  того же кода, что рисует холст. «ПЫХ!» проигрывается при переходе в «Подключено».
-- Голос: шутка — только в заголовке («Испеклось!»), статус в плашке — прямо
-  («VPN включён»), кнопки — глаголом.
-- Шрифты Marmelad, Rubik, PT Mono — `App/Fonts` (Google Fonts, лицензия OFL, тексты рядом).
-
-## Лицензия
-
-OVoC Client распространяется по **GPL-3.0** ([LICENSE](LICENSE)). Внутри — AGPL-3.0-код
-OpenVPNAdapter/OpenVPN3 и GPL-3.0-код Cloak, поэтому любая раздача сборки другим людям — в том
-числе внешним тестерам TestFlight — обязывает дать им доступ к исходникам этой сборки. Компоненты,
-версии и откуда взяты тексты лицензий — [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md).
-Исходники — этот репозиторий, он публичный: [github.com/razhev/ovoc-client](https://github.com/razhev/ovoc-client).
-
-OpenVPN® is a registered trademark of OpenVPN Inc. OVoC Client не связан с Amnezia и OpenVPN Inc.
+OpenVPN® is a registered trademark of OpenVPN Inc. OVoC Client is not affiliated with Amnezia
+or OpenVPN Inc.

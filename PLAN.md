@@ -30,7 +30,7 @@
 | — | Переименование PersonalVPN → OVoC Client | ✅ 2026-09-24, PR #3 | DEVICE-TESTING, «Переход с PersonalVPN» |
 | — | Ложная ошибка #20 при отключении | ✅ проверено на телефоне 2026-09-26, PR #3 | DEVICE-TESTING, «Ложная фатальная ошибка #20» |
 | M5 | Доводка: ru/en, статусы, ошибка под кнопкой, логи, иконка | ✅ на Mac 2026-09-26, PR #4; на телефоне ждёт | DEVICE-TESTING, этап F |
-| — | Дизайн «Печка»: экраны, сцена, иконка «Мёд» | ✅ 2026-09-26, PR #4; на телефоне ждёт | README, «Дизайн «Печка»» |
+| — | Дизайн «Печка»: экраны, сцена, иконка «Мёд» | ✅ 2026-09-26, PR #4; на телефоне ждёт | docs/DEVELOPMENT.md, «Дизайн «Печка»» |
 | M6 | TestFlight: `make testflight`, ExportOptions, инструкция | инструменты ✅ 2026-09-26; подготовка ✅ 2026-09-27; **первая сборка 0.1.0 (1) загружена и установлена у себя через TestFlight ✅ 2026-09-28**; сборка 2 (ссылка на политику в приложении) отправлена на Beta App Review 2026-09-28 — ждём ответа | docs/TESTFLIGHT.md, «Первая загрузка» |
 
 **Работает на телефоне уже сейчас** (iPhone 16 Pro, iOS 26.6.2):
@@ -112,8 +112,8 @@
 ```
 personal-ios-client/
 ├── project.yml            # XcodeGen: цели, подписи, entitlements, версии — единый источник правды
-├── Makefile               # короткие команды: make gen / build / test / install / logs / testflight … (список — в README)
-├── README.md              # статус, команды, архитектура, отладка, дизайн «Печка»
+├── Makefile               # короткие команды: make gen / build / test / install / logs / testflight … (список — в docs/DEVELOPMENT.md)
+├── README.md              # краткое описание (en); README.ru.md — по-русски; разработка — docs/DEVELOPMENT.md
 ├── PLAN.md                # этот файл
 ├── CHANGELOG.md           # изменения по версиям
 ├── Package.swift          # тесты TunnelRuntime и SharedRuntime на Mac
@@ -280,7 +280,7 @@ personal-ios-client/
 - `App/Pechka.swift` — цвета, шрифты с Dynamic Type, кнопки, плашки, карточки; `App/PechkaIcons.swift` — иконки; шрифты Marmelad, Rubik, PT Mono (OFL).
 - Главный экран: сцена в `WKWebView` (SVG + CSS: Вовка тянет тесто в печь, при «Подключено» — «ПЫХ!» и колобок на окне; уважает «Уменьшение движения»), плашка статуса, шуточный заголовок, одна кнопка; восемь состояний на ru/en. Импорт ключа и логи — в том же стиле.
 - Иконка «Мёд» — печь с колобком вместо щита.
-- Источник правды — холст Design «Печка — мультяшный OVoC Client»; сцену пересобирает `make scene` (нужен Node.js). Подробнее — README, «Дизайн «Печка»».
+- Источник правды — холст Design «Печка — мультяшный OVoC Client»; сцену пересобирает `make scene` (нужен Node.js). Подробнее — docs/DEVELOPMENT.md, «Дизайн «Печка»».
 
 ### M6 — Раздача через TestFlight — сборки 1 и 2 загружены
 В App Store Connect создаём запись приложения. `make testflight` собирает архив и заливает его (через API-ключ из M0).

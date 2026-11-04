@@ -23,9 +23,9 @@
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
 	<key>OVoCPrivacyPolicyURL</key>
-	<string>https://gist.github.com/razhev/f7d26b50c314d2fb5f441bd496113c8b</string>
+	<string>https://github.com/razhev/ovoc-client/blob/main/PRIVACY.md</string>
 	<key>OVoCSourceCodeURL</key>
-	<string></string>
+	<string>https://github.com/razhev/ovoc-client</string>
 	<key>UIAppFonts</key>
 	<array>
 		<string>Marmelad-Regular.ttf</string>

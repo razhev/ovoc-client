@@ -2,9 +2,14 @@
 
 **OVoC Client** (OpenVPN over Cloak Client) — минимальный нативный iOS-клиент для личного сервера
 **AmneziaVPN** (протокол **OpenVPN over Cloak**).
-Для установки себе и нескольким родственникам через **TestFlight**. Не для публикации в App Store (пока).
+Для установки себе и нескольким родственникам через **TestFlight**. В App Store не публикуется:
+правило 5.4 допускает VPN-приложения только от организаций, а российская витрина удаляет такие
+клиенты по требованию Роскомнадзора (разбор — [PLAN.md](PLAN.md), «На будущее: App Store»).
 
-Репозиторий — `personal-ios-client`; до 2026-09-24 приложение называлось PersonalVPN.
+Репозиторий открыт: [github.com/razhev/ovoc-client](https://github.com/razhev/ovoc-client), вся
+история разработки с 2026-08-19. До 2026-11-04 он был приватным и назывался `personal-ios-client`;
+при открытии адреса авторов в истории заменены на noreply-адрес GitHub. До 2026-09-24 приложение
+называлось PersonalVPN.
 
 ## Что где
 
@@ -37,8 +42,8 @@ Cloak больше не удерживает глобальную блокиро
 Часовой сеанс, смена сети и полная совместимость банковских приложений ещё не
 проверены. [Разбор и проверки](docs/DEVICE-TESTING.md#задержка-трафика-сразу-после-подключения--исправление-2026-10-17).
 
-Исходник архива — `30c5206`, тег
-[`v0.1.0-build15`](https://github.com/razhev/personal-ios-client/tree/v0.1.0-build15).
+Исходник архива — `14d3909`, тег
+[`v0.1.0-build15`](https://github.com/razhev/ovoc-client/tree/v0.1.0-build15).
 Пройдены проектные, native и Go race tests, проверки Debug/Release,
 происхождения framework и 137 строк локализации.
 
@@ -279,7 +284,7 @@ python3 scripts/decode-vpnkey.py --schema Secrets/my.vpnkey
 OVoC Client распространяется по **GPL-3.0** ([LICENSE](LICENSE)). Внутри — AGPL-3.0-код
 OpenVPNAdapter/OpenVPN3 и GPL-3.0-код Cloak, поэтому любая раздача сборки другим людям — в том
 числе внешним тестерам TestFlight — обязывает дать им доступ к исходникам этой сборки. Компоненты,
-версии и откуда взяты тексты лицензий — [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md); где
-публиковать исходники — [docs/TESTFLIGHT.md](docs/TESTFLIGHT.md), «Исходники и ссылки».
+версии и откуда взяты тексты лицензий — [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md).
+Исходники — этот репозиторий, он публичный: [github.com/razhev/ovoc-client](https://github.com/razhev/ovoc-client).
 
 OpenVPN® is a registered trademark of OpenVPN Inc. OVoC Client не связан с Amnezia и OpenVPN Inc.

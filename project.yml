@@ -93,11 +93,12 @@ targets:
         # документов»); без флага каждая загрузка задаёт вопрос про шифрование. Проверено 2026-09-27.
         ITSAppUsesNonExemptEncryption: false
         # Ссылки для экрана «О приложении» и карточки о данных на экране импорта.
-        # Пустая строка — ссылка не показывается (вместо исходников — «по запросу у
-        # разработчика»). Заполнить, когда исходники и политика опубликованы:
-        # docs/TESTFLIGHT.md, «Первая загрузка», шаги 7–8.
-        OVoCSourceCodeURL: ""
-        OVoCPrivacyPolicyURL: "https://gist.github.com/razhev/f7d26b50c314d2fb5f441bd496113c8b"
+        # Пустая строка — ссылка не показывается. Репозиторий открыт 2026-11-04
+        # (github.com/razhev/ovoc-client, вся история коммитов); политика — файл
+        # PRIVACY.md в нём же. Сборки до 15 включительно ведут на gist с политикой —
+        # не удалять его, пока сборка 15 доступна в TestFlight.
+        OVoCSourceCodeURL: "https://github.com/razhev/ovoc-client"
+        OVoCPrivacyPolicyURL: "https://github.com/razhev/ovoc-client/blob/main/PRIVACY.md"
     scheme:
       testTargets: []
 

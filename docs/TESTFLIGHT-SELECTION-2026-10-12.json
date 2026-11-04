@@ -68,7 +68,7 @@
   },
   "sourcePolicy": {
     "main": "Latest source from build 14; no code rollback",
-    "build14ArchiveCommit": "e5792676c8b7ae8af067d1b25547b4c0695eaf61",
+    "build14ArchiveCommit": "f96ac29c9c41e2251b2c7012f077f50b7d8f6fcf",
     "build14Tag": "v0.1.0-build14",
     "build13Branch": "codex/fix-cloak-cancellation"
   }

@@ -1,0 +1,66 @@
+name: Bug report · Ошибка
+description: The app does not connect, disconnects or behaves wrongly · Не подключается, отключается или работает не так
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **Never paste your `vpn://` key, an `.ovpn` profile or a screenshot that shows them.** Anyone with the key can use your server.
+        **Никогда не вставляйте ключ `vpn://`, профиль `.ovpn` или скриншот, где они видны.** С ключом любой может пользоваться вашим сервером.
+
+        Security problems: [report privately](https://github.com/razhev/ovoc-client/security/advisories/new) · Уязвимости — [закрытым отчётом](https://github.com/razhev/ovoc-client/security/advisories/new).
+  - type: input
+    id: build
+    attributes:
+      label: Build · Сборка
+      description: TestFlight or the About screen (tap the app name) · В TestFlight или на экране «О приложении» (нажать на название)
+      placeholder: 0.1.0 (15)
+    validations:
+      required: true
+  - type: input
+    id: device
+    attributes:
+      label: iPhone and iOS · iPhone и версия iOS
+      placeholder: iPhone 13, iOS 26.1
+    validations:
+      required: true
+  - type: dropdown
+    id: network
+    attributes:
+      label: Network · Сеть
+      multiple: true
+      options:
+        - Wi-Fi
+        - Cellular · Мобильная
+        - Switching between them · При переключении
+    validations:
+      required: true
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened · Что случилось
+      description: What you did, what you expected and what you saw instead · Что делали, чего ожидали и что увидели
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce · Как повторить
+      placeholder: |
+        1. Connect · Подключить
+        2. Lock the phone for 5 minutes · Заблокировать телефон на 5 минут
+        3. ...
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs · Логи
+      description: |
+        Logs screen → Share, then drag the files here. They contain the server address but never the key; remove the address if you prefer.
+        Экран «Логи» → «Поделиться», затем перетащите файлы сюда. В них есть адрес сервера, но нет ключа; адрес можно вырезать.
+  - type: checkboxes
+    id: no-key
+    attributes:
+      label: Key check · Проверка ключа
+      options:
+        - label: This issue contains no `vpn://` key and no `.ovpn` profile · В issue нет ключа `vpn://` и профиля `.ovpn`
+          required: true

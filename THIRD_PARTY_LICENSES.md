@@ -7,10 +7,13 @@ amnezia-client (GPL-3.0). GPLv3 §13 разрешает объединять GPL
 продолжают действовать для его частей.
 
 Что это значит на практике: каждому, кто получил сборку (в том числе внешнему тестеру
-TestFlight), доступен полный исходный код этой сборки. Исходники приложения — этот репозиторий
-(тег/коммит сборки пишет `make testflight` в `build/testflight/uploads.log`). Исходники фреймворка —
-коммиты ниже + [patches/openvpn3-aead-auth-tag.patch](patches/openvpn3-aead-auth-tag.patch), сборка —
-[scripts/build-framework-source.sh](scripts/build-framework-source.sh).
+TestFlight), доступен полный исходный код этой сборки. Исходники приложения — этот репозиторий;
+исходник выпущенной сборки помечен тегом вида `v0.1.0-build15`
+([список тегов](https://github.com/razhev/ovoc-client/tags)). Исходники фреймворка — коммиты
+ниже и патчи из [patches/](patches): три для OpenVPN 3 (метка AEAD, счётчик ссылок Connection,
+очередь отправки Cloak) и один для Cloak (реестр соединений). Сборка —
+[scripts/build-framework-source.sh](scripts/build-framework-source.sh) и
+[scripts/build-cloak-source.sh](scripts/build-cloak-source.sh).
 
 В приложении список компонентов и полные тексты лицензий — экран «О приложении» (нажать на
 название на главном экране). Тексты лежат в [App/Licenses](App/Licenses) и [App/Fonts](App/Fonts).
@@ -44,9 +47,10 @@ TestFlight), доступен полный исходный код этой сб
 `Cloak-Go-modules.txt` — файлы `LICENSE`/`PATENTS` модулей из кэша Go-модулей, версии — те, что
 записаны в бинаре плагина; GPL-3.0 — канонический текст FSF.
 
-**Открытый вопрос.** Плагин Cloak вшит готовым бинарём Amnezia: известен репозиторий и ветка
-исходников (`amnezia-vpn/Cloak`, `master-amnezia`) и версии модулей, но не точный коммит сборки.
-Для полного соответствия GPL надёжнее собирать плагин из исходников самим (пункт «По желанию» в
-[PLAN.md](PLAN.md)).
+Плагин Cloak собирается из исходников, а не берётся готовым бинарём Amnezia:
+`amnezia-vpn/Cloak` на коммите `884ac4f` с патчем
+[patches/cloak-connection-registry.patch](patches/cloak-connection-registry.patch), Go 1.22.2
+закреплён в скрипте. Хеши исходников, патчей и архива записываются в квитанцию фреймворка —
+[docs/FRAMEWORK-API.md](docs/FRAMEWORK-API.md#происхождение-бинаря).
 
 OpenVPN® is a registered trademark of OpenVPN Inc. OVoC Client не связан с Amnezia и OpenVPN Inc.

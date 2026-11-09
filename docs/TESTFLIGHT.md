@@ -35,7 +35,7 @@ Apple обработала сборку (`VALID`) и одобрила внешн
 - Внутренняя группа: `454bc105-f1da-44ae-bd65-7312f5a436d9`.
 - Внешняя группа: `7f4a8bdc-f245-483d-ada5-c76cd725f8ae`.
 - [Установка через TestFlight](https://testflight.apple.com/join/KMXkHFyz).
-- [Квитанция и проверенные состояния](TESTFLIGHT-BUILD15-2026-10-17.json).
+- [Квитанция и проверенные состояния](releases/TESTFLIGHT-BUILD15-2026-10-17.json).
 - Исходник архива: `14d3909e94ba3462d4283732bd15fc9f04338f67`, тег
   [`v0.1.0-build15`](https://github.com/razhev/ovoc-client/tree/v0.1.0-build15).
 
@@ -48,7 +48,7 @@ OpenVPNAdapter с UUID `6BE97552-7AA3-39E8-A04E-E6B1E6E2D68C`, совпадаю�
 ASan/UBSan, ThreadSanitizer, Go race tests, Release-проверка и 137 строк локализации.
 На iPhone 16 Pro проверена development-сборка с тем же framework: 42/42 HTTPS,
 пять переподключений, простой и фоновый трафик; две загрузки по 8 МиБ — 77–78 Мбит/с.
-[Результаты и ограничения](VPN-FIX-VALIDATION-2026-10-17.json).
+[Результаты и ограничения](releases/VPN-FIX-VALIDATION-2026-10-17.json).
 Часовой сеанс, переход Wi-Fi/сотовая сеть и полная совместимость банковских
 приложений остаются непроверенными.
 
@@ -72,12 +72,13 @@ ASan/UBSan, ThreadSanitizer, Go race tests, Release-проверка и 137 ст
 - Срок действия: **2026-12-27**.
 - Остальные загруженные сборки — **1, 3–11, 13 и 14** — переведены в `EXPIRED`.
   Сборка 12 была подготовлена локально, но не загружена в App Store Connect.
-- Проверка API после изменений: [TESTFLIGHT-SELECTION-2026-10-12.json](TESTFLIGHT-SELECTION-2026-10-12.json).
+- Проверка API после изменений: [TESTFLIGHT-SELECTION-2026-10-12.json](releases/TESTFLIGHT-SELECTION-2026-10-12.json).
 
 `main` сохраняет последние исходники сборки 14. Её точный исходник архива —
 `f96ac29`, тег [`v0.1.0-build14`](https://github.com/razhev/ovoc-client/tree/v0.1.0-build14).
-Отдельное исправление сборки 13 сохранено в ветке `codex/fix-cloak-cancellation`;
-оно не входит в архив сборки 14.
+Отдельное исправление сборки 13 (`411d262`) и записи о её выпуске сохранены тегом
+[`v0.1.0-build13`](https://github.com/razhev/ovoc-client/tree/v0.1.0-build13) — прежде
+это была ветка `codex/fix-cloak-cancellation`; в архив сборки 14 оно не входит.
 
 На iPhone открыть **TestFlight → OVoC Client → Установить / Обновить**, проверить
 номер **0.1.0 (2)**. Для ручного выбора открыть **Предыдущие сборки / View Previous

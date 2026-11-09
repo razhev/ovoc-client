@@ -1,6 +1,6 @@
 # Тестирование на iPhone: от одобренного аккаунта до работающего туннеля
 
-Практическая инструкция к этапам M1–M4 из [IMPLEMENTATION.md](IMPLEMENTATION.md). Всё делается
+Практическая инструкция к этапам M1–M4 из [IMPLEMENTATION.md](history/IMPLEMENTATION.md). Всё делается
 из терминала (`make …`); в Xcode заходим только добавить Apple ID и один раз «познакомить» Mac
 с телефоном.
 
@@ -866,7 +866,7 @@ Debug/Release, локализация и происхождение framework.
 watchdog не срабатывал. Все десять выбранных исключений и 104 нормализованных
 маршрута сохранены. Часовой сеанс и переход Wi-Fi/сотовая сеть не проверялись.
 
-Публичный отчёт: [VPN-FIX-VALIDATION-2026-10-17.json](VPN-FIX-VALIDATION-2026-10-17.json).
+Публичный отчёт: [VPN-FIX-VALIDATION-2026-10-17.json](releases/VPN-FIX-VALIDATION-2026-10-17.json).
 Полные результаты: `build/logs/device-fix-result-2026-10-17.json`, подробные запросы —
 `build/logs/fixed-device-verification-2026-10-17.json`. Установленная библиотека
 имеет UUID `6BE97552-7AA3-39E8-A04E-E6B1E6E2D68C`, совпадающий с локальным

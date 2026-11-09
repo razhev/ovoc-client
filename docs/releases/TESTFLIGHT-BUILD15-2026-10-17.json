@@ -22,7 +22,7 @@
   "archiveVerified": true,
   "frameworkDSYM": "build/testflight/OVoCClient-build15.xcarchive/dSYMs/OpenVPNAdapter.framework.dSYM",
   "uploadSucceeded": true,
-  "deviceValidation": "docs/VPN-FIX-VALIDATION-2026-10-17.json",
+  "deviceValidation": "docs/releases/VPN-FIX-VALIDATION-2026-10-17.json",
   "uploadTimeMoscow": "2026-10-17 19:18:34",
   "uploadSymbolsWarning": false,
   "appId": "6816941869",

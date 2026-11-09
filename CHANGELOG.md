@@ -18,6 +18,9 @@
   `codex/fix-cloak-cancellation`.
 - В настройках GitHub включены закрытые отчёты об уязвимостях, secret scanning с блокировкой
   push, Dependabot alerts; `main` защищён от force push и удаления.
+- Опубликованы [релизы GitHub](https://github.com/razhev/ovoc-client/releases) для сборок
+  0.1.0 (13), (14) и (15). В `docs/TESTFLIGHT.md` добавлен шаг выпуска: после одобрения сборки —
+  тег на коммит архива и релиз с заметками из CHANGELOG.
 
 ## Репозиторий открыт — 2026-11-04
 

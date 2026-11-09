@@ -6,6 +6,8 @@
 
 [English](README.md) · Русский
 
+[![CI](https://github.com/razhev/ovoc-client/actions/workflows/ci.yml/badge.svg)](https://github.com/razhev/ovoc-client/actions/workflows/ci.yml)
+
 Небольшое нативное приложение для iPhone, которое подключает телефон к вашему собственному
 серверу OpenVPN over Cloak — например, поднятому через [AmneziaVPN](https://amnezia.org).
 У приложения нет своих серверов, учётных записей и аналитики. Вы добавляете ключ, оно даёт
@@ -70,13 +72,17 @@ OpenVPNAdapter от Amnezia с Cloak, скомпилированным внут�
 - [docs/DEVICE-TESTING.md](docs/DEVICE-TESTING.md) — проверка на iPhone, симптомы и что делать.
 - [docs/TESTFLIGHT.md](docs/TESTFLIGHT.md) — как сборка попадает в TestFlight.
 - [docs/SERVICE-BYPASS-CATALOG.md](docs/SERVICE-BYPASS-CATALOG.md) — откуда взяты адреса для «Без VPN».
-- [PLAN.md](PLAN.md) — исходный план и как вышло на самом деле.
+- [docs/history/](docs/history/README.md) — исходный план и как вышло на самом деле.
 
 ## Обратная связь
 
-Если что-то не подключается — заведите [issue](https://github.com/razhev/ovoc-client/issues)
+Если что-то не подключается — заведите [issue](https://github.com/razhev/ovoc-client/issues/new/choose)
 и приложите файлы с экрана «Логи». В них есть адрес сервера, но никогда нет ключа; адрес можно
-вырезать. Правки через pull request тоже приветствуются.
+вырезать. Сам ключ `vpn://` никогда не вставляйте.
+
+Правки через pull request приветствуются; [CONTRIBUTING.md](CONTRIBUTING.md#как-помочь-проекту)
+объясняет, что вписывается в проект и как его собрать и проверить. Об уязвимостях сообщайте
+закрыто, как описано в [SECURITY.md](SECURITY.md#политика-безопасности).
 
 ## Лицензия
 

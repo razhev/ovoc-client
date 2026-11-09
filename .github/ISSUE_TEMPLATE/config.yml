@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Security vulnerability · Уязвимость
+    url: https://github.com/razhev/ovoc-client/security/advisories/new
+    about: Report privately, not in a public issue · Закрытым отчётом, не публичным issue
+  - name: Server setup · Настройка сервера
+    url: https://amnezia.org
+    about: The server side is AmneziaVPN; OVoC Client has no server of its own · Сервер — это AmneziaVPN, у OVoC Client своего сервера нет

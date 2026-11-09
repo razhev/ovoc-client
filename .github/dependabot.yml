@@ -1,0 +1,8 @@
+version: 2
+updates:
+  # Действия GitHub в .github/workflows закреплены по SHA; Dependabot предлагает обновления.
+  # Swift-пакетов со сторонними зависимостями нет, фреймворк закреплён коммитами в scripts/.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly

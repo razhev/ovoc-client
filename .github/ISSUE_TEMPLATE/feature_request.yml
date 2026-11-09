@@ -1,0 +1,26 @@
+name: Feature request · Предложение
+description: An idea for the app · Идея для приложения
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Please check [what the project does not plan](https://github.com/razhev/ovoc-client/blob/main/CONTRIBUTING.md#what-the-project-is) first.
+        Сначала загляните, [что в проекте не планируется](https://github.com/razhev/ovoc-client/blob/main/CONTRIBUTING.md#что-это-за-проект).
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem · Задача
+      description: What you are trying to do and what gets in the way · Что вы хотите сделать и что мешает
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposal · Предложение
+      description: How the app could help · Как приложение могло бы помочь
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives · Другие варианты
+      description: What you tried or considered · Что пробовали или рассматривали

@@ -6,6 +6,8 @@
 
 English · [Русский](README.ru.md)
 
+[![CI](https://github.com/razhev/ovoc-client/actions/workflows/ci.yml/badge.svg)](https://github.com/razhev/ovoc-client/actions/workflows/ci.yml)
+
 A small native iOS app that connects an iPhone to your own OpenVPN over Cloak server, for example
 one set up with [AmneziaVPN](https://amnezia.org). The app has no servers, accounts or analytics
 of its own. You add your key; it gives you a Connect button.
@@ -71,13 +73,17 @@ Most documents are in Russian.
 - [docs/DEVICE-TESTING.md](docs/DEVICE-TESTING.md) — testing on an iPhone, symptoms and what to do.
 - [docs/TESTFLIGHT.md](docs/TESTFLIGHT.md) — how a build gets to TestFlight.
 - [docs/SERVICE-BYPASS-CATALOG.md](docs/SERVICE-BYPASS-CATALOG.md) — where the "Outside VPN" addresses come from.
-- [PLAN.md](PLAN.md) — the original plan and how it actually went.
+- [docs/history/](docs/history/README.md) — the original plan and how it actually went.
 
 ## Feedback
 
-If something does not connect, open an [issue](https://github.com/razhev/ovoc-client/issues)
+If something does not connect, open an [issue](https://github.com/razhev/ovoc-client/issues/new/choose)
 and attach the files from the Logs screen. They contain the server address but never the key;
-remove the address if you prefer. Pull requests are welcome too.
+remove the address if you prefer. Never paste the `vpn://` key itself.
+
+Pull requests are welcome; [CONTRIBUTING.md](CONTRIBUTING.md) explains what fits the project and
+how to build and test it. Report security problems privately, as described in
+[SECURITY.md](SECURITY.md).
 
 ## License
 

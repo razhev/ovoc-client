@@ -58,7 +58,7 @@ public struct ImportedConfig: Codable, Equatable {
         let ovpnText = try openvpn.ovpnConfigText()
         var cloakFields = try cloak.effectiveFields()
 
-        // Значения по умолчанию — как в PLAN.md.
+        // Значения по умолчанию — как в docs/history/PLAN.md.
         let dns1 = config.dns1?.isEmpty == false ? config.dns1! : "1.1.1.1"
         let dns2 = config.dns2?.isEmpty == false ? config.dns2! : "1.0.0.1"
 

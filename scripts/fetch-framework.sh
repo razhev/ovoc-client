@@ -9,7 +9,7 @@ set -euo pipefail
 # `make framework` (сборка из исходников с исправлением). Скрипт оставлен только
 # для сравнения и воспроизведения дефекта.
 #
-# Запасной источник, если релиз пропадёт (см. docs/IMPLEMENTATION.md, шаг 0.2):
+# Запасной источник, если релиз пропадёт (см. docs/history/IMPLEMENTATION.md, шаг 0.2):
 #   репозиторий amnezia-vpn/3rd-prebuilt, ветка feature/special-handshake,
 #   путь openvpn/apple/OpenVPNAdapter-ios/OpenVPNAdapter.framework
 # Крайний случай — сборка из исходников: scripts/build-framework-source.sh
